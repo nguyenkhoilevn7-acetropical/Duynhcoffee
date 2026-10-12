@@ -280,7 +280,7 @@ function removeVietnameseAccents(str) {
 }
 
 function verifyReceiptTextServer(ocrText, expectedAmount, expectedHolder = 'ĐÀO KHÔI NGUYÊN', expectedAccount = '9911989890') {
-  if (!ocrText || typeof ocrText !== 'string' || ocrText.trim().length < 10) {
+  if (!ocrText || typeof ocrText !== 'string' || ocrText.trim().length < 8) {
     return {
       isValid: false,
       reason: 'Ảnh quá mờ hoặc không nhận diện được nội dung chữ trên biên lai chuyển tiền.'
@@ -289,17 +289,20 @@ function verifyReceiptTextServer(ocrText, expectedAmount, expectedHolder = 'ĐÀ
 
   const cleanText = removeVietnameseAccents(ocrText.toUpperCase());
 
-  // 1. Kiểm tra bằng chứng giao dịch ngân hàng
+  // 1. Kiểm tra bằng chứng giao dịch ngân hàng (Hỗ trợ ảnh chụp camera / landscape / màn hình)
   const bankKeywords = [
     'CHUYEN TIEN', 'CHUYEN KHOAN', 'GIAO DICH', 'THANH CONG', 'HOAN TAT',
     'BIEN LAI', 'HOA DON', 'THU HUONG', 'NGUOI NHAN', 'SO TAI KHOAN', 'TK THU HUONG',
     'VIETCOMBANK', 'VCB', 'MBBANK', 'MB BANK', 'TECHCOMBANK', 'ACB', 'BIDV', 'VIETINBANK',
-    'MOMO', 'ZALOPAY', 'NAPAS', 'VNPAY', 'SUCCESS', 'TRANSFER', 'SUCCESSFUL', 'TIEN CHUYEN'
+    'MOMO', 'ZALOPAY', 'NAPAS', 'VNPAY', 'SUCCESS', 'TRANSFER', 'SUCCESSFUL', 'TIEN CHUYEN',
+    'DA CHUYEN', 'GIAO DICH HOP LE', 'CHUYEN KHOAN DEN', 'MA GD', 'SO THAM CHIEU'
   ];
   const foundKeywords = bankKeywords.filter(kw => cleanText.includes(kw));
-  const hasBankEvidence = (foundKeywords.length >= 2) || 
-    cleanText.includes('THANH CONG') || cleanText.includes('CHUYEN TIEN') || 
-    cleanText.includes('GIAO DICH') || cleanText.includes('VIETCOMBANK');
+  const hasBankEvidence = (foundKeywords.length >= 1) && 
+    (cleanText.includes('THANH CONG') || cleanText.includes('CHUYEN TIEN') || 
+     cleanText.includes('CHUYEN KHOAN') || cleanText.includes('GIAO DICH') || 
+     cleanText.includes('VIETCOMBANK') || cleanText.includes('VCB') || 
+     cleanText.includes('THU HUONG') || cleanText.includes('SUCCESS'));
 
   if (!hasBankEvidence) {
     return {
@@ -317,7 +320,7 @@ function verifyReceiptTextServer(ocrText, expectedAmount, expectedHolder = 'ĐÀ
     hasHolderMatch = true;
   } else if (holderParts.length >= 2 && holderParts.every(p => cleanText.includes(p))) {
     hasHolderMatch = true;
-  } else if (cleanText.includes('DAO KHOI NGUYEN') || cleanText.includes('KHOI NGUYEN')) {
+  } else if (cleanText.includes('DAO KHOI NGUYEN') || cleanText.includes('KHOI NGUYEN') || cleanText.includes('DAO KHOI')) {
     hasHolderMatch = true;
   }
 
@@ -331,7 +334,7 @@ function verifyReceiptTextServer(ocrText, expectedAmount, expectedHolder = 'ĐÀ
     };
   }
 
-  // 3. Kiểm tra số tiền chuyển
+  // 3. Kiểm tra số tiền chuyển (Hỗ trợ lỗi đọc camera: O thay vì 0, định dạng phân cách)
   const amtInt = parseInt(expectedAmount, 10);
   const amtStr = amtInt.toString();
   const amtDot = amtInt.toLocaleString('de-DE'); // 45.000
@@ -341,9 +344,10 @@ function verifyReceiptTextServer(ocrText, expectedAmount, expectedHolder = 'ĐÀ
   if (cleanText.includes(amtStr) || cleanText.includes(amtDot) || cleanText.includes(amtComma)) {
     hasAmountMatch = true;
   } else {
-    const numCandidates = cleanText.match(/[\d\.\,]{4,}/g) || [];
-    for (const cand of numCandidates) {
-      const pureDigits = cand.replace(/[^\d]/g, '');
+    const candidates = cleanText.match(/[\d\.\,\-OoQq]{4,}/g) || [];
+    for (const cand of candidates) {
+      const candFixed = cand.replace(/[OoQq]/g, '0');
+      const pureDigits = candFixed.replace(/[^\d]/g, '');
       if (pureDigits === amtStr) {
         hasAmountMatch = true;
         break;
