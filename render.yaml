@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: duynhcoffee
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: ""
+    startCommand: node server.js
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: NODE_ENV
+        value: production
