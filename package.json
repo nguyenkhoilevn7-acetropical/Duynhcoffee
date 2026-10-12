@@ -1,7 +1,7 @@
 {
   "name": "duynh-tea-coffee",
   "version": "1.0.0",
-  "description": "Hệ Thống Bán Hàng Online & POS Đuỷnh Tea & Coffee (Zero-Dependency Node.js)",
+  "description": "He thong Dat Mon QR & POS Duynh Tea & Coffee",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
