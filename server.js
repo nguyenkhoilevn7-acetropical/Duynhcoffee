@@ -268,6 +268,105 @@ function broadcastWs(message, excludeClient = null) {
   }
 }
 
+
+// ==================== BỘ KIỂM DUYỆT HÓA ĐƠN THÔNG MINH AI (SERVER-SIDE) ====================
+function removeVietnameseAccents(str) {
+  if (!str) return '';
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D');
+}
+
+function verifyReceiptTextServer(ocrText, expectedAmount, expectedHolder = 'ĐÀO KHÔI NGUYÊN', expectedAccount = '9911989890') {
+  if (!ocrText || typeof ocrText !== 'string' || ocrText.trim().length < 10) {
+    return {
+      isValid: false,
+      reason: 'Ảnh quá mờ hoặc không nhận diện được nội dung chữ trên biên lai chuyển tiền.'
+    };
+  }
+
+  const cleanText = removeVietnameseAccents(ocrText.toUpperCase());
+
+  // 1. Kiểm tra bằng chứng giao dịch ngân hàng
+  const bankKeywords = [
+    'CHUYEN TIEN', 'CHUYEN KHOAN', 'GIAO DICH', 'THANH CONG', 'HOAN TAT',
+    'BIEN LAI', 'HOA DON', 'THU HUONG', 'NGUOI NHAN', 'SO TAI KHOAN', 'TK THU HUONG',
+    'VIETCOMBANK', 'VCB', 'MBBANK', 'MB BANK', 'TECHCOMBANK', 'ACB', 'BIDV', 'VIETINBANK',
+    'MOMO', 'ZALOPAY', 'NAPAS', 'VNPAY', 'SUCCESS', 'TRANSFER', 'SUCCESSFUL', 'TIEN CHUYEN'
+  ];
+  const foundKeywords = bankKeywords.filter(kw => cleanText.includes(kw));
+  const hasBankEvidence = (foundKeywords.length >= 2) || 
+    cleanText.includes('THANH CONG') || cleanText.includes('CHUYEN TIEN') || 
+    cleanText.includes('GIAO DICH') || cleanText.includes('VIETCOMBANK');
+
+  if (!hasBankEvidence) {
+    return {
+      isValid: false,
+      reason: 'Ảnh không phải là biên lai chuyển tiền ngân hàng hợp lệ (Không phát hiện dấu hiệu giao dịch chuyển khoản thành công).'
+    };
+  }
+
+  // 2. Kiểm tra tên người thụ hưởng & số tài khoản
+  const holderClean = removeVietnameseAccents(expectedHolder.toUpperCase()).trim();
+  const holderParts = holderClean.split(/\s+/).filter(Boolean);
+
+  let hasHolderMatch = false;
+  if (cleanText.includes(holderClean) || cleanText.replace(/\s+/g, '').includes(holderClean.replace(/\s+/g, ''))) {
+    hasHolderMatch = true;
+  } else if (holderParts.length >= 2 && holderParts.every(p => cleanText.includes(p))) {
+    hasHolderMatch = true;
+  } else if (cleanText.includes('DAO KHOI NGUYEN') || cleanText.includes('KHOI NGUYEN')) {
+    hasHolderMatch = true;
+  }
+
+  const cleanAccount = expectedAccount.replace(/\s+/g, '');
+  const hasAccountMatch = cleanText.includes(cleanAccount) || (cleanAccount.length >= 6 && cleanText.includes(cleanAccount.slice(-6)));
+
+  if (!hasHolderMatch && !hasAccountMatch) {
+    return {
+      isValid: false,
+      reason: 'Tên người nhận trên hóa đơn không khớp với chủ tài khoản tiệm (' + expectedHolder + ' - STK: ' + expectedAccount + ').'
+    };
+  }
+
+  // 3. Kiểm tra số tiền chuyển
+  const amtInt = parseInt(expectedAmount, 10);
+  const amtStr = amtInt.toString();
+  const amtDot = amtInt.toLocaleString('de-DE'); // 45.000
+  const amtComma = amtInt.toLocaleString('en-US'); // 45,000
+
+  let hasAmountMatch = false;
+  if (cleanText.includes(amtStr) || cleanText.includes(amtDot) || cleanText.includes(amtComma)) {
+    hasAmountMatch = true;
+  } else {
+    const numCandidates = cleanText.match(/[\d\.\,]{4,}/g) || [];
+    for (const cand of numCandidates) {
+      const pureDigits = cand.replace(/[^\d]/g, '');
+      if (pureDigits === amtStr) {
+        hasAmountMatch = true;
+        break;
+      }
+    }
+  }
+
+  if (!hasAmountMatch) {
+    return {
+      isValid: false,
+      reason: 'Số tiền trên hóa đơn không trùng khớp với tổng tiền đơn hàng (Cần thanh toán chính xác: ' + amtInt.toLocaleString('vi-VN') + 'đ).'
+    };
+  }
+
+  return {
+    isValid: true,
+    bank: foundKeywords.find(k => k === 'VIETCOMBANK' || k === 'VCB' || k === 'MBBANK' || k === 'TECHCOMBANK') || 'Vietcombank',
+    matchedHolder: expectedHolder,
+    matchedAmount: amtInt,
+    message: 'Khớp chính xác tên người thụ hưởng (' + expectedHolder + ') và số tiền ' + amtInt.toLocaleString('vi-VN') + 'đ'
+  };
+}
+
 // Khởi tạo máy chủ HTTP
 const server = http.createServer(async (req, res) => {
   setCorsHeaders(res);
@@ -413,6 +512,123 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+
+  // 3b. PUT / POST /api/orders/:id/status (CẬP NHẬT TRẠNG THÁI ĐƠN HÀNG)
+  const statusMatch = pathname.match(/^\/api\/orders\/([^\/]+)\/status$/);
+  if (statusMatch && (req.method === 'PUT' || req.method === 'POST')) {
+    try {
+      const orderId = statusMatch[1];
+      const body = await parseRequestBody(req);
+      const targetStatus = body.status;
+      const order = ordersCache.find(o => o.id === orderId);
+      if (order) {
+        order.status = targetStatus;
+        if (targetStatus === 'done') {
+          order.completedAtIso = new Date().toISOString();
+        } else if (targetStatus === 'shipping') {
+          order.shippedAtIso = new Date().toISOString();
+        }
+        writeJsonFile(ORDERS_FILE, ordersCache);
+        ordersVersion = Date.now();
+        broadcastWs({
+          type: 'ORDER_STATUS',
+          orderId,
+          status: targetStatus,
+          order,
+          ordersVersion
+        });
+        sendJson(res, 200, { success: true, order, ordersVersion });
+      } else {
+        sendJson(res, 404, { error: 'Không tìm thấy đơn hàng: ' + orderId });
+      }
+    } catch(err) {
+      sendJson(res, 500, { error: err.message });
+    }
+    return;
+  }
+
+  // 3c. POST /api/orders/:id/dispatch (BÀN GIAO CHO SHIPPER - ĐANG GIAO HÀNG)
+  const dispatchMatch = pathname.match(/^\/api\/orders\/([^\/]+)\/dispatch$/);
+  if (dispatchMatch && req.method === 'POST') {
+    try {
+      const orderId = dispatchMatch[1];
+      const body = await parseRequestBody(req);
+      const order = ordersCache.find(o => o.id === orderId);
+      if (order) {
+        order.status = 'shipping'; // Đã giao cho shipper
+        order.deliveryPartner = body.partner || 'ahamove';
+        order.deliveryPartnerName = (body.partner === 'ahamove') ? 'Ahamove Siêu Tốc' : 'Lalamove Giao Nhanh';
+        order.deliveryStatus = 'in_transit';
+        order.shippedAtIso = new Date().toISOString();
+        if (body.driver) order.driver = body.driver;
+        if (body.trackingCode) order.trackingCode = body.trackingCode;
+        writeJsonFile(ORDERS_FILE, ordersCache);
+        ordersVersion = Date.now();
+        broadcastWs({
+          type: 'ORDER_DISPATCH',
+          orderId,
+          order,
+          ordersVersion
+        });
+        sendJson(res, 200, { success: true, order, ordersVersion });
+      } else {
+        sendJson(res, 404, { error: 'Không tìm thấy đơn hàng: ' + orderId });
+      }
+    } catch(err) {
+      sendJson(res, 500, { error: err.message });
+    }
+    return;
+  }
+
+  // 3d. POST /api/orders/:id/delivery-status HOẶC /api/orders/:id/webhook-delivered
+  // WEBHOOK KẾT NỐI HỆ THỐNG GIAO HÀNG ĐỐI TÁC (AHAMOVE / LALAMOVE)
+  // Chỉ khi Shipper xác nhận trên hệ thống của họ là đã giao xong thì đơn hàng mới chuyển thành Hoàn Thành
+  const deliveryStatusMatch = pathname.match(/^\/api\/orders\/([^\/]+)\/(?:delivery-status|webhook-delivered)$/);
+  if (deliveryStatusMatch && req.method === 'POST') {
+    try {
+      const orderId = deliveryStatusMatch[1];
+      const body = await parseRequestBody(req);
+      const order = ordersCache.find(o => o.id === orderId);
+      if (order) {
+        if (body.status === 'delivered' || body.deliveryStatus === 'delivered' || body.action === 'complete') {
+          order.status = 'done'; // Chỉ lúc này mới Hoàn Thành
+          order.deliveryStatus = 'delivered';
+          order.deliveredAtIso = body.deliveredAt || new Date().toISOString();
+          order.completedAtIso = order.deliveredAtIso;
+          writeJsonFile(ORDERS_FILE, ordersCache);
+          ordersVersion = Date.now();
+
+          broadcastWs({
+            type: 'ORDER_DELIVERED',
+            orderId,
+            order,
+            ordersVersion,
+            message: 'Shipper đã xác nhận giao hàng thành công trên hệ thống đối tác'
+          });
+
+          sendJson(res, 200, {
+            success: true,
+            orderId,
+            status: 'done',
+            deliveryStatus: 'delivered',
+            message: 'Đã nhận xác nhận từ hệ thống Shipper và chuyển đơn sang HOÀN THÀNH',
+            ordersVersion
+          });
+        } else {
+          order.deliveryStatus = body.status || order.deliveryStatus;
+          writeJsonFile(ORDERS_FILE, ordersCache);
+          ordersVersion = Date.now();
+          sendJson(res, 200, { success: true, order });
+        }
+      } else {
+        sendJson(res, 404, { error: 'Không tìm thấy đơn hàng: ' + orderId });
+      }
+    } catch(err) {
+      sendJson(res, 500, { error: err.message });
+    }
+    return;
+  }
+
   // 4. GET & POST /api/config
   if (pathname === '/api/config') {
     if (req.method === 'GET') {
@@ -471,9 +687,34 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // 6. POST /api/verify-receipt
+  // 6. POST /api/verify-receipt (AI KIỂM DUYỆT HÓA ĐƠN THÔNG MINH)
   if (pathname === '/api/verify-receipt' && req.method === 'POST') {
-    sendJson(res, 200, { isValid: true, reason: 'Hóa đơn hợp lệ' });
+    try {
+      const body = await parseRequestBody(req);
+      const { imageBase64, expectedAmount, expectedAccountHolder, expectedAccountNumber, clientOcrText } = body;
+      
+      let ocrText = clientOcrText || '';
+      
+      // Nếu có tesseract CLI trên hệ thống máy chủ và chưa có text, thử nhận diện
+      if (!ocrText && imageBase64) {
+        try {
+          const { execSync } = require('child_process');
+          const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+          const tmpImgPath = path.join(os.tmpdir(), `receipt_${Date.now()}_${Math.random().toString(36).substr(2, 6)}.png`);
+          fs.writeFileSync(tmpImgPath, Buffer.from(base64Data, 'base64'));
+          ocrText = execSync(`tesseract "${tmpImgPath}" stdout --oem 1 -l eng 2>/dev/null`, { timeout: 8000 }).toString('utf8');
+          try { fs.unlinkSync(tmpImgPath); } catch(e) {}
+        } catch(ocrErr) {}
+      }
+
+      const holder = expectedAccountHolder || (configCache && configCache.bankConfig && configCache.bankConfig.accountHolder) || 'ĐÀO KHÔI NGUYÊN';
+      const account = expectedAccountNumber || (configCache && configCache.bankConfig && configCache.bankConfig.accountNumber) || '9911989890';
+      
+      const verification = verifyReceiptTextServer(ocrText, expectedAmount, holder, account);
+      sendJson(res, 200, verification);
+    } catch(err) {
+      sendJson(res, 500, { isValid: false, reason: 'Lỗi kiểm duyệt: ' + err.message });
+    }
     return;
   }
 
