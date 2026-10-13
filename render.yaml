@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: duynh-coffee-server
+    name: duynh-server
     env: node
     plan: free
     buildCommand: npm install
