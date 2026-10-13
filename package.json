@@ -1,7 +1,7 @@
 {
-  "name": "duynh-tea-coffee-pos",
+  "name": "duynh-coffee-server",
   "version": "1.0.0",
-  "description": "Đuỷnh Tea & Coffee Cloud Server for Render.com",
+  "description": "Production Node.js Server for Đuỷnh Tea & Coffee POS",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
