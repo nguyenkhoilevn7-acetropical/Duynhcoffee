@@ -1,13 +1,10 @@
 services:
   - type: web
-    name: duynhcoffee
-    runtime: node
+    name: duynh-coffee-server
+    env: node
     plan: free
-    region: singapore
-    buildCommand: ""
+    buildCommand: npm install
     startCommand: node server.js
     envVars:
-      - key: PORT
-        value: 10000
-      - key: NODE_ENV
-        value: production
+      - key: NODE_VERSION
+        value: 18.20.4
