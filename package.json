@@ -1,12 +1,14 @@
 {
-  "name": "duynh-tea-coffee",
+  "name": "duynh-tea-coffee-pos",
   "version": "1.0.0",
-  "description": "He thong POS Duynh Tea & Coffee - Ngon Den Giot Cuoi Cung",
+  "description": "Đuỷnh Tea & Coffee Cloud Server for Render.com",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "dependencies": {},
+  "dependencies": {
+    "ws": "^8.16.0"
+  },
   "engines": {
     "node": ">=18.0.0"
   }
