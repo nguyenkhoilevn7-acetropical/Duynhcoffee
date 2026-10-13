@@ -1,5 +1,5 @@
 {
-  "name": "duynh-coffee-server",
+  "name": "duynh-server",
   "version": "1.0.0",
   "description": "Production Node.js Server for Đuỷnh Tea & Coffee POS",
   "main": "server.js",
