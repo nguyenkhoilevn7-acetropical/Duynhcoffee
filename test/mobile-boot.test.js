@@ -33,3 +33,31 @@ test('product cards defer image decoding below the viewport', () => {
   s.renderCustomerProducts();
   assert.match(grid.innerHTML, /class="product-img" loading="lazy" decoding="async"/);
 });
+
+test('initial sync uses one automatic WebSocket snapshot, with bounded HTTP fallback', () => {
+  for (const receivesHandshake of [true,false]) {
+    const timers = new Map();let next=0,requests=0,locals=0;
+    const s={console:{log(){}},isInitialLoadDone:false,pollIntervalTimer:null,
+      initWebSocketSync(){},initLocalTabSync(){locals++;},pullFullSyncFromServer(){requests++;},
+      setTimeout(fn,ms){timers.set(++next,{fn,ms});return next;},clearTimeout(id){timers.delete(id);},
+      setInterval(fn,ms){timers.set(++next,{fn,ms});return next;},clearInterval(id){timers.delete(id);}};
+    vm.createContext(s);
+    vm.runInContext(html.slice(html.indexOf('    let initialSyncFallbackTimer'),html.indexOf('    const DEFAULT_INITIAL_MENU')),s);
+    s.initRealtimeCloudMesh();assert.equal(requests,0);assert.equal(locals,1);
+    s.isInitialLoadDone=receivesHandshake;
+    [...timers.values()].find(t=>t.ms===1500).fn();assert.equal(requests,receivesHandshake?0:1);
+    [...timers.values()].find(t=>t.ms===6500).fn();assert.equal(requests,receivesHandshake?1:2);
+  }
+});
+
+test('WebSocket connection accepts server handshake without requesting duplicate full data', () => {
+  let socket,received=0;const sent=[];
+  class WebSocket {constructor(){socket=this;this.readyState=1;}send(data){sent.push(JSON.parse(data));}}
+  const s={WebSocket,wsClient:null,wsPingTimer:null,wsReconnectTimer:null,console:{log(){},warn(){}},
+    getCloudWsUrl:()=> 'wss://example.test',updateCloudSyncIndicator(){},clearTimeout(){},clearInterval(){},
+    setInterval(){return 1;},setTimeout(){return 1;},handleIncomingMeshPayload(p){if(p.type==='HANDSHAKE') received++;}};
+  vm.createContext(s);
+  vm.runInContext(html.slice(html.indexOf('    function initWebSocketSync()'),html.indexOf('    // ==================== MULTI-TAB')),s);
+  s.initWebSocketSync();socket.onopen();socket.onmessage({data:JSON.stringify({type:'HANDSHAKE',menu:[{id:1}]})});
+  assert.equal(received,1);assert.equal(sent.length,0);
+});

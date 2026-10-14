@@ -3127,24 +3127,11 @@ body {
       -webkit-overflow-scrolling: touch !important;
       overscroll-behavior-y: none;
     }
-    header {
-      transform: translateZ(0);
-      -webkit-transform: translateZ(0);
-      backface-visibility: hidden;
-    }
     .products-grid {
       contain: layout style;
     }
     .product-card {
-      transform: translateZ(0) !important;
-      -webkit-transform: translateZ(0) !important;
-      backface-visibility: hidden !important;
-      -webkit-backface-visibility: hidden !important;
       contain: content;
-    }
-    .product-img {
-      transform: translateZ(0);
-      -webkit-transform: translateZ(0);
     }
 
     /* ==================== AI SCANNER & RECEIPT VERIFICATION ANIMATION ==================== */
@@ -5604,13 +5591,8 @@ body {
             wsReconnectTimer = null;
           }
 
-          try {
-            wsClient.send(JSON.stringify({
-              type: 'REQUEST_FULL_SYNC',
-              deviceId: LOCAL_DEVICE_ID,
-              senderId: LOCAL_DEVICE_ID
-            }));
-          } catch(e) {}
+          // The server sends HANDSHAKE automatically on every connection.
+          // Do not request another multi-megabyte snapshot here.
 
           if (wsPingTimer) clearInterval(wsPingTimer);
           wsPingTimer = setInterval(() => {
@@ -6074,10 +6056,17 @@ body {
       pullFullSyncFromServer();
     }
 
+    let initialSyncFallbackTimer = null;
     function initRealtimeCloudMesh() {
       initWebSocketSync();
       initLocalTabSync();
-      pullFullSyncFromServer();
+      // Give the automatic WebSocket snapshot a short head start.
+      // HTTP remains available when WebSocket cannot deliver initial data.
+      if (initialSyncFallbackTimer) clearTimeout(initialSyncFallbackTimer);
+      initialSyncFallbackTimer = setTimeout(() => {
+        initialSyncFallbackTimer = null;
+        if (!isInitialLoadDone) pullFullSyncFromServer();
+      }, 1500);
 
       if (pollIntervalTimer) clearInterval(pollIntervalTimer);
       pollIntervalTimer = setInterval(pullFullSyncFromServer, 6500);
