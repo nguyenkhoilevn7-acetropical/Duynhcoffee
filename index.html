@@ -6873,7 +6873,7 @@ function toggleKitchenSoundAlert() {
       const url = URL.createObjectURL(file);
       const image = new Image();
       image.onload = () => {
-        const scale = Math.min(1, 1600 / Math.max(image.width, image.height));
+        const scale = Math.min(1, 1000 / Math.max(image.width, image.height));
         const canvas = document.createElement('canvas');
         canvas.width = Math.max(1, Math.round(image.width * scale));
         canvas.height = Math.max(1, Math.round(image.height * scale));
@@ -6887,7 +6887,7 @@ function toggleKitchenSoundAlert() {
 
     async function runClientVerifyData(base64Str, expAmt, onProgressCallback, order = null) {
       const controller = new AbortController();
-      const deadline = setTimeout(() => controller.abort(), 8000);
+      const deadline = setTimeout(() => controller.abort(), 20000);
       try {
         if (onProgressCallback) onProgressCallback(35, 'Máy chủ đang đọc tên người nhận và số tiền...');
         const items = order ? order.items.map(i => ({ id: i.id, qty: i.qty })) : cart.map(c => ({ id: c.item.id, qty: c.qty }));
@@ -6899,7 +6899,7 @@ function toggleKitchenSoundAlert() {
         if (!response.ok) throw new Error(result.error || result.reason || 'Chưa xác minh được biên lai');
         return result;
       } catch (error) {
-        return { isValid: false, matchedRecipient: false, matchedAmount: false, reason: error.name === 'AbortError' ? 'Kết nối quét đang chậm. Vui lòng thử lại với ảnh biên lai gốc.' : error.message };
+        return { isValid: false, verificationUnavailable: true, reason: error.name === 'AbortError' ? 'Kết nối quét đang chậm. Chưa thể xác minh biên lai; vui lòng thử lại.' : error.message };
       } finally { clearTimeout(deadline); }
     }
 
@@ -7038,6 +7038,21 @@ function toggleKitchenSoundAlert() {
           const reasonMsg = (resObj && resObj.reason)
             ? resObj.reason
             : `Hình ảnh không khớp người thụ hưởng (${storeConfig.bankConfig?.accountHolder}) hoặc không khớp số tiền (${formatMoney(beverageTotal)})!`;
+
+          if (resObj && resObj.verificationUnavailable) {
+            if (overlay) overlay.style.display = 'none';
+            if (laserBeam) laserBeam.style.display = 'none';
+            if (reticleLabel) reticleLabel.textContent = 'CHƯA XÁC MINH ĐƯỢC';
+            if (tickerEl) tickerEl.textContent = 'Chưa xác minh được biên lai — vui lòng thử lại.';
+            if (statusBox) {
+              statusBox.style.display = 'block';
+              statusBox.className = 'smart-validation-status error';
+              statusBox.textContent = reasonMsg;
+            }
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'CHƯA XÁC MINH ĐƯỢC — VUI LÒNG QUÉT LẠI'; }
+            showSmsToast('Chưa xác minh được biên lai', reasonMsg);
+            return;
+          }
 
           const layoutOk = !!(resObj && resObj.isReceiptLayout); // retained for compatibility; not used to approve/reject
           const recipientOk = !!(resObj && resObj.matchedRecipient);
@@ -9187,6 +9202,10 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
           `;
         }
         playSuccessChime();
+      } else if (res && res.verificationUnavailable) {
+        if (laser) laser.style.display = 'none';
+        if (reticleLabel) reticleLabel.textContent = 'CHƯA XÁC MINH ĐƯỢC';
+        if (resultBox) resultBox.textContent = res.reason;
       } else {
         if (laser) laser.className = 'ai-laser-beam error';
         if (reticleLabel) reticleLabel.textContent = '🚫 [100%] ẢNH SAI PHẠM!';

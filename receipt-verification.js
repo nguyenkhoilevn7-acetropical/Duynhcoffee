@@ -121,7 +121,7 @@ function createReceiptVerifier({ readState, recognize, now = Date.now }) {
     busy = true;
     let timer;
     try {
-      const text = await Promise.race([ocr(image), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Chưa đọc xong trong 5 giây. Hãy tải ảnh biên lai gốc rõ nét hơn và thử lại.')), 5000); })]);
+      const text = await Promise.race([ocr(image), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Máy chủ chưa đọc xong biên lai. Chưa thể kết luận số tiền hoặc tên người nhận sai; vui lòng thử lại.')), 15000); })]);
       const result = compareReceipt(text, amount, holder);
       if (result.isValid) {
         const encoded = Buffer.from(JSON.stringify({ image: hash(image), amount, holder: normalize(holder), expires: now() + 15 * 60000 })).toString('base64url');
@@ -132,7 +132,7 @@ function createReceiptVerifier({ readState, recognize, now = Date.now }) {
       workerGeneration++;
       workerReady = null;
       if (worker) { const oldWorker = worker; worker = null; oldWorker.terminate().catch(() => {}); }
-      throw new Error(recognize || error.message.includes('5 giây') ? error.message : 'Không đọc được biên lai trên máy chủ. Vui lòng thử ảnh rõ nét hơn');
+      throw new Error(recognize || error.message.includes('chưa đọc xong') ? error.message : 'Không đọc được biên lai trên máy chủ. Vui lòng thử ảnh rõ nét hơn');
     } finally { clearTimeout(timer); busy = false; }
   }
   function assertVerified(order) {

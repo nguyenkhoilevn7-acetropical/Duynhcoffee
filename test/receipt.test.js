@@ -51,14 +51,20 @@ test('fails closed on OCR outage, bad images and disabled discounts', async () =
   await assert.rejects(service.verify({image:'data:image/svg+xml;base64,YWJj',items:[{id:1,qty:1}]}));
   assert.throws(()=>calculateAmount([{id:1,qty:1}],state.menu,state.discounts,'OFF'));
 });
-test('OCR deadline returns within five seconds without issuing verification proof', async () => {
+test('OCR deadline reports unavailable, allows retry and does not issue verification proof', async () => {
   const state={menu:[{id:1,price:45000}],config:{bankConfig:{accountHolder:'DAO KHOI NGUYEN'}},discounts:[]};
   let stall=true;
   const service=createReceiptVerifier({readState:()=>state,recognize:()=>stall ? new Promise(()=>{}) : Promise.resolve(text)});
   const body={image:'data:image/png;base64,YWJj',items:[{id:1,qty:1}]};
   const started=Date.now();
-  await assert.rejects(service.verify(body), /5 giây/);
-  assert.ok(Date.now()-started < 5500);
+  await assert.rejects(service.verify(body), /Chưa thể kết luận/);
+  assert.ok(Date.now()-started < 15500);
   stall=false;
   assert.equal((await service.verify(body)).isValid,true);
+});
+test('wallet OCR text reads the actual 45000 amount and ignores the balance notification', () => {
+  const receipt='Thông báo VCB Số dư TK VCB 9911989890 -45,000 VND\nGiao dich thanh cong\n45.000d\nGiao dich 151227712371 >\nThời gian thanh toán 23:45 - 11/10/2026\nBiên lai chuyển tiền\nNgười nhận DAO KHOI NGUYEN\nSố thẻ/TK 9911989890\nNgân hàng Vietcombank\nTin nhắn ORD1005';
+  assert.equal(compareReceipt(receipt,45000,'DAO KHOI NGUYEN').isValid,true);
+  assert.equal(compareReceipt(receipt.replace('45.000d','46.000d'),45000,'DAO KHOI NGUYEN').isValid,false);
+  assert.equal(compareReceipt(receipt,45000,'DAO KHUE NGUYEN').isValid,false);
 });
