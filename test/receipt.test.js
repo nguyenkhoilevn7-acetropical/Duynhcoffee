@@ -13,6 +13,21 @@ test('does not approve sender name or scattered/out of order recipient tokens', 
   assert.equal(compareReceipt(text.replace('ĐÀO KHÔI NGUYÊN','NGUYEN KHOI DAO'),45000,'DAO KHOI NGUYEN').isValid,false);
   assert.equal(compareReceipt('DAO\nKHOI\nNGUYEN\n45000',45000,'DAO KHOI NGUYEN').isValid,false);
 });
+test('reads wallet success amounts and OCR currency/spacing variants', () => {
+  for (const money of ['45.000đ', '45.000d', '45 . 000 đ', '45,000.00 VND', '45\u202f000 ₫', '45000 VND']) {
+    const receipt = `Giao dịch thành công\n${money}\nNgười nhận: DAO KHOI NGUYEN\nSố dư 900.000đ`;
+    assert.equal(compareReceipt(receipt, 45000, 'DAO KHOI NGUYEN').isValid, true, money);
+  }
+  assert.equal(compareReceipt('45.000d\nNgười nhận: DAO KHOI NGUYEN', 45000, 'DAO KHOI NGUYEN').isValid, true);
+});
+test('does not take matching balances, fees or reference numbers as payment', () => {
+  for (const receipt of [
+    'Giao dịch thành công\n145.000đ\nSố dư 45.000đ',
+    'Số tiền: 145.000đ\nPhí: 45.000đ',
+    'Số dư 45.000đ\nMã giao dịch 45000',
+    'Tin nhắn ORD45000\nSố tài khoản 45000'
+  ]) assert.equal(compareReceipt(receipt + '\nNgười nhận: DAO KHOI NGUYEN', 45000, 'DAO KHOI NGUYEN').isValid, false);
+});
 test('proof binds server prices, image, recipient, cart total and expiry', async () => {
   const state={menu:[{id:1,price:45000}],config:{bankConfig:{accountHolder:'DAO KHOI NGUYEN'}},discounts:[]};
   let clock=1000;

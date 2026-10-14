@@ -28,16 +28,36 @@ function compareReceipt(text, amount, holder) {
       if (rawLines[i + 1] && !/\d/.test(rawLines[i])) moneyLines.push(rawLines[i + 1]);
     }
   }
-  if (!moneyLines.length) moneyLines = rawLines.filter(s => /(?:VND|VNĐ|₫|đ|dong)(?:\s|$)/i.test(s));
-  const detected = moneyLines.flatMap(line => (line.match(/\d+(?:(?:[.,]|[ \t])\d{3})*(?:[.,]00)?/g) || []).map(s => {
+  // Wallet receipts often put the amount directly below the success heading,
+  // without a "Số tiền" label. Prefer it over balances, fees or notifications.
+  if (!moneyLines.length) {
+    for (let i = 0; i < rawLines.length; i++) {
+      if (/\b(?:GIAO DICH THANH CONG|CHUYEN TIEN THANH CONG|TRANSFER SUCCESSFUL|SUCCESSFUL TRANSFER)\b/.test(normalize(rawLines[i]))) {
+        moneyLines.push(rawLines[i]);
+        if (rawLines[i + 1]) moneyLines.push(rawLines[i + 1]);
+        break;
+      }
+    }
+  }
+  const numberPattern = /\d+(?:(?:[.,]|[ \t])\d{3})*(?:[.,]00)?/g;
+  const currencyPattern = /(\d+(?:(?:[.,]|[ \t])\d{3})*(?:[.,]00)?)\s*(?:VND|VNĐ|₫|đ|d|dong)(?=\s|$|[)])/gi;
+  const cleanMoneyLine = line => line.replace(/\u00a0|\u202f/g, ' ').replace(/(\d)\s*([.,])\s*(?=\d)/g, '$1$2');
+  let tokens;
+  if (moneyLines.length) {
+    tokens = moneyLines.flatMap(line => cleanMoneyLine(line).match(numberPattern) || []);
+  } else {
+    tokens = rawLines.filter(line => !/\b(?:SO DU|BALANCE|PHI|FEE|THONG BAO|NOI DUNG|TIN NHAN)\b/.test(normalize(line)))
+      .flatMap(line => Array.from(cleanMoneyLine(line).matchAll(currencyPattern), match => match[1]));
+  }
+  const detected = tokens.map(s => {
     // VND banks can display a trailing decimal .00 or ,00.
     const integer = s.replace(/[.,]00$/, '');
     return Number(integer.replace(/[^0-9]/g, ''));
-  }));
+  });
   const matchedAmount = Number.isSafeInteger(amount) && amount > 0 && detected.includes(amount);
   return { isValid: matchedRecipient && matchedAmount, matchedRecipient, matchedAmount,
     matchedHolder: matchedRecipient ? holder : null, detectedAmount: matchedAmount ? amount : null,
-    reason: !matchedRecipient ? 'Không đọc được đúng tên người nhận đã cấu hình trên biên lai.' : !matchedAmount ? 'Số tiền trên biên lai không khớp tiền nước cần thanh toán.' : '' };
+    reason: !matchedRecipient ? 'Không đọc được đúng tên người nhận đã cấu hình trên biên lai.' : !matchedAmount ? (detected.length ? 'Số tiền trên biên lai không khớp tiền nước cần thanh toán.' : 'Chưa đọc được số tiền trên biên lai. Hãy tải ảnh gốc rõ nét hơn.') : '' };
 }
 function calculateAmount(items, menu, discounts, code) {
   if (!Array.isArray(items) || !items.length || items.length > 100) throw new Error('Giỏ hàng không hợp lệ');
