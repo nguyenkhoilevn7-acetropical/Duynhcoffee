@@ -6898,13 +6898,14 @@ function toggleKitchenSoundAlert() {
         } finally { clearTimeout(timeout); }
       }
       try {
-        if (onProgressCallback) onProgressCallback(35, 'Đang đọc tên người nhận và số tiền...');
+        if (onProgressCallback) onProgressCallback(25, 'Đang gửi ảnh biên lai...');
         const items = order ? order.items.map(i => ({ id: i.id, qty: i.qty })) : cart.map(c => ({ id: c.item.id, qty: c.qty }));
         let job = await request('/api/receipt-scans', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: base64Str, items, discountCode: order ? order.discount?.code : activeDiscount?.code })
         });
         const started = Date.now();
+        if (job.status === 'pending' && onProgressCallback) onProgressCallback(45, 'Đã gửi ảnh, đang xác minh số tiền và người nhận...');
         let networkFailures = 0;
         while (job.status === 'pending' && Date.now() - started < 60000) {
           if (Date.now() - started > 5000 && onProgressCallback) onProgressCallback(65, 'Máy chủ vẫn đang đọc biên lai; đang chờ kết quả...');
@@ -6938,6 +6939,9 @@ function toggleKitchenSoundAlert() {
       }
 
       if (!file) return;
+      // Selecting the same file must trigger a new change event on retry.
+      const receiptInput = document.getElementById('receipt-file-input');
+      if (receiptInput) receiptInput.value = '';
 
       clearActiveReceiptScanTimers();
       isReceiptValid = false;

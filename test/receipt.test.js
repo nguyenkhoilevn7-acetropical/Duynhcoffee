@@ -1,7 +1,26 @@
 'use strict';
 const test = require('node:test'), assert = require('node:assert/strict');
-const { compareReceipt, createReceiptVerifier, calculateAmount } = require('../receipt-verification');
+const { compareReceipt, createReceiptVerifier, calculateAmount, shouldRetryOcr } = require('../receipt-verification');
 const text = 'Số tiền: 45.000 VND\nNgười nhận:\nĐÀO KHÔI NGUYÊN\nNgười gửi: TRAN VAN AN';
+test('readable wrong recipient or amount returns immediately without a second OCR pass', () => {
+  for (const sample of [text, text.replace('45.000','46.000'), text.replace('ĐÀO KHÔI NGUYÊN','TRAN VAN AN'), text.replace('45.000','46.000').replace('ĐÀO KHÔI NGUYÊN','TRAN VAN AN')]) {
+    const result=compareReceipt(sample,45000,'DAO KHOI NGUYEN');
+    assert.equal(result.recipientReadable,true);
+    assert.equal(result.amountReadable,true);
+    assert.equal(shouldRetryOcr(result,95),false);
+  }
+});
+test('low-confidence or missing fields retain fallback; reminder text is not a recipient field', () => {
+  const wrong=compareReceipt(text.replace('ĐÀO KHÔI NGUYÊN','TRAN VAN AN'),45000,'DAO KHOI NGUYEN');
+  assert.equal(shouldRetryOcr(wrong,40),true);
+  const missing=compareReceipt('45.000đ\nLưu người nhận để tìm lại nhanh hơn vào lần sau.',45000,'DAO KHOI NGUYEN');
+  assert.equal(missing.recipientReadable,false);assert.equal(shouldRetryOcr(missing,95),true);
+  const labelOnly=compareReceipt('45.000đ\nNgười nhận\nSố thẻ TK',45000,'DAO KHOI NGUYEN');
+  assert.equal(labelOnly.recipientReadable,false);
+  assert.equal(compareReceipt('45.000đ\nLưu người nhận DAO KHOI NGUYEN',45000,'DAO KHOI NGUYEN').isValid,false);
+  assert.equal(compareReceipt('45.000đ\nNgười nhận\nNgân hàng Vietcombank',45000,'DAO KHOI NGUYEN').recipientReadable,false);
+  assert.equal(compareReceipt('45.000đ\nNgười nhận\n9911989890',45000,'DAO KHOI NGUYEN').recipientReadable,false);
+});
 test('matches accented recipient with unaccented settings and exact VND amount', () => {
   assert.equal(compareReceipt(text,45000,'DAO KHOI NGUYEN').isValid,true);
   assert.equal(compareReceipt(text.replace('45.000','45,000.00'),45000,'DAO KHOI NGUYEN').isValid,true);

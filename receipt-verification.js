@@ -7,19 +7,17 @@ function compareReceipt(text, amount, holder) {
   const lines = String(text || '').split(/\r?\n/).map(normalize).filter(Boolean);
   const name = normalize(holder);
   const recipientLabel = /(?:NGUOI (?:NHAN|THU HUONG|HUONG)|TEN (?:NGUOI NHAN|TAI KHOAN|THU HUONG)|CHU TAI KHOAN|BENEFICIARY|RECIPIENT|TO ACCOUNT)/;
-  const stopLabel = /(?:NGUOI GUI|NGUOI CHUYEN|SENDER|FROM ACCOUNT|SO TIEN|AMOUNT|NOI DUNG|CONTENT|MA GIAO DICH|TRANSACTION)/;
-  let recipientLines = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (!recipientLabel.test(lines[i])) continue;
-    recipientLines.push(lines[i].replace(recipientLabel, '').trim());
-    for (let j = i + 1; j < Math.min(lines.length, i + 4); j++) {
-      if (stopLabel.test(lines[j])) break;
-      recipientLines.push(lines[j]);
-    }
-  }
-  // Require the complete ordered name in the recipient field, not scattered
-  // tokens or the sender's name elsewhere in the receipt.
-  const matchedRecipient = !!name && recipientLines.some(line => (' ' + line + ' ').includes(' ' + name + ' '));
+  const directLabel = new RegExp('^(?:' + recipientLabel.source + ')\\b');
+  const otherField = /^(?:SO (?:THE|TK|TAI KHOAN|DU|TIEN)|NGAN HANG|TIN NHAN|LUU|NOI DUNG|NGUOI GUI|BANK|ACCOUNT|AMOUNT|SENDER|CONTENT)\b/;
+  const recipientFields = lines.flatMap((line, i) => {
+    if (!directLabel.test(line)) return [];
+    const field = line.replace(directLabel, '').trim() || lines[i + 1] || '';
+    return field && !otherField.test(field) ? [field] : [];
+  });
+  // Match the complete ordered name in the directly labeled recipient field.
+  // Reminder text and sender/bank rows must never become recipient evidence.
+  const matchedRecipient = !!name && recipientFields.some(field => (' ' + field + ' ').includes(' ' + name + ' '));
+  const recipientReadable = recipientFields.some(field => /^[A-Z]{2,}(?: [A-Z]{2,}){1,6}$/.test(field));
   const rawLines = String(text || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
   let moneyLines = [];
   for (let i = 0; i < rawLines.length; i++) {
@@ -55,9 +53,17 @@ function compareReceipt(text, amount, holder) {
     return Number(integer.replace(/[^0-9]/g, ''));
   });
   const matchedAmount = Number.isSafeInteger(amount) && amount > 0 && detected.includes(amount);
-  return { isValid: matchedRecipient && matchedAmount, matchedRecipient, matchedAmount,
+  const amountReadable = detected.length === 1 && Number.isSafeInteger(detected[0]) && detected[0] > 0;
+  return { isValid: matchedRecipient && matchedAmount, matchedRecipient, matchedAmount, recipientReadable, amountReadable,
     matchedHolder: matchedRecipient ? holder : null, detectedAmount: matchedAmount ? amount : (detected.length === 1 ? detected[0] : null),
-    reason: !matchedRecipient ? 'Không đọc được đúng tên người nhận đã cấu hình trên biên lai.' : !matchedAmount ? (detected.length ? 'Số tiền trên biên lai không khớp tiền nước cần thanh toán.' : 'Chưa đọc được số tiền trên biên lai. Hãy tải ảnh gốc rõ nét hơn.') : '' };
+    reason: !matchedRecipient ? (recipientReadable ? 'Tên người nhận trên biên lai không khớp tên đã cấu hình.' : 'Không đọc được đúng tên người nhận đã cấu hình trên biên lai.') : !matchedAmount ? (detected.length ? 'Số tiền trên biên lai không khớp tiền nước cần thanh toán.' : 'Chưa đọc được số tiền trên biên lai. Hãy tải ảnh gốc rõ nét hơn.') : '' };
+}
+function shouldRetryOcr(comparison, confidence) {
+  if (comparison.isValid) return false;
+  // A readable mismatch is already a decision. Reread only uncertain fields,
+  // regardless of whether the first decision would approve or reject.
+  const readable = (comparison.matchedRecipient || comparison.recipientReadable) && (comparison.matchedAmount || comparison.amountReadable);
+  return !readable || !Number.isFinite(confidence) || confidence < 70;
 }
 function calculateAmount(items, menu, discounts, code) {
   if (!Array.isArray(items) || !items.length || items.length > 100) throw new Error('Giỏ hàng không hợp lệ');
@@ -106,7 +112,7 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
     return workerReady;
   }
   async function ocr(image, amount, holder) {
-    if (recognize) return recognize(image);
+    if (recognize) return { text: await recognize(image), passes: 1 };
     await warmup();
     const activeWorker = worker;
     const { prepareReceipt } = require('./receipt-image');
@@ -114,13 +120,13 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
     // Remove pale watermarks and decorative backgrounds before recognizing text.
     const first = await activeWorker.recognize(prepared.cleaned);
     const comparison = compareReceipt(first.data.text, amount, holder);
-    if (comparison.isValid || (comparison.matchedRecipient && comparison.detectedAmount !== null)) return first.data.text;
+    if (!shouldRetryOcr(comparison, first.data.confidence)) return { text: first.data.text, passes: 1 };
     // Do not discard faint text on unfamiliar receipts: retry the original
     // colors with both languages only when the quick pass is inconclusive.
     await activeWorker.reinitialize('eng+vie', 1);
     try {
       const fallback = await activeWorker.recognize(prepared.original);
-      return fallback.data.text;
+      return { text: fallback.data.text, passes: 2 };
     } finally { await activeWorker.reinitialize('vie', 1); }
   }
   async function verify(body) {
@@ -136,7 +142,8 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
     const processingStarted = Date.now();
     try {
       const text = await Promise.race([ocr(image, amount, holder), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Máy chủ chưa đọc xong biên lai. Chưa thể kết luận số tiền hoặc tên người nhận sai; vui lòng thử lại.')), deadlineMs); })]);
-      const result = compareReceipt(text, amount, holder);
+      const result = compareReceipt(text.text, amount, holder);
+      result.ocrPasses = text.passes;
       result.processingMs = Date.now() - processingStarted;
       if (result.isValid) {
         const encoded = Buffer.from(JSON.stringify({ image: hash(image), amount, holder: normalize(holder), expires: now() + 15 * 60000 })).toString('base64url');
@@ -172,4 +179,4 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
   }
   return { verify, assertVerified, warmup, requestKey };
 }
-module.exports = { normalize, compareReceipt, calculateAmount, createReceiptVerifier };
+module.exports = { normalize, compareReceipt, calculateAmount, createReceiptVerifier, shouldRetryOcr };
