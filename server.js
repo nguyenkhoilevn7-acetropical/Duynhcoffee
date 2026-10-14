@@ -1068,6 +1068,7 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
+  receiptVerifier.warmup().catch(() => console.warn('[OCR] Chưa khởi động được bộ đọc; sẽ thử lại khi quét.'));
   const localIp = getLocalNetworkIp();
   console.log(`=======================================================`);
   console.log(`🍵 HỆ THỐNG BÁN HÀNG ONLINE ĐUỶNH TEA HOUSE (ZERO-DEPENDENCY)`);

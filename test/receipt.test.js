@@ -51,3 +51,14 @@ test('fails closed on OCR outage, bad images and disabled discounts', async () =
   await assert.rejects(service.verify({image:'data:image/svg+xml;base64,YWJj',items:[{id:1,qty:1}]}));
   assert.throws(()=>calculateAmount([{id:1,qty:1}],state.menu,state.discounts,'OFF'));
 });
+test('OCR deadline returns within five seconds without issuing verification proof', async () => {
+  const state={menu:[{id:1,price:45000}],config:{bankConfig:{accountHolder:'DAO KHOI NGUYEN'}},discounts:[]};
+  let stall=true;
+  const service=createReceiptVerifier({readState:()=>state,recognize:()=>stall ? new Promise(()=>{}) : Promise.resolve(text)});
+  const body={image:'data:image/png;base64,YWJj',items:[{id:1,qty:1}]};
+  const started=Date.now();
+  await assert.rejects(service.verify(body), /5 giây/);
+  assert.ok(Date.now()-started < 5500);
+  stall=false;
+  assert.equal((await service.verify(body)).isValid,true);
+});

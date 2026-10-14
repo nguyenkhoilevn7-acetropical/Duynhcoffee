@@ -6869,20 +6869,38 @@ function toggleKitchenSoundAlert() {
       };
     }
 
+    function compressReceiptImage(file, callback) {
+      const url = URL.createObjectURL(file);
+      const image = new Image();
+      image.onload = () => {
+        const scale = Math.min(1, 1600 / Math.max(image.width, image.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        callback(canvas.toDataURL('image/jpeg', 0.9));
+      };
+      image.onerror = () => { URL.revokeObjectURL(url); showSmsToast('Không đọc được ảnh', 'Hãy chọn ảnh biên lai PNG hoặc JPEG.'); };
+      image.src = url;
+    }
+
     async function runClientVerifyData(base64Str, expAmt, onProgressCallback, order = null) {
+      const controller = new AbortController();
+      const deadline = setTimeout(() => controller.abort(), 8000);
       try {
         if (onProgressCallback) onProgressCallback(35, 'Máy chủ đang đọc tên người nhận và số tiền...');
         const items = order ? order.items.map(i => ({ id: i.id, qty: i.qty })) : cart.map(c => ({ id: c.item.id, qty: c.qty }));
         const response = await fetch(getCloudApiUrl('/api/verify-receipt'), {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store', signal: controller.signal,
           body: JSON.stringify({ image: base64Str, items, discountCode: order ? order.discount?.code : activeDiscount?.code })
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || result.reason || 'Chưa xác minh được biên lai');
         return result;
       } catch (error) {
-        return { isValid: false, matchedRecipient: false, matchedAmount: false, reason: error.message };
-      }
+        return { isValid: false, matchedRecipient: false, matchedAmount: false, reason: error.name === 'AbortError' ? 'Kết nối quét đang chậm. Vui lòng thử lại với ảnh biên lai gốc.' : error.message };
+      } finally { clearTimeout(deadline); }
     }
 
     function handleReceiptImageUpload(arg) {
@@ -6929,10 +6947,10 @@ function toggleKitchenSoundAlert() {
         submitBtn.innerHTML = `<span>⏳</span> <span>AI đang khởi động quét hóa đơn (15%)...</span>`;
       }
 
-      // Nén ở độ phân giải cao 1600px, chất lượng 0.92 giống hệt bản index cũ để OCR đọc chữ rõ nhất
+      // Bound both dimensions: portrait screenshots otherwise remained very tall.
       const scanGeneration = ++receiptScanGeneration;
       const scanContext = paymentContext();
-      compressImageFile(file, 1600, 0.92, async function(dataUrl) {
+      compressReceiptImage(file, async function(dataUrl) {
         if (scanGeneration !== receiptScanGeneration) return;
         currentCustomerReceiptBase64 = dataUrl;
         if (prevImg) prevImg.src = dataUrl;
@@ -6970,7 +6988,6 @@ function toggleKitchenSoundAlert() {
 
         updateScanProgressUi(20, `Đang quét ký tự OCR & đối chiếu số tiền (${formatMoney(beverageTotal)})...`);
 
-        const scanStartTime = Date.now();
 
         // Helper KẾT LUẬN HỢP LỆ (100%)
         function approveReceiptSuccess(resObj) {
@@ -7087,12 +7104,9 @@ function toggleKitchenSoundAlert() {
           }, 150);
         }
 
-        // CHẠY KIỂM DUYỆT TRỰC TIẾP BẰNG AI OCR TRÊN TRÌNH DUYỆT (KHÔNG GỌI API RENDER ĐỂ TRÁNH BỊ DUYỆT ẢO)
+        // Verify on the server; display the decision immediately when available.
         try {
           const res = await runClientVerifyData(dataUrl, beverageTotal, updateScanProgressUi);
-          const elapsed = Date.now() - scanStartTime;
-          const remainingDelay = Math.max(0, 1400 - elapsed);
-          setTimeout(() => {
             if (scanGeneration !== receiptScanGeneration) return;
             if (scanContext !== paymentContext()) { rejectReceiptFail({ reason: 'Giỏ hàng hoặc thông tin người nhận đã đổi. Vui lòng quét lại biên lai.' }); return; }
             if (res && res.isValid === true && res.verificationToken) {
@@ -7100,7 +7114,6 @@ function toggleKitchenSoundAlert() {
             } else {
               rejectReceiptFail(res);
             }
-          }, remainingDelay);
         } catch(err) {
           rejectReceiptFail({
             isValid: false,

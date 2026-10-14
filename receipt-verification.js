@@ -77,13 +77,15 @@ function calculateAmount(items, menu, discounts, code) {
 }
 function createReceiptVerifier({ readState, recognize, now = Date.now }) {
   const secret = crypto.randomBytes(32);
-  let worker, busy = false;
+  let worker, workerReady, busy = false, workerGeneration = 0;
   const hash = image => crypto.createHash('sha256').update(image).digest('hex');
   const sign = encoded => crypto.createHmac('sha256', secret).update(encoded).digest('base64url');
-  async function ocr(image) {
-    if (recognize) return recognize(image);
+  async function warmup() {
+    if (recognize) return;
+    if (workerReady) return workerReady;
+    const generation = workerGeneration;
+    workerReady = (async () => {
     const { createWorker } = require('tesseract.js');
-    if (!worker) {
       // Ship language data through npm so the first receipt does not need a
       // runtime CDN download. Both languages must share one local langPath.
       const fs = require('node:fs'), path = require('node:path');
@@ -91,10 +93,20 @@ function createReceiptVerifier({ readState, recognize, now = Date.now }) {
       fs.mkdirSync(languageDir, { recursive: true });
       for (const language of ['eng', 'vie']) {
         const data = require('@tesseract.js-data/' + language);
-        fs.copyFileSync(path.join(data.langPath, language + '.traineddata.gz'), path.join(languageDir, language + '.traineddata.gz'));
+        // Integer models are bundled in the existing packages and much smaller
+        // than the floating-point models used by default.
+        fs.copyFileSync(path.join(data.langPath + '_best_int', language + '.traineddata.gz'), path.join(languageDir, language + '.traineddata.gz'));
       }
-      worker = await createWorker('eng+vie', 1, { langPath: languageDir, gzip: true, cacheMethod: 'none', errorHandler: () => {} });
-    }
+      const initialized = await createWorker('eng+vie', 1, { langPath: languageDir, gzip: true, cacheMethod: 'none', errorHandler: () => {} });
+      if (generation !== workerGeneration) { await initialized.terminate(); throw new Error('OCR initialization cancelled'); }
+      worker = initialized;
+      await worker.setParameters({ tessedit_pageseg_mode: '6' });
+    })().catch(error => { if (generation === workerGeneration) workerReady = null; throw error; });
+    return workerReady;
+  }
+  async function ocr(image) {
+    if (recognize) return recognize(image);
+    await warmup();
     const result = await worker.recognize(Buffer.from(image.split(',')[1], 'base64'));
     return result.data.text;
   }
@@ -109,7 +121,7 @@ function createReceiptVerifier({ readState, recognize, now = Date.now }) {
     busy = true;
     let timer;
     try {
-      const text = await Promise.race([ocr(image), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Đọc ảnh quá lâu. Hãy thử ảnh rõ hơn')), 90000); })]);
+      const text = await Promise.race([ocr(image), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Chưa đọc xong trong 5 giây. Hãy tải ảnh biên lai gốc rõ nét hơn và thử lại.')), 5000); })]);
       const result = compareReceipt(text, amount, holder);
       if (result.isValid) {
         const encoded = Buffer.from(JSON.stringify({ image: hash(image), amount, holder: normalize(holder), expires: now() + 15 * 60000 })).toString('base64url');
@@ -117,8 +129,10 @@ function createReceiptVerifier({ readState, recognize, now = Date.now }) {
       }
       return result;
     } catch (error) {
-      if (worker) { await worker.terminate().catch(() => {}); worker = null; }
-      throw new Error(recognize ? error.message : 'Không đọc được biên lai trên máy chủ. Vui lòng thử ảnh rõ nét hơn');
+      workerGeneration++;
+      workerReady = null;
+      if (worker) { const oldWorker = worker; worker = null; oldWorker.terminate().catch(() => {}); }
+      throw new Error(recognize || error.message.includes('5 giây') ? error.message : 'Không đọc được biên lai trên máy chủ. Vui lòng thử ảnh rõ nét hơn');
     } finally { clearTimeout(timer); busy = false; }
   }
   function assertVerified(order) {
@@ -132,6 +146,6 @@ function createReceiptVerifier({ readState, recognize, now = Date.now }) {
     if (proof.expires < now() || proof.image !== hash(String(order.receiptImage || '')) || proof.amount !== amount || Number(order.total) !== amount || proof.holder !== normalize(state.config.bankConfig && state.config.bankConfig.accountHolder)) throw new Error('Giỏ hàng hoặc người nhận đã thay đổi. Vui lòng quét lại biên lai');
     return true;
   }
-  return { verify, assertVerified };
+  return { verify, assertVerified, warmup };
 }
 module.exports = { normalize, compareReceipt, calculateAmount, createReceiptVerifier };
