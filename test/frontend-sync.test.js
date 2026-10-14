@@ -80,13 +80,33 @@ test('banner releases hidden images after transition and loads the requested sli
   s.updateFrontendSliderDom('fade');assert.equal(imgs[1].src,'b');assert.equal(imgs[0].src,'a');assert.equal(imgs[2].src,null);
   finish();assert.equal(imgs[0].src,null);assert.equal(imgs[1].src,'b');
 });
-test('receipt decoding releases bitmap and canvas before starting verification',async()=>{
-  let closed=false,canvas={width:0,height:0,getContext:()=>({drawImage(){}}),toDataURL:()=> 'data:image/png;base64,ok'};
-  const s={createImageBitmap:async()=>({width:900,height:1200,close(){closed=true;}}),
-    document:{createElement:()=>canvas},showSmsToast(){throw Error('unexpected error');}};
+function receiptDecoder(width, height, fails = false) {
+  const canvases = [], draws = [], images = [];
+  let revoked = 0;
+  class Image {
+    constructor() { this.width = width; this.height = height; images.push(this); }
+    set src(value) { if (value) queueMicrotask(() => fails ? this.onerror() : this.onload()); }
+  }
+  const s = { Image, URL: { createObjectURL:()=> 'blob:receipt', revokeObjectURL:()=> revoked++ },
+    document: {createElement() {
+      const c={width:0,height:0,getContext:()=>({drawImage(...args){draws.push(args.slice(1));}}),toDataURL:()=> 'data:image/png;base64,ok'};
+      canvases.push(c); return c;
+    }} };
   vm.createContext(s);
   vm.runInContext(html.slice(html.indexOf('    async function compressReceiptImage'),html.indexOf('    async function runClientVerifyData')),s);
-  let called=false;
-  await s.compressReceiptImage({},data=>{called=true;assert.equal(data,'data:image/png;base64,ok');assert.equal(closed,true);assert.equal(canvas.width,0);});
-  assert.equal(called,true);
+  return {s,canvases,draws,images,get revoked(){return revoked;}};
+}
+test('receipt keeps one resize pass, no enlargement, and releases resources before verification',async()=>{
+  for (const [w,h,ew,eh] of [[1477,1536,865,900],[300,500,300,500],[2000,1000,900,450]]) {
+    const ctx=receiptDecoder(w,h);
+    await ctx.s.compressReceiptImage({},data=>{
+      assert.equal(data,'data:image/png;base64,ok');assert.equal(ctx.canvases[0].width,0);assert.equal(ctx.revoked,1);
+    });
+    assert.equal(ctx.draws.length,1);assert.deepEqual(ctx.draws[0],[0,0,ew,eh]);assert.equal(ctx.images[0].onload,null);
+  }
+});
+test('undecodable receipt completes with failure and releases object URL so upload can retry',async()=>{
+  const ctx=receiptDecoder(0,0,true);let called=false;
+  await ctx.s.compressReceiptImage({},data=>{called=true;assert.equal(data,null);assert.equal(ctx.revoked,1);});
+  assert.equal(called,true);assert.equal(ctx.canvases.length,0);
 });

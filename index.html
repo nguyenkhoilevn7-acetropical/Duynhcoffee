@@ -6850,35 +6850,26 @@ function toggleKitchenSoundAlert() {
     }
 
     async function compressReceiptImage(file, callback) {
-      let url = null, image = null, bitmap = null, canvas = null;
-      let dataUrl;
+      let url = null, image = null, canvas = null;
+      let dataUrl = null;
       try {
-        // Decode directly at receipt resolution when supported; avoid retaining a full-size photo.
-        if (typeof createImageBitmap === 'function') {
-          try { bitmap = await createImageBitmap(file, { resizeWidth: 900, resizeQuality: 'high' }); }
-          catch (_) { /* Older browsers use the Image fallback. */ }
-        }
-        if (!bitmap) {
-          url = URL.createObjectURL(file);
-          image = new Image();
-          await new Promise((resolve, reject) => {
-            image.onload = resolve;
-            image.onerror = reject;
-            image.src = url;
-          });
-        }
-        const source = bitmap || image;
-        const scale = Math.min(1, 900 / Math.max(source.width, source.height));
+        // Keep the proven single resize path: never enlarge or filter receipt text twice.
+        url = URL.createObjectURL(file);
+        image = new Image();
+        await new Promise((resolve, reject) => {
+          image.onload = resolve;
+          image.onerror = reject;
+          image.src = url;
+        });
+        const scale = Math.min(1, 900 / Math.max(image.width, image.height));
         canvas = document.createElement('canvas');
-        canvas.width = Math.max(1, Math.round(source.width * scale));
-        canvas.height = Math.max(1, Math.round(source.height * scale));
-        canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height);
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
         dataUrl = canvas.toDataURL('image/png');
       } catch (_) {
-        showSmsToast('Không đọc được ảnh', 'Hãy chọn ảnh biên lai PNG hoặc JPEG.');
-        return;
+        // Report decode failure to the upload UI instead of leaving it at 15% forever.
       } finally {
-        if (bitmap) bitmap.close();
         if (image) { image.onload = image.onerror = null; image.src = ''; }
         if (url) URL.revokeObjectURL(url);
         if (canvas) { canvas.width = 0; canvas.height = 0; }
@@ -6977,6 +6968,22 @@ function toggleKitchenSoundAlert() {
       const scanContext = paymentContext();
       compressReceiptImage(file, async function(dataUrl) {
         if (scanGeneration !== receiptScanGeneration) return;
+        if (!dataUrl) {
+          currentCustomerReceiptBase64 = null;
+          invalidateReceiptVerification();
+          if (prevImg) prevImg.removeAttribute('src');
+          if (prevBox) prevBox.style.display = 'none';
+          if (idleBox) idleBox.style.display = 'block';
+          if (overlay) overlay.style.display = 'none';
+          if (laserBeam) laserBeam.style.display = 'none';
+          if (submitBtn) submitBtn.textContent = 'Không đọc được ảnh — vui lòng chọn biên lai khác';
+          if (statusBox) {
+            statusBox.style.display = 'block';
+            statusBox.textContent = 'Trình duyệt không đọc được ảnh này. Vui lòng chọn biên lai PNG hoặc JPEG.';
+          }
+          showSmsToast('Không đọc được ảnh', 'Hãy chọn ảnh biên lai PNG hoặc JPEG.');
+          return;
+        }
         currentCustomerReceiptBase64 = dataUrl;
         if (prevImg) prevImg.src = dataUrl;
         if (idleBox) idleBox.style.display = 'none';
@@ -10106,7 +10113,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         return `
           <div class="product-card ${isOutOfStock ? 'out-of-stock' : ''} ${item.isBestSeller ? 'is-bestseller' : ''}" onclick="openProductCustomModal(${item.id})">
             <div class="product-img-box">
-              <img src="${item.image || getCategoryFallbackSvg(item.category, itemName)}" alt="${itemName}" class="product-img" loading="eager" onerror="this.onerror=null; this.src=window.getSafeProductImageFallback(this.getAttribute('data-category') || 'tea', this.getAttribute('alt') || 'Đuỷnh');" data-category="${item.category}">
+              <img src="${item.image || getCategoryFallbackSvg(item.category, itemName)}" alt="${itemName}" class="product-img" loading="lazy" decoding="async" onerror="this.onerror=null; this.src=window.getSafeProductImageFallback(this.getAttribute('data-category') || 'tea', this.getAttribute('alt') || 'Đuỷnh');" data-category="${item.category}">
               ${badgeHtml}
               ${(!isOutOfStock && stockLeft <= 10) ? `<span class="product-stock-tag stock-low">Chỉ còn ${stockLeft}</span>` : ''}
             </div>
@@ -10972,8 +10979,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       try { sanitizeOrdersData(); } catch(e) { console.error('Lỗi orders data:', e); }
       try { try { applyLanguageToStaticDom(); } catch(e) {}
       try { renderCategoryFilterPills(); } catch(e) {}
-      renderCustomerProducts(); } catch(e) { console.error('Lỗi render products:', e); }
-      try { renderFrontendBanner(); } catch(e) { console.error('Lỗi render banner:', e); }
+      } catch(e) { console.error('Lỗi chuẩn bị giao diện:', e); }
       try { updateCartBadge(); } catch(e) { console.error('Lỗi cart badge:', e); }
 
       if (window.location.hash === '#admin') {
