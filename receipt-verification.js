@@ -107,19 +107,20 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
   async function ocr(image, amount, holder) {
     if (recognize) return recognize(image);
     await warmup();
+    const activeWorker = worker;
     const { prepareReceipt } = require('./receipt-image');
     const prepared = prepareReceipt(Buffer.from(image.split(',')[1], 'base64'), image.match(/^data:image\/(\w+)/)[1]);
     // Remove pale watermarks and decorative backgrounds before recognizing text.
-    const first = await worker.recognize(prepared.cleaned);
+    const first = await activeWorker.recognize(prepared.cleaned);
     const comparison = compareReceipt(first.data.text, amount, holder);
     if (comparison.isValid || (comparison.matchedRecipient && comparison.detectedAmount !== null)) return first.data.text;
     // Do not discard faint text on unfamiliar receipts: retry the original
     // colors with both languages only when the quick pass is inconclusive.
-    await worker.reinitialize('eng+vie', 1);
+    await activeWorker.reinitialize('eng+vie', 1);
     try {
-      const fallback = await worker.recognize(prepared.original);
+      const fallback = await activeWorker.recognize(prepared.original);
       return fallback.data.text;
-    } finally { await worker.reinitialize('vie', 1); }
+    } finally { await activeWorker.reinitialize('vie', 1); }
   }
   async function verify(body) {
     const image = body.image || body.receiptImage;
