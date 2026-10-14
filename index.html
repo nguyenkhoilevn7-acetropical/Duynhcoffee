@@ -4125,18 +4125,18 @@ body {
             <div class="bank-info-grid">
               <div class="bank-info-item">
                 <span class="bank-info-label">Ngân hàng</span>
-                <span class="bank-info-val">Vietcombank</span>
+                <span id="pay-bank-name" class="bank-info-val"></span>
               </div>
               <div class="bank-info-item">
                 <span class="bank-info-label">Số tài khoản</span>
                 <div style="display: flex; align-items: center;">
-                  <span class="bank-info-val" style="color: #2563EB;">9911989890</span>
-                  <button type="button" class="btn-copy-chip" onclick="copyToClipboard('9911989890', 'Đã chép số tài khoản 9911989890')">Sao Chép</button>
+                  <span id="pay-bank-account" class="bank-info-val" style="color: #2563EB;"></span>
+                  <button type="button" class="btn-copy-chip" onclick="copyToClipboard(document.getElementById('pay-bank-account').textContent, 'Đã chép số tài khoản')">Sao Chép</button>
                 </div>
               </div>
               <div class="bank-info-item">
                 <span class="bank-info-label">Chủ tài khoản</span>
-                <span class="bank-info-val">ĐÀO KHÔI NGUYÊN</span>
+                <span id="pay-bank-holder" class="bank-info-val"></span>
               </div>
               <div class="bank-info-item">
                 <span class="bank-info-label">Số tiền chuyển</span>
@@ -5521,11 +5521,49 @@ body {
       }
     }
 
+    let receiptVerificationToken = null;
+    let receiptVerificationContext = null;
+    let receiptScanGeneration = 0;
+    function paymentContext() {
+      return JSON.stringify({ items: cart.map(c => ({ id: c.item.id, qty: c.qty, price: c.item.price })),
+        discount: activeDiscount ? activeDiscount.code : null, bank: storeConfig.bankConfig });
+    }
+    function invalidateReceiptVerification() {
+      receiptScanGeneration++;
+      receiptVerificationToken = null;
+      receiptVerificationContext = null;
+      isReceiptValid = false;
+      const button = document.getElementById('btn-submit-customer-order');
+      if (button) { button.disabled = true; button.textContent = 'Vui lòng quét biên lai cho thông tin thanh toán hiện tại'; }
+    }
+    function renderPaymentBankInfo() {
+      const bank = storeConfig.bankConfig || {};
+      for (const [id, value] of [['pay-bank-name', bank.bankName || bank.bankId], ['pay-bank-account', bank.accountNumber], ['pay-bank-holder', bank.accountHolder]]) {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value || '';
+      }
+      if (receiptVerificationContext && receiptVerificationContext !== paymentContext()) invalidateReceiptVerification();
+    }
+    function applyServerConfig(config, version) {
+      if (!config || typeof config !== 'object' || Array.isArray(config)) return;
+      if (version && lastConfigVersion && version < lastConfigVersion) return;
+      storeConfig = { ...storeConfig, ...config,
+        bankConfig: { ...(storeConfig.bankConfig || {}), ...(config.bankConfig || {}) } };
+      if (config.banner) {
+        bannerUploadedImages = Array.isArray(config.banner.images) ? [...config.banner.images] : [];
+        try { localStorage.setItem('duynh_custom_banner_backup', JSON.stringify(config.banner)); } catch (_) {}
+      }
+      lastConfigVersion = version || lastConfigVersion;
+      renderPaymentBankInfo();
+      if (document.getElementById('checkout-modal')?.style.display === 'flex') updateCheckoutFinancials();
+    }
+
     function renderBackendConfig() {
+      renderPaymentBankInfo();
       if (!storeConfig) return;
       const setVal = (id, val) => {
         const el = document.getElementById(id);
-        if (el && val !== undefined) el.value = val;
+        if (el && val !== undefined && document.activeElement !== el) el.value = val;
       };
       setVal('setting-store-name', storeConfig.storeName);
       setVal('setting-store-slogan', storeConfig.storeSlogan);
@@ -5809,27 +5847,7 @@ body {
           if (Array.isArray(payload.menu) && payload.menu.length > 0) {
             menu = mergeMenuWithServer(payload.menu);
           }
-          if (payload.config && typeof payload.config === 'object') {
-            if (payload.config.banner && Array.isArray(payload.config.banner.images) && payload.config.banner.images.length > 0) {
-              storeConfig = { ...storeConfig, ...payload.config };
-              try {
-                localStorage.setItem('duynh_banner_customized', 'true');
-                localStorage.setItem('duynh_custom_banner_backup', JSON.stringify(storeConfig.banner));
-              } catch(e) {}
-            } else {
-              let preservedBanner = null;
-              try {
-                preservedBanner = JSON.parse(localStorage.getItem('duynh_custom_banner_backup') || 'null');
-              } catch(e) {}
-              storeConfig = { ...storeConfig, ...payload.config };
-              if (preservedBanner && Array.isArray(preservedBanner.images) && preservedBanner.images.length > 0) {
-                storeConfig.banner = preservedBanner;
-              } else if (!storeConfig.banner || !Array.isArray(storeConfig.banner.images) || storeConfig.banner.images.length === 0) {
-                if (!storeConfig.banner) storeConfig.banner = {};
-                storeConfig.banner.images = [...DEFAULT_BANNER_PRESETS];
-              }
-            }
-          }
+          applyServerConfig(payload.config, payload.configVersion);
           if (Array.isArray(payload.discounts)) {
             discounts = payload.discounts;
             saveLocalDiscounts();
@@ -5874,40 +5892,12 @@ body {
         }
 
         case 'CONFIG_UPDATE': {
-          const freshConfig = payload.config || payload.data;
-          if (freshConfig && typeof freshConfig === 'object') {
-            if (freshConfig.banner && Array.isArray(freshConfig.banner.images) && freshConfig.banner.images.length > 0) {
-              storeConfig.banner = freshConfig.banner;
-              bannerUploadedImages = [...freshConfig.banner.images];
-              try {
-                localStorage.setItem('duynh_banner_customized', 'true');
-                localStorage.setItem('duynh_custom_banner_backup', JSON.stringify(storeConfig.banner));
-              } catch(e) {}
-            } else {
-              let preservedBanner = null;
-              try {
-                preservedBanner = JSON.parse(localStorage.getItem('duynh_custom_banner_backup') || 'null');
-              } catch(e) {}
-              const curBanner = (storeConfig && storeConfig.banner) ? storeConfig.banner : null;
-              if (preservedBanner && Array.isArray(preservedBanner.images) && preservedBanner.images.length > 0) {
-                storeConfig.banner = preservedBanner;
-                bannerUploadedImages = [...preservedBanner.images];
-              } else if (curBanner && Array.isArray(curBanner.images) && curBanner.images.length > 0) {
-                bannerUploadedImages = [...curBanner.images];
-              }
-            }
-            storeConfig = { ...storeConfig, ...freshConfig, banner: storeConfig.banner };
-            lastConfigVersion = payload.configVersion || Date.now();
-            debouncedSaveLocalData();
-            renderBackendConfig();
-            renderCustomerFooterInfo();
-            renderFrontendBanner();
-            try { renderCategoryFilterPills(); } catch(e) {}
-            try { populateCategorySelectDropdowns(); } catch(e) {}
-            if (isAdminDevice) {
-              loadBannerSettingsToAdmin();
-            }
-          }
+          applyServerConfig(payload.config || payload.data, payload.configVersion);
+          debouncedSaveLocalData();
+          renderBackendConfig();
+          renderCustomerFooterInfo();
+          renderFrontendBanner();
+          if (isAdminDevice) loadBannerSettingsToAdmin();
           break;
         }
 
@@ -5965,42 +5955,7 @@ body {
           }
           if (pData.config && typeof pData.config === 'object') {
             if (!lastConfigVersion || (pData.configVersion && pData.configVersion !== lastConfigVersion) || !isInitialLoadDone) {
-              if (pData.config.banner && Array.isArray(pData.config.banner.images) && pData.config.banner.images.length > 0) {
-                storeConfig.banner = pData.config.banner;
-                bannerUploadedImages = [...pData.config.banner.images];
-                try {
-                  localStorage.setItem('duynh_banner_customized', 'true');
-                  localStorage.setItem('duynh_custom_banner_backup', JSON.stringify(storeConfig.banner));
-                } catch(e) {}
-              } else {
-                let preservedBanner = null;
-                try {
-                  preservedBanner = JSON.parse(localStorage.getItem('duynh_custom_banner_backup') || 'null');
-                } catch(e) {}
-                const curBanner = (storeConfig && storeConfig.banner) ? storeConfig.banner : null;
-                if (preservedBanner && Array.isArray(preservedBanner.images) && preservedBanner.images.length > 0) {
-                  storeConfig.banner = preservedBanner;
-                  bannerUploadedImages = [...preservedBanner.images];
-                } else if (curBanner && Array.isArray(curBanner.images) && curBanner.images.length > 0) {
-                  bannerUploadedImages = [...curBanner.images];
-                } else {
-                  if (!storeConfig.banner) storeConfig.banner = {};
-                  storeConfig.banner.images = [...DEFAULT_BANNER_PRESETS];
-                  bannerUploadedImages = [...DEFAULT_BANNER_PRESETS];
-                }
-                // Nếu máy này là Admin và máy chủ chưa có banner: tự động đẩy banner lên máy chủ!
-                if (isAdminDevice && storeConfig.banner && Array.isArray(storeConfig.banner.images) && storeConfig.banner.images.length > 0) {
-                  try {
-                    fetch(getCloudApiUrl('/api/config'), {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(storeConfig)
-                    }).catch(() => {});
-                  } catch(e) {}
-                }
-              }
-              storeConfig = { ...storeConfig, ...pData.config, banner: storeConfig.banner };
-              lastConfigVersion = pData.configVersion || Date.now();
+              applyServerConfig(pData.config, pData.configVersion);
               configChanged = true;
             }
           }
@@ -6914,136 +6869,20 @@ function toggleKitchenSoundAlert() {
       };
     }
 
-    async function ensureTesseractReady() {
-      if (typeof window.Tesseract !== 'undefined' && typeof window.Tesseract.recognize === 'function') {
-        return true;
+    async function runClientVerifyData(base64Str, expAmt, onProgressCallback, order = null) {
+      try {
+        if (onProgressCallback) onProgressCallback(35, 'Máy chủ đang đọc tên người nhận và số tiền...');
+        const items = order ? order.items.map(i => ({ id: i.id, qty: i.qty })) : cart.map(c => ({ id: c.item.id, qty: c.qty }));
+        const response = await fetch(getCloudApiUrl('/api/verify-receipt'), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
+          body: JSON.stringify({ image: base64Str, items, discountCode: order ? order.discount?.code : activeDiscount?.code })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || result.reason || 'Chưa xác minh được biên lai');
+        return result;
+      } catch (error) {
+        return { isValid: false, matchedRecipient: false, matchedAmount: false, reason: error.message };
       }
-      return new Promise((resolve) => {
-        const timer = setTimeout(() => resolve(typeof window.Tesseract !== 'undefined' && typeof window.Tesseract.recognize === 'function'), 30000);
-        try {
-          const script = document.createElement('script');
-          script.async = true;
-          script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-          script.onload = () => { clearTimeout(timer); resolve(typeof window.Tesseract !== 'undefined'); };
-          script.onerror = () => { clearTimeout(timer); resolve(false); };
-          document.body.appendChild(script);
-        } catch(e) {
-          clearTimeout(timer);
-          resolve(false);
-        }
-      });
-    }
-
-    async function runClientVerifyData(base64Str, expAmt, onProgressCallback) {
-      const expectedHolder = (storeConfig && storeConfig.bankConfig && storeConfig.bankConfig.accountHolder) || 'ĐÀO KHÔI NGUYÊN';
-      const expectedAccount = (storeConfig && storeConfig.bankConfig && storeConfig.bankConfig.accountNumber) || '9911989890';
-      const amtInt = parseInt(expAmt, 10) || 0;
-
-      if (!base64Str || typeof base64Str !== 'string') {
-        return {
-          isValid: false,
-          isReceiptLayout: false,
-          matchedRecipient: false,
-          matchedAmount: false,
-          reason: 'Chưa có hình ảnh hóa đơn tải lên!'
-        };
-      }
-
-      // 1. Nếu là hóa đơn điện tử SVG trong hệ thống
-      if (base64Str.includes('svg') || base64Str.includes('<svg')) {
-        try {
-          let rawText = base64Str;
-          if (rawText.includes('base64,')) {
-            rawText = atob(rawText.split('base64,')[1]);
-          } else {
-            rawText = decodeURIComponent(rawText);
-          }
-          const textOnly = rawText.replace(/<[^>]+>/g, ' ');
-          if (onProgressCallback) onProgressCallback(95, 'Đang đối chiếu tên chủ quán & số tiền...');
-          return verifyReceiptText(textOnly, expAmt, expectedHolder, expectedAccount);
-        } catch(e) {
-          return {
-            isValid: false,
-            isReceiptLayout: false,
-            matchedRecipient: false,
-            matchedAmount: false,
-            reason: 'Lỗi đọc dữ liệu hóa đơn SVG!'
-          };
-        }
-      }
-
-      // 2. Đọc OCR và chỉ đối chiếu tên người hưởng + số tiền.
-      // 3. Quét OCR chữ trên biên lai (Tesseract.js + OCR dự phòng)
-      let extractedText = '';
-      const hasTess = await ensureTesseractReady();
-
-      if (hasTess && window.Tesseract) {
-        try {
-          async function performOcrScan(imgSrc, language, labelPrefix) {
-            const ocrPromise = window.Tesseract.recognize(imgSrc, language, {
-              logger: m => {
-                if (m && m.status === 'recognizing text' && typeof onProgressCallback === 'function') {
-                  const rawPct = Math.round((m.progress || 0) * 100);
-                  const mappedPct = Math.min(95, Math.max(25, rawPct));
-                  onProgressCallback(mappedPct, `${labelPrefix} (${mappedPct}%)...`);
-                }
-              }
-            });
-            const timeoutPromise = new Promise((_, rej) => setTimeout(() => rej(new Error('OCR_TIMEOUT')), 35000));
-            const res = await Promise.race([ocrPromise, timeoutPromise]);
-            return (res && res.data && res.data.text) ? res.data.text : '';
-          }
-
-          if (onProgressCallback) onProgressCallback(30, 'Đang đọc số tiền và tên người nhận trên biên lai');
-          // Biên lai ngân hàng Việt Nam thường có tên tiếng Việt không dấu. Thử OCR
-          // bằng tiếng Anh trước, sau đó tiếng Việt và kết hợp hai ngôn ngữ nếu cần.
-          // Chỉ chấp nhận một lần quét nếu chính lần quét đó khớp cả tên lẫn số tiền.
-          const ocrLanguages = ['eng', 'vie', 'eng+vie'];
-          let bestCheck = null;
-          let bestText = '';
-          for (let i = 0; i < ocrLanguages.length; i++) {
-            try {
-              const language = ocrLanguages[i];
-              const text = await performOcrScan(
-                base64Str,
-                language,
-                language === 'eng' ? 'Đang đọc biên lai' : (language === 'vie' ? 'Đang thử nhận diện tiếng Việt' : 'Đang nhận diện song ngữ')
-              );
-              if (text && text.trim()) {
-                const check = verifyReceiptText(text, expAmt, expectedHolder, expectedAccount);
-                if (check.isValid) return check;
-                // Giữ kết quả có nhiều tiêu chí đạt nhất để thông báo đúng nguyên nhân.
-                const score = (check.matchedRecipient ? 1 : 0) + (check.matchedAmount ? 1 : 0);
-                const bestScore = bestCheck ? ((bestCheck.matchedRecipient ? 1 : 0) + (bestCheck.matchedAmount ? 1 : 0)) : -1;
-                if (score > bestScore) {
-                  bestCheck = check;
-                  bestText = text;
-                }
-              }
-            } catch (languageError) {
-              console.warn(`[Tesseract OCR ${ocrLanguages[i]}]:`, languageError);
-            }
-          }
-          extractedText = bestText;
-          if (bestCheck && bestText) return bestCheck;
-        } catch(ocrErr) {
-          console.warn('[Tesseract OCR]:', ocrErr);
-        }
-      }
-
-      // Không dựa vào khóa OCR demo công khai (thường bị giới hạn/CORS khi mở file trực tiếp).
-      // Nếu Tesseract không đọc được ảnh, báo lỗi rõ ràng và không tự động duyệt.
-      if (!extractedText || extractedText.trim().length < 3) {
-        return {
-          isValid: false,
-          isReceiptLayout: false,
-          matchedRecipient: false,
-          matchedAmount: false,
-          reason: 'Không thể đọc chữ trên ảnh. Hãy kết nối Internet, chờ OCR tải xong rồi thử ảnh rõ nét hơn.'
-        };
-      }
-
-      return verifyReceiptText(extractedText, expAmt, expectedHolder, expectedAccount);
     }
 
     function handleReceiptImageUpload(arg) {
@@ -7091,7 +6930,10 @@ function toggleKitchenSoundAlert() {
       }
 
       // Nén ở độ phân giải cao 1600px, chất lượng 0.92 giống hệt bản index cũ để OCR đọc chữ rõ nhất
+      const scanGeneration = ++receiptScanGeneration;
+      const scanContext = paymentContext();
       compressImageFile(file, 1600, 0.92, async function(dataUrl) {
+        if (scanGeneration !== receiptScanGeneration) return;
         currentCustomerReceiptBase64 = dataUrl;
         if (prevImg) prevImg.src = dataUrl;
         if (idleBox) idleBox.style.display = 'none';
@@ -7134,6 +6976,8 @@ function toggleKitchenSoundAlert() {
         function approveReceiptSuccess(resObj) {
           clearActiveReceiptScanTimers();
           isReceiptValid = true;
+          receiptVerificationToken = resObj.verificationToken;
+          receiptVerificationContext = scanContext;
           const bankName = (resObj && resObj.bank) ? resObj.bank : 'Vietcombank';
 
           if (overlay) overlay.style.display = 'none';
@@ -7145,7 +6989,7 @@ function toggleKitchenSoundAlert() {
           if (tickerEl) {
             tickerEl.innerHTML = `
               <div class="ai-scan-step-badge" style="background:#ECFDF5; border-color:#10B981; color:#065F46; font-weight:800;">
-                <span>✅</span> <span>[100%] KẾT LUẬN AI: HÓA ĐƠN HỢP LỆ — ĐỐI SOÁT TRÙNG KHỚP 100%!</span>
+                <span>✅</span> <span>[100%] KẾT LUẬN AI: HÓA ĐƠN HỢP LỆ — KHỚP TÊN VÀ SỐ TIỀN!</span>
               </div>
             `;
           }
@@ -7157,7 +7001,7 @@ function toggleKitchenSoundAlert() {
                 <span>✅</span> <span>KẾT LUẬN XÉT DUYỆT AI (100%): HÓA ĐƠN HỢP LỆ</span>
               </div>
               <div style="font-size: 0.79rem; color: #15803D; margin-top: 5px; line-height: 1.55; background: #FFFFFF; padding: 8px 10px; border-radius: 8px; border: 1px solid #86EFAC;">
-                • <b>Tên người hưởng:</b> ✅ <b>${resObj && resObj.matchedHolder ? resObj.matchedHolder : 'ĐÀO KHÔI NGUYÊN'}</b> (khớp)<br>
+                • <b>Tên người hưởng:</b> ✅ <b>${resObj && resObj.matchedHolder ? resObj.matchedHolder : storeConfig.bankConfig?.accountHolder}</b> (khớp)<br>
                 • <b>Số tiền thanh toán:</b> ✅ <b>${formatMoney(beverageTotal)}</b> (khớp chính xác đơn hàng)
               </div>
             `;
@@ -7167,7 +7011,7 @@ function toggleKitchenSoundAlert() {
             submitBtn.innerHTML = `<span>🚀</span> <b>XÁC NHẬN GỬI ĐƠN HÀNG LÊN HỆ THỐNG ➔</b>`;
           }
           playSuccessChime();
-          showSmsToast("✅ [100%] AI DUYỆT THÀNH CÔNG!", `Hóa đơn khớp tên ĐÀO KHÔI NGUYÊN và số tiền ${formatMoney(beverageTotal)}.`);
+          showSmsToast("✅ [100%] AI DUYỆT THÀNH CÔNG!", `Hóa đơn khớp tên ${storeConfig.bankConfig?.accountHolder} và số tiền ${formatMoney(beverageTotal)}.`);
         }
 
         // Helper KẾT LUẬN SAI PHẠM / TỪ CHỐI (100%)
@@ -7176,7 +7020,7 @@ function toggleKitchenSoundAlert() {
           isReceiptValid = false;
           const reasonMsg = (resObj && resObj.reason)
             ? resObj.reason
-            : `Hình ảnh không khớp người thụ hưởng (ĐÀO KHÔI NGUYÊN - STK 9911989890) hoặc không khớp số tiền (${formatMoney(beverageTotal)})!`;
+            : `Hình ảnh không khớp người thụ hưởng (${storeConfig.bankConfig?.accountHolder}) hoặc không khớp số tiền (${formatMoney(beverageTotal)})!`;
 
           const layoutOk = !!(resObj && resObj.isReceiptLayout); // retained for compatibility; not used to approve/reject
           const recipientOk = !!(resObj && resObj.matchedRecipient);
@@ -7214,7 +7058,7 @@ function toggleKitchenSoundAlert() {
                 <span>❌</span> <span>CHƯA ĐẠT 2 ĐIỀU KIỆN: KIỂM TRA SỐ TIỀN VÀ TÊN NGƯỜI NHẬN</span>
               </div>
               <div style="font-size: 0.79rem; color: #7F1D1D; line-height: 1.6; background: #FFFFFF; padding: 9px 11px; border-radius: 8px; border: 1px solid #FCA5A5; text-align: left;">
-                <div>• <b>1. Tên người hưởng:</b> ${recipientOk ? '✅ Khớp tên người nhận' : '❌ <b>Không khớp</b> — Cần đúng tên <b>ĐÀO KHÔI NGUYÊN</b>'}</div>
+                <div>• <b>1. Tên người hưởng:</b> ${recipientOk ? '✅ Khớp tên người nhận' : `❌ <b>Không khớp</b> — Cần đúng tên <b>${storeConfig.bankConfig?.accountHolder}</b>`}</div>
                 <div>• <b>2. Số tiền:</b> ${amountOk ? '✅ Khớp ' + formatMoney(beverageTotal) : '❌ <b>Không khớp</b> — Cần đúng <b>' + formatMoney(beverageTotal) + '</b>'}</div>
                 <div style="margin-top: 6px; padding-top: 5px; border-top: 1px dashed #FECACA; color: #B91C1C; font-weight: 700;">
                   👉 Kết luận: ${reasonMsg}
@@ -7229,13 +7073,13 @@ function toggleKitchenSoundAlert() {
           }
 
           playAudioChime(260, 0.3);
-          showSmsToast("CHƯA KHỚP THÔNG TIN BIÊN LAI", `Ảnh không khớp tên chủ quán ĐÀO KHÔI NGUYÊN hoặc số tiền ${formatMoney(beverageTotal)}.`);
+          showSmsToast("CHƯA KHỚP THÔNG TIN BIÊN LAI", `Ảnh không khớp tên chủ quán ${storeConfig.bankConfig?.accountHolder} hoặc số tiền ${formatMoney(beverageTotal)}.`);
 
           setTimeout(() => {
             alert(
               `CHƯA THỂ DUYỆT BIÊN LAI\n\n` +
               `Biên lai chưa vượt qua đủ 2 điều kiện: tên người nhận và số tiền. Không kiểm tra nội dung chuyển khoản:\n\n` +
-              `1. Tên người hưởng: ${recipientOk ? '✅ Đạt' : '❌ KHÔNG KHỚP (Bắt buộc: ĐÀO KHÔI NGUYÊN)'}\n` +
+              `1. Tên người hưởng: ${recipientOk ? '✅ Đạt' : `❌ KHÔNG KHỚP (Bắt buộc: ${storeConfig.bankConfig?.accountHolder})`}\n` +
               `2. Số tiền: ${amountOk ? '✅ Đạt' : '❌ KHÔNG KHỚP (Bắt buộc đúng: ' + formatMoney(beverageTotal) + ')'}\n\n` +
               `👉 Chi tiết: ${reasonMsg}\n\n` +
               `Vui lòng kiểm tra lại tên người nhận và số tiền hoặc tải ảnh rõ hơn!`
@@ -7249,7 +7093,9 @@ function toggleKitchenSoundAlert() {
           const elapsed = Date.now() - scanStartTime;
           const remainingDelay = Math.max(0, 1400 - elapsed);
           setTimeout(() => {
-            if (res && res.isValid === true) {
+            if (scanGeneration !== receiptScanGeneration) return;
+            if (scanContext !== paymentContext()) { rejectReceiptFail({ reason: 'Giỏ hàng hoặc thông tin người nhận đã đổi. Vui lòng quét lại biên lai.' }); return; }
+            if (res && res.isValid === true && res.verificationToken) {
               approveReceiptSuccess(res);
             } else {
               rejectReceiptFail(res);
@@ -8225,7 +8071,12 @@ function openProductCustomModal(itemId) {
     window.lockScreenScroll = lockScreenScroll;
     window.unlockScreenScroll = unlockScreenScroll;
 
-function openPaymentCheckoutModal() {
+async function openPaymentCheckoutModal() {
+      try {
+        const response = await fetch(getCloudApiUrl('/api/config'), { cache: 'no-store' });
+        if (!response.ok) throw new Error('Không lấy được thông tin thanh toán mới nhất');
+        applyServerConfig(await response.json());
+      } catch (error) { alert(error.message); return; }
       lockScreenScroll();
       hideFloatingCartNow();
       if (!cart || cart.length === 0) {
@@ -8266,10 +8117,10 @@ function openPaymentCheckoutModal() {
       updateShipFeeDisplay();
 
       // VietQR Vietcombank: CHỈ TÍNH TIỀN NƯỚC (beverageTotal)
-      const vcbAcc = "9911989890";
-      const vcbName = encodeURIComponent("DAO KHOI NGUYEN");
+      const vcbAcc = encodeURIComponent(storeConfig.bankConfig?.accountNumber || "");
+      const vcbName = encodeURIComponent(storeConfig.bankConfig?.accountHolder || "");
       const memo = encodeURIComponent(currentPendingOrderId);
-      const qrUrl = `https://api.vietqr.io/image/970436-${vcbAcc}-compact2.png?amount=${beverageTotal}&addInfo=${memo}&accountName=${vcbName}`;
+      const qrUrl = `https://api.vietqr.io/image/${encodeURIComponent(storeConfig.bankConfig?.bin || "970436")}-${vcbAcc}-compact2.png?amount=${beverageTotal}&addInfo=${memo}&accountName=${vcbName}`;
       const elQrImg = document.getElementById('pay-vietqr-img');
       if (elQrImg) elQrImg.src = qrUrl;
 
@@ -8307,7 +8158,7 @@ function openPaymentCheckoutModal() {
     }
 
     // GỬI ĐƠN HÀNG (BẮT BUỘC HÓA ĐƠN & PHẢI QUA NHẬN DIỆN THÔNG MINH)
-    function submitCustomerOrderWithBill() {
+    async function submitCustomerOrderWithBill() {
       if (!cart || cart.length === 0) {
         alert("⚠️ Giỏ hàng của bạn đang trống! Vui lòng chọn món trước khi đặt hàng.");
         closePaymentCheckoutModal();
@@ -8325,7 +8176,7 @@ function openPaymentCheckoutModal() {
         return;
       }
 
-      if (!currentCustomerReceiptBase64 || !isReceiptValid) {
+      if (!currentCustomerReceiptBase64 || !isReceiptValid || !receiptVerificationToken || receiptVerificationContext !== paymentContext()) {
         alert("⚠️ BẮT BUỘC ĐÍNH KÈM HÓA ĐƠN:\n\nBạn vui lòng chạm vào ô 'Tải Lên Hóa Đơn Chuyển Tiền' để đính kèm ảnh chụp màn hình chuyển khoản VietQR.\n\nTiệm sẽ tự động mở hộp thoại chọn ảnh cho bạn ngay bây giờ!");
         const uploadBox = document.getElementById('receipt-upload-box');
         if (uploadBox) {
@@ -8390,6 +8241,7 @@ function openPaymentCheckoutModal() {
         paymentStatus: 'receipt_submitted',
         status: 'new',
         receiptImage: currentCustomerReceiptBase64,
+        verificationToken: receiptVerificationToken,
         mapUrl: mapUrl,
         items: cart.map(c => ({
           id: c.item.id,
@@ -8401,6 +8253,17 @@ function openPaymentCheckoutModal() {
         }))
       };
 
+      try {
+        const response = await fetch(getCloudApiUrl('/api/orders'), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newOrder)
+        });
+        const saved = await response.json();
+        if (!response.ok || !saved.success) throw new Error(saved.error || 'Máy chủ chưa nhận đơn');
+      } catch (error) {
+        alert('Chưa gửi được đơn: ' + error.message);
+        return;
+      }
+      delete newOrder.verificationToken;
       // Giảm tồn kho
       cart.forEach(c => {
         const m = menu.find(it => it.id === c.item.id);
@@ -8412,15 +8275,8 @@ function openPaymentCheckoutModal() {
       orders.unshift(newOrder);
       localStorage.setItem('duynh_latest_order_id', newOrder.id);
       saveLocalData();
-      broadcastMeshEvent('NEW_ORDER', { order: newOrder, menuStock: menu });
-      playNewOrderAlertSound();
 
-      // Gửi lên server
-      fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newOrder)
-      }).catch(() => {});
+      playNewOrderAlertSound();
 
       cart = [];
       activeDiscount = null;
@@ -9295,7 +9151,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
             </div>
           `;
         }
-      });
+      }, order);
 
       if (res && res.isValid === true) {
         if (overlay) overlay.style.display = 'none';
@@ -9311,7 +9167,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
               </div>
               <div style="font-size: 0.78rem; margin-top: 4px; line-height: 1.55;">
                 • <b>Ngân hàng:</b> ${res.bank || 'Vietcombank'}<br>
-                • <b>Người hưởng thụ:</b> ✅ <b>ĐÀO KHÔI NGUYÊN</b> (STK: <b>9911989890</b>)<br>
+                • <b>Người hưởng thụ:</b> ✅ <b>${storeConfig.bankConfig?.accountHolder}</b> (STK: <b>9911989890</b>)<br>
                 • <b>Số tiền hóa đơn:</b> ✅ <b>${formatMoney(expAmt)}</b> (Khớp chính xác đơn hàng)
               </div>
             </div>
@@ -9335,7 +9191,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
                 <span>🚨</span> <span>[100%] KẾT LUẬN AI: HÌNH ẢNH SAI PHẠM (KHÔNG ĐÚNG HÓA ĐƠN)</span>
               </div>
               <div style="font-size: 0.78rem; margin-top: 4px; line-height: 1.55;">
-                • <b>1. Tên người hưởng:</b> ${recipientOk ? '✅ Khớp tên người nhận' : '❌ Không khớp (ĐÀO KHÔI NGUYÊN)'}<br>
+                • <b>1. Tên người hưởng:</b> ${recipientOk ? '✅ Khớp tên người nhận' : `❌ Không khớp (${storeConfig.bankConfig?.accountHolder})`}<br>
                 • <b>2. Số tiền:</b> ${amountOk ? '✅ Khớp ' + formatMoney(expAmt) : '❌ Không khớp đơn hàng (' + formatMoney(expAmt) + ')'}<br>
                 • <b>Chi tiết:</b> ${(res && res.reason) || 'Biên lai không hợp lệ!'}
               </div>
@@ -9439,6 +9295,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
     // TÍNH TOÁN LẠI TỔNG TIỀN VÀ CẬP NHẬT MÃ VIETQR KHI CÓ DISCOUNT
     function updateCheckoutFinancials() {
+      renderPaymentBankInfo();
       const rawBeverageTotal = cart.reduce((s, c) => s + (c.item.price * c.qty), 0);
       let finalBeverageTotal = rawBeverageTotal;
 
@@ -9475,10 +9332,10 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       if (vqrText) vqrText.textContent = formatMoney(finalBeverageTotal);
 
       // Cập nhật lại mã VietQR theo số tiền sau chiết khấu
-      const vcbAcc = "9911989890";
-      const vcbName = encodeURIComponent("DAO KHOI NGUYEN");
+      const vcbAcc = encodeURIComponent(storeConfig.bankConfig?.accountNumber || "");
+      const vcbName = encodeURIComponent(storeConfig.bankConfig?.accountHolder || "");
       const memo = encodeURIComponent(currentPendingOrderId);
-      const qrUrl = `https://api.vietqr.io/image/970436-${vcbAcc}-compact2.png?amount=${finalBeverageTotal}&addInfo=${memo}&accountName=${vcbName}`;
+      const qrUrl = `https://api.vietqr.io/image/${encodeURIComponent(storeConfig.bankConfig?.bin || "970436")}-${vcbAcc}-compact2.png?amount=${finalBeverageTotal}&addInfo=${memo}&accountName=${vcbName}`;
       const vqrImg = document.getElementById('pay-vietqr-img');
       if (vqrImg) vqrImg.src = qrUrl;
     }
@@ -10115,23 +9972,17 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         return el ? el.value.trim() : '';
       };
 
-      // Chỉ báo thành công sau khi máy chủ xác nhận đã lưu cấu hình.
-      storeConfig.storeName = getSettingValue('setting-store-name');
-      storeConfig.storeSlogan = getSettingValue('setting-store-slogan');
-      storeConfig.storeAddress = getSettingValue('setting-store-address');
-      storeConfig.storePhone = getSettingValue('setting-store-phone');
-      if (!storeConfig.bankConfig || typeof storeConfig.bankConfig !== 'object') {
-        storeConfig.bankConfig = {};
-      }
-      storeConfig.bankConfig.accountNumber = getSettingValue('setting-bank-account');
-      storeConfig.bankConfig.accountHolder = getSettingValue('setting-bank-holder');
-
+      const draft = {
+        storeName: getSettingValue('setting-store-name'), storeSlogan: getSettingValue('setting-store-slogan'),
+        storeAddress: getSettingValue('setting-store-address'), storePhone: getSettingValue('setting-store-phone'),
+        bankConfig: { accountNumber: getSettingValue('setting-bank-account'), accountHolder: getSettingValue('setting-bank-holder') }
+      };
       try {
         const response = await fetch(getCloudApiUrl('/api/config'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           cache: 'no-store',
-          body: JSON.stringify(storeConfig)
+          body: JSON.stringify(draft)
         });
         let result = {};
         try { result = await response.json(); } catch (_) {}
@@ -10141,10 +9992,9 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
         // Lấy cấu hình máy chủ trả về để giao diện không giữ lại dữ liệu cũ.
         if (result.config && typeof result.config === 'object') {
-          storeConfig = { ...storeConfig, ...result.config };
+          applyServerConfig(result.config, result.configVersion);
         }
         saveLocalData();
-        broadcastMeshEvent('CONFIG_UPDATE', { config: storeConfig });
         renderBackendConfig();
         showSmsToast("💾 ĐÃ LƯU CÀI ĐẶT!", "Thông tin đã được máy chủ xác nhận và đồng bộ ra giao diện.");
       } catch (error) {
@@ -10388,7 +10238,9 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     let previewSlideTimer = null;
 
     function getBannerConfig() {
-      // Ưu tiên 1: Đọc từ bản sao lưu tùy biến bảo vệ bất biến
+      // Cấu hình vừa nhận từ server là nguồn chính, kể cả danh sách ảnh rỗng.
+      if (storeConfig && storeConfig.banner && Array.isArray(storeConfig.banner.images)) return storeConfig.banner;
+      // Bản cục bộ chỉ là dự phòng trước khi nhận cấu hình máy chủ.
       let customBanner = null;
       try {
         customBanner = JSON.parse(localStorage.getItem('duynh_custom_banner_backup') || 'null');
@@ -10901,7 +10753,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
       saveLocalData();
       renderFrontendBanner();
-      broadcastMeshEvent('CONFIG_UPDATE', { config: storeConfig, configVersion: lastConfigVersion });
+      broadcastMeshEvent('CONFIG_UPDATE', { config: { banner: updatedBanner }, configVersion: lastConfigVersion });
       playSuccessChime();
 
       // Gửi trực tiếp lên Render Cloud không dùng keepalive để tránh giới hạn 64KB
@@ -10909,7 +10761,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         fetch(getCloudApiUrl('/api/config'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(storeConfig)
+          body: JSON.stringify({ banner: updatedBanner })
         }).then(r => r.json()).then(res => {
           console.log('✅ Đã lưu cấu hình Banner lên Render Cloud:', res);
         }).catch(err => console.warn('Lỗi POST /api/config:', err));
@@ -11232,7 +11084,6 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
             'X-Device-Id': LOCAL_DEVICE_ID
           },
           body: JSON.stringify({
-            orders: sanitizeOrdersForMesh(orders),
             menu: menu,
             discounts: discounts,
             config: storeConfig,
@@ -11241,10 +11092,11 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
             senderId: LOCAL_DEVICE_ID
           }),
           // keepalive removed for max payload safety
-        }).then(() => {
+        }).then(async response => {
+          if (!response.ok) { const result = await response.json(); throw new Error(result.error || 'Chưa lưu được dữ liệu'); }
           showSmsToast("📡 ĐỒNG BỘ 100% THÀNH CÔNG!", "Toàn bộ ảnh món thật, giá và banner đã được cập nhật tới tất cả điện thoại.");
         }).catch(() => {
-          showSmsToast("📡 ĐÃ PHÁT SÓNG ĐỒNG BỘ!", "Dữ liệu đã gửi qua WebSocket tới các máy khác.");
+          showSmsToast("⚠️ CHƯA LƯU ĐƯỢC DỮ LIỆU", "Máy chủ chưa xác nhận lưu. Vui lòng thử lại.");
         });
       } catch(e) {}
 

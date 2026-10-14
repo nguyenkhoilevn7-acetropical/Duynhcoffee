@@ -13,6 +13,7 @@ const url = require('url');
 const os = require('os');
 const crypto = require('crypto');
 const { createBackup } = require('./drive-backup');
+const { createReceiptVerifier } = require('./receipt-verification');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const ROOT_DIR = __dirname;
@@ -119,6 +120,16 @@ if (!restoredFromDrive && (!fs.existsSync(CONFIG_FILE) || !configCache || typeof
   writeJsonFile(CONFIG_FILE, configCache);
 }
 
+const receiptVerifier = createReceiptVerifier({ readState: () => ({ menu: menuCache, config: configCache, discounts: discountsCache }) });
+function mergeConfig(current, patch) {
+  return { ...current, ...patch,
+    bankConfig: { ...(current.bankConfig || {}), ...(patch.bankConfig || {}) },
+    momoConfig: { ...(current.momoConfig || {}), ...(patch.momoConfig || {}) } };
+}
+function checkOrder(order) {
+  receiptVerifier.assertVerified(order);
+  return { ...order, verificationToken: undefined, paymentStatus: 'receipt_verified' };
+}
 // Quản lý phiên bản dữ liệu và mã nguồn (Data & Code Versioning)
 let codeVersion = Date.now();
 let menuVersion = Date.now();
@@ -286,6 +297,9 @@ function broadcastRealtime(eventType, data, senderClient = null, senderId = null
       try { client.send(payloadStr); } catch (e) { wsClients.delete(client); }
     }
   }
+  for (const client of sseClients) {
+    try { client.write('data: ' + payloadStr + '\n\n'); } catch (_) { sseClients.delete(client); }
+  }
   return;
 }
 
@@ -314,6 +328,7 @@ function _legacyBroadcast(eventType, data) {for (const client of wsClients) {
 function handleClientWsMessage(payload, senderClient) {
   const type = payload.type;
   if (type === 'NEW_ORDER' && payload.order) {
+    try { payload.order = checkOrder(payload.order); } catch (_) { return; }
     ordersCache = readJsonFile(ORDERS_FILE, ordersCache);
     const existingIdx = ordersCache.findIndex(o => o.id === payload.order.id);
     if (existingIdx >= 0) {
@@ -328,7 +343,7 @@ function handleClientWsMessage(payload, senderClient) {
     writeJsonFile(MENU_FILE, menuCache);
     broadcastRealtime('MENU_UPDATE', menuCache, senderClient, payload.senderId);
   } else if (type === 'CONFIG_UPDATE' && payload.config) {
-    configCache = { ...configCache, ...payload.config };
+    configCache = mergeConfig(configCache, payload.config);
     writeJsonFile(CONFIG_FILE, configCache);
     broadcastRealtime('CONFIG_UPDATE', configCache, senderClient, payload.senderId);
   } else if (type === 'ORDER_STATUS') {
@@ -655,6 +670,7 @@ const server = http.createServer(async (req, res) => {
         const body = await parseRequestBody(req);
         if (body) {
           if (Array.isArray(body.orders) && body.orders.length > 0) {
+            body.orders = body.orders.map(checkOrder);
             ordersCache = readJsonFile(ORDERS_FILE, ordersCache);
             body.orders.forEach(co => {
               const idx = ordersCache.findIndex(o => o.id === co.id);
@@ -672,7 +688,7 @@ const server = http.createServer(async (req, res) => {
             writeJsonFile(DISCOUNTS_FILE, discountsCache);
           }
           if (body.config && typeof body.config === 'object') {
-            configCache = { ...configCache, ...body.config };
+            configCache = mergeConfig(configCache, body.config);
             writeJsonFile(CONFIG_FILE, configCache);
           }
                     ordersVersion = Date.now();
@@ -710,6 +726,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      try { Object.assign(body, checkOrder(body)); } catch (error) { sendJson(res, 422, { error: error.message }); return; }
       ordersCache = readJsonFile(ORDERS_FILE, ordersCache);
       const existingIdx = ordersCache.findIndex(o => o.id === body.id);
       if (existingIdx >= 0) {
@@ -757,6 +774,7 @@ const server = http.createServer(async (req, res) => {
       ordersCache = readJsonFile(ORDERS_FILE, ordersCache);
       let order = ordersCache.find(o => o.id === orderId);
 
+      try { checkOrder({ ...(order || body.order || {}), ...body, receiptImage }); } catch (error) { sendJson(res, 422, { error: error.message }); return; }
       if (order) {
         order.receiptImage = receiptImage;
         order.paymentStatus = 'receipt_submitted';
@@ -861,10 +879,10 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST') {
       try {
         const body = await parseRequestBody(req);
-        configCache = { ...configCache, ...body };
+        configCache = mergeConfig(configCache, body);
         if (!writeJsonFile(CONFIG_FILE, configCache)) throw new Error('Không lưu được cài đặt');
         broadcastRealtime('CONFIG_UPDATE', configCache);
-        sendJson(res, 200, { success: true, config: configCache, backup: backupService.status() });
+        sendJson(res, 200, { success: true, config: configCache, configVersion, backup: backupService.status() });
       } catch (err) {
         sendJson(res, 500, { error: err.message });
       }
@@ -926,7 +944,8 @@ const server = http.createServer(async (req, res) => {
 
   // 8. POST /api/verify-receipt
   if (pathname === '/api/verify-receipt' && req.method === 'POST') {
-    sendJson(res, 200, { isValid: true, reason: 'Đã nhận diện hóa đơn chuyển khoản ngân hàng thành công' });
+    try { sendJson(res, 200, await receiptVerifier.verify(await parseRequestBody(req))); }
+    catch (error) { sendJson(res, 422, { isValid: false, error: error.message }); }
     return;
   }
 
@@ -937,7 +956,7 @@ const server = http.createServer(async (req, res) => {
   // Source code and local data are not static assets.
   let normalized;
   try { normalized = path.posix.normalize(decodeURIComponent(cleanPath)); } catch { sendJson(res, 400, { error: 'Đường dẫn không hợp lệ' }); return; }
-  if (normalized.split('/').some(part => part.startsWith('.')) || ['server.js', 'drive-backup.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || normalized.startsWith('/test/') || /\.(tmp|md)$/.test(normalized)) {
+  if (normalized.split('/').some(part => part.startsWith('.')) || ['server.js', 'drive-backup.js', 'receipt-verification.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || normalized.startsWith('/test/') || /\.(tmp|md)$/.test(normalized)) {
     sendJson(res, 404, { error: 'Không tìm thấy' }); return;
   }
   if (cleanPath === '/' || cleanPath === '/admin' || cleanPath === '/pos') {
