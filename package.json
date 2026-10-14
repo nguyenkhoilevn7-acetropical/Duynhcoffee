@@ -9,6 +9,8 @@
   "dependencies": {
     "@tesseract.js-data/eng": "1.0.0",
     "@tesseract.js-data/vie": "1.0.0",
+    "jpeg-js": "0.4.4",
+    "pngjs": "7.0.0",
     "tesseract.js": "5.1.1",
     "ws": "^8.16.0"
   },

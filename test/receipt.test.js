@@ -54,11 +54,11 @@ test('fails closed on OCR outage, bad images and disabled discounts', async () =
 test('OCR deadline reports unavailable, allows retry and does not issue verification proof', async () => {
   const state={menu:[{id:1,price:45000}],config:{bankConfig:{accountHolder:'DAO KHOI NGUYEN'}},discounts:[]};
   let stall=true;
-  const service=createReceiptVerifier({readState:()=>state,recognize:()=>stall ? new Promise(()=>{}) : Promise.resolve(text)});
+  const service=createReceiptVerifier({readState:()=>state,deadlineMs:50,recognize:()=>stall ? new Promise(()=>{}) : Promise.resolve(text)});
   const body={image:'data:image/png;base64,YWJj',items:[{id:1,qty:1}]};
   const started=Date.now();
   await assert.rejects(service.verify(body), /Chưa thể kết luận/);
-  assert.ok(Date.now()-started < 15500);
+  assert.ok(Date.now()-started < 1000);
   stall=false;
   assert.equal((await service.verify(body)).isValid,true);
 });

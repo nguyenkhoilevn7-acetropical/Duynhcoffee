@@ -6886,21 +6886,41 @@ function toggleKitchenSoundAlert() {
     }
 
     async function runClientVerifyData(base64Str, expAmt, onProgressCallback, order = null) {
-      const controller = new AbortController();
-      const deadline = setTimeout(() => controller.abort(), 20000);
+      async function request(path, options = {}) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 12000);
+        try {
+          const response = await fetch(getCloudApiUrl(path), { ...options, cache: 'no-store', signal: controller.signal });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || 'Chưa xác minh được biên lai');
+          return result;
+        } finally { clearTimeout(timeout); }
+      }
       try {
-        if (onProgressCallback) onProgressCallback(35, 'Máy chủ đang đọc tên người nhận và số tiền...');
+        if (onProgressCallback) onProgressCallback(35, 'Đang đọc tên người nhận và số tiền...');
         const items = order ? order.items.map(i => ({ id: i.id, qty: i.qty })) : cart.map(c => ({ id: c.item.id, qty: c.qty }));
-        const response = await fetch(getCloudApiUrl('/api/verify-receipt'), {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store', signal: controller.signal,
+        let job = await request('/api/receipt-scans', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: base64Str, items, discountCode: order ? order.discount?.code : activeDiscount?.code })
         });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || result.reason || 'Chưa xác minh được biên lai');
-        return result;
+        const started = Date.now();
+        let networkFailures = 0;
+        while (job.status === 'pending' && Date.now() - started < 60000) {
+          if (Date.now() - started > 5000 && onProgressCallback) onProgressCallback(65, 'Máy chủ vẫn đang đọc biên lai; đang chờ kết quả...');
+          await new Promise(resolve => setTimeout(resolve, 700));
+          try {
+            job = await request('/api/receipt-scans/' + encodeURIComponent(job.jobId));
+            networkFailures = 0;
+          } catch (error) {
+            if (error.name !== 'AbortError' && !(error instanceof TypeError)) throw error;
+            if (++networkFailures > 2) throw error;
+          }
+        }
+        if (job.status === 'complete') return job.result;
+        throw new Error(job.error || 'Máy chủ vẫn đang xử lý. Tải lại cùng ảnh để nhận tác vụ đang chạy; chưa có kết luận sai thông tin.');
       } catch (error) {
-        return { isValid: false, verificationUnavailable: true, reason: error.name === 'AbortError' ? 'Kết nối quét đang chậm. Chưa thể xác minh biên lai; vui lòng thử lại.' : error.message };
-      } finally { clearTimeout(deadline); }
+        return { isValid: false, verificationUnavailable: true, reason: error.name === 'AbortError' ? 'Kết nối đang chậm. Biên lai vẫn được xử lý trên máy chủ; vui lòng thử lại cùng ảnh.' : error.message };
+      }
     }
 
     function handleReceiptImageUpload(arg) {
@@ -6974,6 +6994,7 @@ function toggleKitchenSoundAlert() {
         playAudioChime(750, 0.08);
 
         function updateScanProgressUi(pct, stepText) {
+          if (scanGeneration !== receiptScanGeneration) return;
           if (reticleLabel) reticleLabel.textContent = `AI SCANNING (${pct}%)...`;
           if (submitBtn) submitBtn.innerHTML = `<span>⏳</span> <span>${stepText}</span>`;
           if (tickerEl) {

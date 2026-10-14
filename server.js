@@ -14,6 +14,7 @@ const os = require('os');
 const crypto = require('crypto');
 const { createBackup } = require('./drive-backup');
 const { createReceiptVerifier } = require('./receipt-verification');
+const { createReceiptJobs } = require('./receipt-jobs');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const ROOT_DIR = __dirname;
@@ -121,6 +122,7 @@ if (!restoredFromDrive && (!fs.existsSync(CONFIG_FILE) || !configCache || typeof
 }
 
 const receiptVerifier = createReceiptVerifier({ readState: () => ({ menu: menuCache, config: configCache, discounts: discountsCache }) });
+const receiptJobs = createReceiptJobs({ verify: body => receiptVerifier.verify(body) });
 function mergeConfig(current, patch) {
   return { ...current, ...patch,
     bankConfig: { ...(current.bankConfig || {}), ...(patch.bankConfig || {}) },
@@ -942,7 +944,20 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // 8. POST /api/verify-receipt
+  // Short requests let the browser follow existing work instead of restarting OCR.
+  if (pathname === '/api/receipt-scans' && req.method === 'POST') {
+    try {
+      const body = await parseRequestBody(req);
+      sendJson(res, 202, receiptJobs.start(body, receiptVerifier.requestKey(body)));
+    } catch (error) { sendJson(res, 422, { error: error.message }); }
+    return;
+  }
+  if (pathname.startsWith('/api/receipt-scans/') && req.method === 'GET') {
+    const job = receiptJobs.get(pathname.slice('/api/receipt-scans/'.length));
+    sendJson(res, job ? 200 : 404, job || { error: 'Tác vụ quét đã hết hạn hoặc máy chủ vừa khởi động lại. Vui lòng thử lại.' });
+    return;
+  }
+  // 8. POST /api/verify-receipt (preserved for existing integrations)
   if (pathname === '/api/verify-receipt' && req.method === 'POST') {
     try { sendJson(res, 200, await receiptVerifier.verify(await parseRequestBody(req))); }
     catch (error) { sendJson(res, 422, { isValid: false, error: error.message }); }
@@ -956,7 +971,7 @@ const server = http.createServer(async (req, res) => {
   // Source code and local data are not static assets.
   let normalized;
   try { normalized = path.posix.normalize(decodeURIComponent(cleanPath)); } catch { sendJson(res, 400, { error: 'Đường dẫn không hợp lệ' }); return; }
-  if (normalized.split('/').some(part => part.startsWith('.')) || ['server.js', 'drive-backup.js', 'receipt-verification.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || normalized.startsWith('/test/') || /\.(tmp|md)$/.test(normalized)) {
+  if (normalized.split('/').some(part => part.startsWith('.')) || ['server.js', 'drive-backup.js', 'receipt-verification.js', 'receipt-jobs.js', 'receipt-image.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || normalized.startsWith('/test/') || /\.(tmp|md)$/.test(normalized)) {
     sendJson(res, 404, { error: 'Không tìm thấy' }); return;
   }
   if (cleanPath === '/' || cleanPath === '/admin' || cleanPath === '/pos') {

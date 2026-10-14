@@ -56,7 +56,7 @@ function compareReceipt(text, amount, holder) {
   });
   const matchedAmount = Number.isSafeInteger(amount) && amount > 0 && detected.includes(amount);
   return { isValid: matchedRecipient && matchedAmount, matchedRecipient, matchedAmount,
-    matchedHolder: matchedRecipient ? holder : null, detectedAmount: matchedAmount ? amount : null,
+    matchedHolder: matchedRecipient ? holder : null, detectedAmount: matchedAmount ? amount : (detected.length === 1 ? detected[0] : null),
     reason: !matchedRecipient ? 'Không đọc được đúng tên người nhận đã cấu hình trên biên lai.' : !matchedAmount ? (detected.length ? 'Số tiền trên biên lai không khớp tiền nước cần thanh toán.' : 'Chưa đọc được số tiền trên biên lai. Hãy tải ảnh gốc rõ nét hơn.') : '' };
 }
 function calculateAmount(items, menu, discounts, code) {
@@ -75,7 +75,7 @@ function calculateAmount(items, menu, discounts, code) {
   if (!Number.isSafeInteger(total) || total <= 0) throw new Error('Số tiền không hợp lệ');
   return total;
 }
-function createReceiptVerifier({ readState, recognize, now = Date.now }) {
+function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineMs = 45000 }) {
   const secret = crypto.randomBytes(32);
   let worker, workerReady, busy = false, workerGeneration = 0;
   const hash = image => crypto.createHash('sha256').update(image).digest('hex');
@@ -97,18 +97,29 @@ function createReceiptVerifier({ readState, recognize, now = Date.now }) {
         // than the floating-point models used by default.
         fs.copyFileSync(path.join(data.langPath + '_best_int', language + '.traineddata.gz'), path.join(languageDir, language + '.traineddata.gz'));
       }
-      const initialized = await createWorker('eng+vie', 1, { langPath: languageDir, gzip: true, cacheMethod: 'none', errorHandler: () => {} });
+      const initialized = await createWorker('vie', 1, { langPath: languageDir, gzip: true, cacheMethod: 'none', errorHandler: () => {} });
       if (generation !== workerGeneration) { await initialized.terminate(); throw new Error('OCR initialization cancelled'); }
       worker = initialized;
       await worker.setParameters({ tessedit_pageseg_mode: '6' });
     })().catch(error => { if (generation === workerGeneration) workerReady = null; throw error; });
     return workerReady;
   }
-  async function ocr(image) {
+  async function ocr(image, amount, holder) {
     if (recognize) return recognize(image);
     await warmup();
-    const result = await worker.recognize(Buffer.from(image.split(',')[1], 'base64'));
-    return result.data.text;
+    const { prepareReceipt } = require('./receipt-image');
+    const prepared = prepareReceipt(Buffer.from(image.split(',')[1], 'base64'), image.match(/^data:image\/(\w+)/)[1]);
+    // Remove pale watermarks and decorative backgrounds before recognizing text.
+    const first = await worker.recognize(prepared.cleaned);
+    const comparison = compareReceipt(first.data.text, amount, holder);
+    if (comparison.isValid || (comparison.matchedRecipient && comparison.detectedAmount !== null)) return first.data.text;
+    // Do not discard faint text on unfamiliar receipts: retry the original
+    // colors with both languages only when the quick pass is inconclusive.
+    await worker.reinitialize('eng+vie', 1);
+    try {
+      const fallback = await worker.recognize(prepared.original);
+      return fallback.data.text;
+    } finally { await worker.reinitialize('vie', 1); }
   }
   async function verify(body) {
     const image = body.image || body.receiptImage;
@@ -120,9 +131,11 @@ function createReceiptVerifier({ readState, recognize, now = Date.now }) {
     if (busy) throw new Error('Máy chủ đang đọc một biên lai khác. Vui lòng thử lại sau');
     busy = true;
     let timer;
+    const processingStarted = Date.now();
     try {
-      const text = await Promise.race([ocr(image), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Máy chủ chưa đọc xong biên lai. Chưa thể kết luận số tiền hoặc tên người nhận sai; vui lòng thử lại.')), 15000); })]);
+      const text = await Promise.race([ocr(image, amount, holder), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Máy chủ chưa đọc xong biên lai. Chưa thể kết luận số tiền hoặc tên người nhận sai; vui lòng thử lại.')), deadlineMs); })]);
       const result = compareReceipt(text, amount, holder);
+      result.processingMs = Date.now() - processingStarted;
       if (result.isValid) {
         const encoded = Buffer.from(JSON.stringify({ image: hash(image), amount, holder: normalize(holder), expires: now() + 15 * 60000 })).toString('base64url');
         result.verificationToken = encoded + '.' + sign(encoded);
@@ -146,6 +159,15 @@ function createReceiptVerifier({ readState, recognize, now = Date.now }) {
     if (proof.expires < now() || proof.image !== hash(String(order.receiptImage || '')) || proof.amount !== amount || Number(order.total) !== amount || proof.holder !== normalize(state.config.bankConfig && state.config.bankConfig.accountHolder)) throw new Error('Giỏ hàng hoặc người nhận đã thay đổi. Vui lòng quét lại biên lai');
     return true;
   }
-  return { verify, assertVerified, warmup };
+  function requestKey(body) {
+    const image = body.image || body.receiptImage;
+    if (typeof image !== 'string' || !/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(image) || image.length > 6 * 1024 * 1024) throw new Error('Hãy tải ảnh PNG, JPEG hoặc WebP dưới 4 MB');
+    const state = readState();
+    const amount = calculateAmount(body.items, state.menu, state.discounts, body.discountCode);
+    const holder = normalize(state.config.bankConfig && state.config.bankConfig.accountHolder);
+    if (!holder) throw new Error('Chưa cấu hình tên người nhận');
+    return hash(image + ':' + amount + ':' + holder);
+  }
+  return { verify, assertVerified, warmup, requestKey };
 }
 module.exports = { normalize, compareReceipt, calculateAmount, createReceiptVerifier };
