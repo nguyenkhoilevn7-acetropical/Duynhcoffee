@@ -67,3 +67,26 @@ test('slow HTTP polling has only one outstanding request and releases guard afte
   resolve({ok:false});await pending;
   const next=s.pullFullSyncFromServer();assert.equal(requests,2);resolve({ok:false});await next;
 });
+test('banner releases hidden images after transition and loads the requested slide',()=>{
+  let finish;
+  const imgs=[{src:'a'},{src:null},{src:null}].map(x=>({...x,getAttribute(){return this.src;},removeAttribute(){this.src=null;}}));
+  const slides=imgs.map(img=>({querySelector:()=>img,classList:{toggle(){}}}));
+  const track={};
+  const s={window:{},bannerActiveSlideIndex:1,getBannerConfig:()=>({images:['a','b','c']}),
+    setTimeout:fn=>{finish=fn;return 1;},clearTimeout(){},
+    document:{querySelectorAll:q=>q.includes('track')?slides:[],getElementById:()=>track}};
+  vm.createContext(s);
+  vm.runInContext(html.slice(html.indexOf('    function updateFrontendSliderDom'),html.indexOf('    function copyBannerPromoCode')),s);
+  s.updateFrontendSliderDom('fade');assert.equal(imgs[1].src,'b');assert.equal(imgs[0].src,'a');assert.equal(imgs[2].src,null);
+  finish();assert.equal(imgs[0].src,null);assert.equal(imgs[1].src,'b');
+});
+test('receipt decoding releases bitmap and canvas before starting verification',async()=>{
+  let closed=false,canvas={width:0,height:0,getContext:()=>({drawImage(){}}),toDataURL:()=> 'data:image/png;base64,ok'};
+  const s={createImageBitmap:async()=>({width:900,height:1200,close(){closed=true;}}),
+    document:{createElement:()=>canvas},showSmsToast(){throw Error('unexpected error');}};
+  vm.createContext(s);
+  vm.runInContext(html.slice(html.indexOf('    async function compressReceiptImage'),html.indexOf('    async function runClientVerifyData')),s);
+  let called=false;
+  await s.compressReceiptImage({},data=>{called=true;assert.equal(data,'data:image/png;base64,ok');assert.equal(closed,true);assert.equal(canvas.width,0);});
+  assert.equal(called,true);
+});

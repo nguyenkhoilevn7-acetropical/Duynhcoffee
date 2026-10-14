@@ -6849,21 +6849,41 @@ function toggleKitchenSoundAlert() {
       };
     }
 
-    function compressReceiptImage(file, callback) {
-      const url = URL.createObjectURL(file);
-      const image = new Image();
-      image.onload = () => {
-        const scale = Math.min(1, 900 / Math.max(image.width, image.height));
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.max(1, Math.round(image.width * scale));
-        canvas.height = Math.max(1, Math.round(image.height * scale));
-        canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
-        URL.revokeObjectURL(url);
-        // PNG avoids slow server JPEG decoding and preserves crisp receipt text.
-        callback(canvas.toDataURL('image/png'));
-      };
-      image.onerror = () => { URL.revokeObjectURL(url); showSmsToast('Không đọc được ảnh', 'Hãy chọn ảnh biên lai PNG hoặc JPEG.'); };
-      image.src = url;
+    async function compressReceiptImage(file, callback) {
+      let url = null, image = null, bitmap = null, canvas = null;
+      let dataUrl;
+      try {
+        // Decode directly at receipt resolution when supported; avoid retaining a full-size photo.
+        if (typeof createImageBitmap === 'function') {
+          try { bitmap = await createImageBitmap(file, { resizeWidth: 900, resizeQuality: 'high' }); }
+          catch (_) { /* Older browsers use the Image fallback. */ }
+        }
+        if (!bitmap) {
+          url = URL.createObjectURL(file);
+          image = new Image();
+          await new Promise((resolve, reject) => {
+            image.onload = resolve;
+            image.onerror = reject;
+            image.src = url;
+          });
+        }
+        const source = bitmap || image;
+        const scale = Math.min(1, 900 / Math.max(source.width, source.height));
+        canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(source.width * scale));
+        canvas.height = Math.max(1, Math.round(source.height * scale));
+        canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height);
+        dataUrl = canvas.toDataURL('image/png');
+      } catch (_) {
+        showSmsToast('Không đọc được ảnh', 'Hãy chọn ảnh biên lai PNG hoặc JPEG.');
+        return;
+      } finally {
+        if (bitmap) bitmap.close();
+        if (image) { image.onload = image.onerror = null; image.src = ''; }
+        if (url) URL.revokeObjectURL(url);
+        if (canvas) { canvas.width = 0; canvas.height = 0; }
+      }
+      callback(dataUrl);
     }
 
     async function runClientVerifyData(base64Str, expAmt, onProgressCallback, order = null) {
@@ -10391,8 +10411,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       if (bannerBox && imgContainer) {
         // Keep existing images and autoplay position when unrelated settings/menu sync arrives.
         const sliderKey = JSON.stringify([images, b.transitionEffect || 'fade', Number(b.autoplaySpeed) || 3.5]);
-        if (imgContainer.dataset.sliderKey === sliderKey) return;
-        imgContainer.dataset.sliderKey = sliderKey;
+        if (imgContainer._sliderKey === sliderKey) return;
+        imgContainer._sliderKey = sliderKey;
         if (bannerSlideTimer) { clearInterval(bannerSlideTimer); bannerSlideTimer = null; }
         if (images.length > 0) {
           bannerBox.classList.add('has-ad-image');
@@ -10406,7 +10426,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
               <div class="hero-slider-track" id="frontend-slider-track">
                 ${images.map((img, idx) => `
                   <div class="hero-slider-slide ${idx === 0 ? 'active' : ''}" data-index="${idx}">
-                    <img src="${img}" alt="Quảng cáo ${idx + 1}">
+                    <img ${idx === 0 ? `src="${img}"` : ''} decoding="async" alt="Quảng cáo ${idx + 1}">
                   </div>
                 `).join('')}
               </div>
@@ -10469,9 +10489,21 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       const dots = document.querySelectorAll('#frontend-banner-slider .hero-slider-dot');
       const track = document.getElementById('frontend-slider-track');
 
+      const images = getBannerConfig().images || [];
       slides.forEach((s, idx) => {
+        const img = s.querySelector('img');
+        if (idx === bannerActiveSlideIndex && img && img.getAttribute('src') !== images[idx]) img.src = images[idx];
         s.classList.toggle('active', idx === bannerActiveSlideIndex);
       });
+      // Release hidden image resources after the transition, rather than decoding every banner at once.
+      if (track) {
+        clearTimeout(track._releaseTimer);
+        track._releaseTimer = setTimeout(() => {
+          slides.forEach((s, idx) => {
+            if (idx !== bannerActiveSlideIndex) s.querySelector('img')?.removeAttribute('src');
+          });
+        }, 800);
+      }
       dots.forEach((d, idx) => {
         d.classList.toggle('active', idx === bannerActiveSlideIndex);
       });
