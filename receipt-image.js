@@ -22,12 +22,17 @@ function prepareReceipt(buffer, mime) {
     const source = (Math.min(image.height - 1, Math.floor(y / scale)) * image.width + Math.min(image.width - 1, Math.floor(x / scale))) * 4;
     const target = (y * width + x) * 4;
     const alpha = image.data[source + 3] / 255;
-    const colors = [0,1,2].map(c => Math.round(image.data[source + c] * alpha + 255 * (1 - alpha)));
-    const value = colors[0] * 0.299 + colors[1] * 0.587 + colors[2] * 0.114 < 190 ? 0 : 255;
-    for (let c = 0; c < 3; c++) { original.data[target + c] = colors[c]; cleaned.data[target + c] = value; }
+    const white = 255 * (1 - alpha);
+    const red = image.data[source] * alpha + white;
+    const green = image.data[source + 1] * alpha + white;
+    const blue = image.data[source + 2] * alpha + white;
+    const value = red * 0.299 + green * 0.587 + blue * 0.114 < 190 ? 0 : 255;
+    original.data[target] = red; original.data[target + 1] = green; original.data[target + 2] = blue;
+    cleaned.data[target] = cleaned.data[target + 1] = cleaned.data[target + 2] = value;
     original.data[target + 3] = cleaned.data[target + 3] = 255;
   }
   const options = { deflateLevel: 1 };
-  return { cleaned: PNG.sync.write(cleaned, options), original: PNG.sync.write(original, options) };
+  let originalPng;
+  return { cleaned: PNG.sync.write(cleaned, options), get original() { return originalPng || (originalPng = PNG.sync.write(original, options)); } };
 }
 module.exports = { prepareReceipt };

@@ -95,7 +95,8 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
         const data = require('@tesseract.js-data/' + language);
         // Integer models are bundled in the existing packages and much smaller
         // than the floating-point models used by default.
-        fs.copyFileSync(path.join(data.langPath + '_best_int', language + '.traineddata.gz'), path.join(languageDir, language + '.traineddata.gz'));
+        const source = language === 'vie' ? path.join(__dirname, 'ocr-data', 'vie.traineddata.gz') : path.join(data.langPath + '_best_int', language + '.traineddata.gz');
+        fs.copyFileSync(source, path.join(languageDir, language + '.traineddata.gz'));
       }
       const initialized = await createWorker('vie', 1, { langPath: languageDir, gzip: true, cacheMethod: 'none', errorHandler: () => {} });
       if (generation !== workerGeneration) { await initialized.terminate(); throw new Error('OCR initialization cancelled'); }
