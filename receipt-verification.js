@@ -4,60 +4,99 @@ function normalize(value) {
   return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'D').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
 }
 function compareReceipt(text, amount, holder) {
-  const lines = String(text || '').split(/\r?\n/).map(normalize).filter(Boolean);
+  const successLabel = /^(?:GIAO DICH|CHUYEN TIEN|CHUYEN KHOAN|THANH TOAN) THANH CONG\b|^(?:TRANSFER SUCCESSFUL|SUCCESSFUL TRANSFER|PAYMENT SUCCESSFUL)\b/;
+  const allRows = String(text || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  const successAt = allRows.findIndex(row => successLabel.test(normalize(row)));
+  // Locate payment evidence inside its own receipt, never in surrounding
+  // checkout instructions or a second transaction shown in the same image.
+  const rawRows = successAt >= 0 ? allRows.slice(successAt) : allRows;
+  const secondSuccess = rawRows.findIndex((row,i) => i > 0 && successLabel.test(normalize(row)));
+  const rows = secondSuccess >= 0 ? rawRows.slice(0,secondSuccess) : rawRows;
+  const lines = rows.map(normalize);
   const name = normalize(holder);
-  const recipientLabel = /(?:NGUOI (?:NHAN|THU HUONG|HUONG)|TEN (?:NGUOI NHAN|TAI KHOAN|THU HUONG)|CHU TAI KHOAN|BENEFICIARY|RECIPIENT|TO ACCOUNT)/;
-  const directLabel = new RegExp('^(?:' + recipientLabel.source + ')\\b');
-  const otherField = /^(?:SO (?:THE|TK|TAI KHOAN|DU|TIEN)|NGAN HANG|TIN NHAN|LUU|NOI DUNG|NGUOI GUI|BANK|ACCOUNT|AMOUNT|SENDER|CONTENT)\b/;
-  const recipientFields = lines.flatMap((line, i) => {
-    if (!directLabel.test(line)) return [];
-    const field = line.replace(directLabel, '').trim() || lines[i + 1] || '';
-    return field && !otherField.test(field) ? [field] : [];
-  });
-  // Match the complete ordered name in the directly labeled recipient field.
-  // Reminder text and sender/bank rows must never become recipient evidence.
-  const matchedRecipient = !!name && recipientFields.some(field => (' ' + field + ' ').includes(' ' + name + ' '));
-  const recipientReadable = recipientFields.some(field => /^[A-Z]{2,}(?: [A-Z]{2,}){1,6}$/.test(field));
-  const rawLines = String(text || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-  let moneyLines = [];
-  for (let i = 0; i < rawLines.length; i++) {
-    if (/\b(?:SO TIEN|AMOUNT|TRANSFER AMOUNT)\b/.test(normalize(rawLines[i]))) {
-      moneyLines.push(rawLines[i]);
-      if (rawLines[i + 1] && !/\d/.test(rawLines[i])) moneyLines.push(rawLines[i + 1]);
+  const recipientLabel = /^(?:THONG TIN NGUOI (?:NHAN|THU HUONG)|TEN (?:NGUOI )?(?:THU HUONG|NHAN|HUONG)|TEN CHU TAI KHOAN|TEN TAI KHOAN|CHU TAI KHOAN|NGUOI (?:THU HUONG|NHAN|HUONG)|TAI KHOAN (?:THU HUONG|NHAN)|TK (?:THU HUONG|NHAN)|BENEFICIARY NAME|RECIPIENT NAME|BENEFICIARY|RECIPIENT|TO ACCOUNT|DEN TAI KHOAN)\b/;
+  const senderLabel = /^(?:THONG TIN NGUOI (?:GUI|CHUYEN)|NGUOI (?:GUI|CHUYEN)|TAI KHOAN (?:NGUON|TRICH NO)|TK TRICH NO|NGUON TIEN|TU TAI KHOAN|FROM ACCOUNT|SENDER)\b/;
+  const otherField = /^(?:SO (?:THE|TK|TAI KHOAN|DU|TIEN)|NGAN HANG|TIN NHAN|LUU|NOI DUNG|NGUOI GUI|BANK|ACCOUNT|AMOUNT|SENDER|CONTENT|PHI|MA GIAO DICH|THOI GIAN)\b/;
+  const personName = field => /^[A-Z]{2,}(?: [A-Z]{2,}){1,6}$/.test(field) && !otherField.test(field);
+  let inSender = false;
+  const recipientFields = [];
+  for (let i=0;i<lines.length;i++) {
+    const line=lines[i];
+    if (senderLabel.test(line)) { inSender=true; continue; }
+    if (!recipientLabel.test(line)) continue;
+    const genericOwner = /^(?:CHU TAI KHOAN|TEN (?:CHU )?TAI KHOAN)\b/.test(line);
+    if (inSender && genericOwner) continue;
+    inSender=false;
+    const inline=line.replace(recipientLabel,'').trim();
+    if (inline && !/^\d[\d ]*$/.test(inline)) {
+      if (!otherField.test(inline)) recipientFields.push(inline);
+      continue;
+    }
+    // Account-number rows may precede the name in bank recipient cards.
+    for (let j=i+1;j<Math.min(lines.length,i+4);j++) {
+      if (/^\d[\d ]*$/.test(lines[j])) continue;
+      if (senderLabel.test(lines[j]) || otherField.test(lines[j]) || recipientLabel.test(lines[j])) break;
+      if (personName(lines[j])) recipientFields.push(lines[j]);
+      break;
     }
   }
-  // Wallet receipts often put the amount directly below the success heading,
-  // without a "Số tiền" label. Prefer it over balances, fees or notifications.
-  if (!moneyLines.length) {
-    for (let i = 0; i < rawLines.length; i++) {
-      if (/\b(?:GIAO DICH THANH CONG|CHUYEN TIEN THANH CONG|TRANSFER SUCCESSFUL|SUCCESSFUL TRANSFER)\b/.test(normalize(rawLines[i]))) {
-        moneyLines.push(rawLines[i]);
-        if (rawLines[i + 1]) moneyLines.push(rawLines[i + 1]);
-        break;
-      }
+  const numberPattern = '\\d+(?:(?:[.,]|[ \\t])\\d{3})*(?:[.,]00)?';
+  const currencyPattern = new RegExp('^(' + numberPattern + ')\\s*(?:VND|VNĐ|₫|đ|d|dong)\\s*[^\\p{L}\\p{N}]*$', 'iu');
+  const barePattern = new RegExp('^(' + numberPattern + ')\\s*[^\\p{L}\\p{N}]*$', 'u');
+  const clean = row => row.replace(/\u00a0|\u202f/g,' ').replace(/(\d)\s*([.,])\s*(?=\d)/g,'$1$2').replace(/^[:：]\s*/,'').trim();
+  const parseMoney = (row,allowBare=false) => {
+    const match=clean(row).match(currencyPattern) || (allowBare && clean(row).match(barePattern));
+    if (!match) return null;
+    const value=Number(match[1].replace(/[.,]00$/,'').replace(/[^0-9]/g,''));
+    return Number.isSafeInteger(value) && value>0 ? value : null;
+  };
+  const amountLabel = /^(?:SO TIEN(?: (?:CHUYEN|GIAO DICH|THANH TOAN))?|TONG TIEN THANH TOAN|TRANSFER AMOUNT|TRANSACTION AMOUNT|AMOUNT)\b/;
+  const metadata = /^(?:MA GIAO DICH|MA THAM CHIEU|THOI GIAN|NGAY|NOI DUNG|TIN NHAN|PHI|SO DU|TRANSACTION ID|REFERENCE|DATE|TIME|CONTENT|FEE|BALANCE)\b/;
+  const payments = [], totals = [];
+  for (let i=0;i<rows.length;i++) {
+    if (!amountLabel.test(lines[i]) || /\b(?:PHI|GIAM GIA|FEE|DISCOUNT)\b/.test(lines[i])) continue;
+    const rawValue=rows[i].normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'D').toUpperCase()
+      .replace(amountLabel,'').replace(/^\s*(?:\((?:VND|D|₫)\))?\s*[:：]?\s*/,'');
+    let value=parseMoney(rawValue,true),index=i;
+    if (value===null && rows[i+1] && !metadata.test(lines[i+1])) { value=parseMoney(rows[i+1],true);index=i+1; }
+    if (value!==null) (/^TONG TIEN/.test(lines[i]) ? totals : payments).push({index,value});
+  }
+  if (!payments.length) payments.push(...totals);
+  if (!payments.length && successAt>=0) {
+    for (let i=1;i<Math.min(rows.length,11);i++) {
+      if (metadata.test(lines[i]) || (i>1 && metadata.test(lines[i-1]) && !/\d/.test(rows[i-1]))) continue;
+      let value=parseMoney(rows[i]),index=i;
+      if (value===null && /^(?:VND|D|₫)$/.test(lines[i+1]||'')) { value=parseMoney(rows[i]+' '+rows[i+1]);index=i+1; }
+      if (value===null && /[.,]\d{3}/.test(clean(rows[i]))) value=parseMoney(rows[i],true);
+      if (value!==null) { payments.push({index,value});break; }
     }
   }
-  const numberPattern = /\d+(?:(?:[.,]|[ \t])\d{3})*(?:[.,]00)?/g;
-  const currencyPattern = /(\d+(?:(?:[.,]|[ \t])\d{3})*(?:[.,]00)?)\s*(?:VND|VNĐ|₫|đ|d|dong)(?=\s|$|[)])/gi;
-  const cleanMoneyLine = line => line.replace(/\u00a0|\u202f/g, ' ').replace(/(\d)\s*([.,])\s*(?=\d)/g, '$1$2');
-  let tokens;
-  if (moneyLines.length) {
-    tokens = moneyLines.flatMap(line => cleanMoneyLine(line).match(numberPattern) || []);
-  } else {
-    tokens = rawLines.filter(line => !/\b(?:SO DU|BALANCE|PHI|FEE|THONG BAO|NOI DUNG|TIN NHAN)\b/.test(normalize(line)))
-      .flatMap(line => Array.from(cleanMoneyLine(line).matchAll(currencyPattern), match => match[1]));
+  if (!payments.length && successAt<0) {
+    for (let i=0;i<rows.length;i++) {
+      if (metadata.test(lines[i]) || otherField.test(lines[i])) continue;
+      const value=parseMoney(rows[i]);
+      if (value!==null) payments.push({index:i,value});
+    }
   }
-  const detected = tokens.map(s => {
-    // VND banks can display a trailing decimal .00 or ,00.
-    const integer = s.replace(/[.,]00$/, '');
-    return Number(integer.replace(/[^0-9]/g, ''));
-  });
-  const matchedAmount = Number.isSafeInteger(amount) && amount > 0 && detected.includes(amount);
-  const amountReadable = detected.length === 1 && Number.isSafeInteger(detected[0]) && detected[0] > 0;
-  return { isValid: matchedRecipient && matchedAmount, matchedRecipient, matchedAmount, recipientReadable, amountReadable,
-    matchedHolder: matchedRecipient ? holder : null, detectedAmount: matchedAmount ? amount : (detected.length === 1 ? detected[0] : null),
-    reason: !matchedRecipient ? (recipientReadable ? 'Tên người nhận trên biên lai không khớp tên đã cấu hình.' : 'Không đọc được đúng tên người nhận đã cấu hình trên biên lai.') : !matchedAmount ? (detected.length ? 'Số tiền trên biên lai không khớp tiền nước cần thanh toán.' : 'Chưa đọc được số tiền trên biên lai. Hãy tải ảnh gốc rõ nét hơn.') : '' };
+  // ZaloPay-style recipient card: amount, alphabetic name, adjacent bank row.
+  // Bank/account details locate the card; they are not extra match criteria.
+  if (!recipientFields.length && payments.length===1 && successAt>=0) {
+    const i=payments[0].index;
+    if (personName(lines[i+1]||'') && /^(?:NGAN HANG|BANK)\b/.test(lines[i+2]||'')) recipientFields.push(lines[i+1]);
+  }
+  const names=recipientFields.filter(field => personName(field));
+  const conflictingNames=new Set(names).size>1;
+  const matchedRecipient = !conflictingNames && !!name && recipientFields.some(field => field===name);
+  const recipientReadable=names.length>0 && !conflictingNames;
+  const amounts=[...new Set(payments.map(p=>p.value))];
+  const amountReadable=amounts.length===1;
+  const matchedAmount=Number.isSafeInteger(amount) && amount>0 && amountReadable && amounts[0]===amount;
+  return { isValid:matchedRecipient&&matchedAmount,matchedRecipient,matchedAmount,recipientReadable,amountReadable,
+    matchedHolder:matchedRecipient?holder:null,detectedAmount:amountReadable?amounts[0]:null,
+    reason:!matchedRecipient?(recipientReadable?'Tên người nhận trên biên lai không khớp tên đã cấu hình.':'Chưa đọc rõ tên trong vùng người nhận trên biên lai.'):
+      !matchedAmount?(amountReadable?'Số tiền trên biên lai không khớp tiền nước cần thanh toán.':'Chưa đọc rõ số tiền giao dịch trên biên lai. Hãy tải ảnh gốc rõ nét hơn.') : '' };
 }
+
 function shouldRetryOcr(comparison, confidence) {
   if (comparison.isValid) return false;
   // A readable mismatch is already a decision. Reread only uncertain fields,

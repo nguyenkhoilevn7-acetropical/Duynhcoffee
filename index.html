@@ -5545,17 +5545,20 @@ body {
       if (receiptVerificationContext && receiptVerificationContext !== paymentContext()) invalidateReceiptVerification();
     }
     function applyServerConfig(config, version) {
-      if (!config || typeof config !== 'object' || Array.isArray(config)) return;
-      if (version && lastConfigVersion && version < lastConfigVersion) return;
-      storeConfig = { ...storeConfig, ...config,
+      if (!config || typeof config !== 'object' || Array.isArray(config)) return false;
+      if (version && lastConfigVersion && version < lastConfigVersion) return false;
+      const nextConfig = { ...storeConfig, ...config,
         bankConfig: { ...(storeConfig.bankConfig || {}), ...(config.bankConfig || {}) } };
+      lastConfigVersion = version || lastConfigVersion;
+      if (JSON.stringify(nextConfig) === JSON.stringify(storeConfig)) return false;
+      storeConfig = nextConfig;
       if (config.banner) {
         bannerUploadedImages = Array.isArray(config.banner.images) ? [...config.banner.images] : [];
         try { localStorage.setItem('duynh_custom_banner_backup', JSON.stringify(config.banner)); } catch (_) {}
       }
-      lastConfigVersion = version || lastConfigVersion;
       renderPaymentBankInfo();
       if (document.getElementById('checkout-modal')?.style.display === 'flex') updateCheckoutFinancials();
+      return true;
     }
 
     function renderBackendConfig() {
@@ -5665,7 +5668,9 @@ body {
     }
 
         // ==================== FAST HTTP POLLING TỪ RENDER (CÓ DIFFING CHỐNG LAG) ====================
+    let fullSyncInFlight = false;
     async function pullFullSyncFromServer() {
+      if (fullSyncInFlight) return;
       // Nếu WebSocket đang kết nối trực tiếp, không cần gọi HTTP polling dồn dập
       if (wsClient && wsClient.readyState === 1 && isInitialLoadDone) {
         return;
@@ -5681,8 +5686,11 @@ body {
       }
 
       const startTime = Date.now();
+      fullSyncInFlight = true;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
       try {
-        const resp = await fetch(syncUrl, { cache: 'no-store' });
+        const resp = await fetch(syncUrl, { cache: 'no-store', signal: controller.signal });
         if (resp.ok) {
           const data = await resp.json();
           const latency = Date.now() - startTime;
@@ -5717,6 +5725,9 @@ body {
         }
       } catch(e) {
         // Render đang khởi động hoặc ngủ đông
+      } finally {
+        clearTimeout(timeout);
+        fullSyncInFlight = false;
       }
     }
 
@@ -5839,38 +5850,6 @@ body {
           break;
         }
 
-        case 'HANDSHAKE': {
-          console.log('[Render Handshake] 🤝 Đã nhận toàn bộ dữ liệu mới nhất từ Render Cloud!');
-          if (payload.codeVersion) {
-            window.__posCodeVersion = payload.codeVersion;
-          }
-          if (Array.isArray(payload.menu) && payload.menu.length > 0) {
-            menu = mergeMenuWithServer(payload.menu);
-          }
-          applyServerConfig(payload.config, payload.configVersion);
-          if (Array.isArray(payload.discounts)) {
-            discounts = payload.discounts;
-            saveLocalDiscounts();
-          }
-          if (Array.isArray(payload.orders)) {
-            orders = payload.orders;
-          }
-          lastMenuVersion = payload.menuVersion || Date.now();
-          lastOrdersVersion = payload.ordersVersion || Date.now();
-          lastConfigVersion = payload.configVersion || Date.now();
-          lastDiscountsVersion = payload.discountsVersion || Date.now();
-          debouncedSaveLocalData();
-          renderCustomerProducts();
-          renderFrontendBanner();
-          if (isAdminDevice) {
-            sanitizeOrdersData();
-            renderAllBackendTabs();
-          }
-          updateCartBadge();
-          isInitialLoadDone = true;
-          break;
-        }
-
         case 'MENU_UPDATE': {
           const freshMenu = payload.menu || payload.data;
           if (Array.isArray(freshMenu) && freshMenu.length > 0) {
@@ -5892,7 +5871,7 @@ body {
         }
 
         case 'CONFIG_UPDATE': {
-          applyServerConfig(payload.config || payload.data, payload.configVersion);
+          if (!applyServerConfig(payload.config || payload.data, payload.configVersion)) break;
           debouncedSaveLocalData();
           renderBackendConfig();
           renderCustomerFooterInfo();
@@ -5914,6 +5893,7 @@ body {
           break;
         }
 
+        case 'HANDSHAKE':
         case 'FULL_SYNC':
         case 'RESPONSE_FULL_SYNC': {
           const pData = payload.data || payload;
@@ -5929,34 +5909,33 @@ body {
           // 1. Kiểm tra đơn hàng: Chỉ cập nhật khi ordersVersion thay đổi hoặc lần đầu nạp
           if (Array.isArray(pData.orders)) {
             if (!lastOrdersVersion || (pData.ordersVersion && pData.ordersVersion !== lastOrdersVersion) || !isInitialLoadDone) {
-              orders = pData.orders;
-              lastOrdersVersion = pData.ordersVersion || Date.now();
-              ordersChanged = true;
+              ordersChanged = JSON.stringify(orders) !== JSON.stringify(pData.orders);
+              if (ordersChanged) orders = pData.orders;
+              lastOrdersVersion = pData.ordersVersion || lastOrdersVersion;
             }
           }
 
           // 2. Kiểm tra thực đơn: CHỈ CẬP NHẬT KHI THỰC SỰ CÓ THAY ĐỔI VERSION
           if (Array.isArray(pData.menu) && pData.menu.length > 0) {
             if (!lastMenuVersion || (pData.menuVersion && pData.menuVersion !== lastMenuVersion) || !isInitialLoadDone) {
-              menu = mergeMenuWithServer(pData.menu);
-              lastMenuVersion = pData.menuVersion || Date.now();
-              menuChanged = true;
+              const merged = mergeMenuWithServer(pData.menu);
+              menuChanged = hasMenuChanged(menu, merged);
+              if (menuChanged) menu = merged;
+              lastMenuVersion = pData.menuVersion || lastMenuVersion;
             }
           }
 
           // 3. Khuyến mãi & Cấu hình
           if (Array.isArray(pData.discounts)) {
             if (!lastDiscountsVersion || (pData.discountsVersion && pData.discountsVersion !== lastDiscountsVersion) || !isInitialLoadDone) {
-              discounts = pData.discounts;
-              lastDiscountsVersion = pData.discountsVersion || Date.now();
-              saveLocalDiscounts();
-              discountsChanged = true;
+              discountsChanged = JSON.stringify(discounts) !== JSON.stringify(pData.discounts);
+              if (discountsChanged) { discounts = pData.discounts; saveLocalDiscounts(); }
+              lastDiscountsVersion = pData.discountsVersion || lastDiscountsVersion;
             }
           }
           if (pData.config && typeof pData.config === 'object') {
             if (!lastConfigVersion || (pData.configVersion && pData.configVersion !== lastConfigVersion) || !isInitialLoadDone) {
-              applyServerConfig(pData.config, pData.configVersion);
-              configChanged = true;
+              configChanged = applyServerConfig(pData.config, pData.configVersion);
             }
           }
 
@@ -5989,6 +5968,7 @@ body {
             debouncedSaveLocalData();
             renderBackendConfig();
             renderCustomerFooterInfo();
+            renderFrontendBanner();
           }
 
           isInitialLoadDone = true;
@@ -9395,7 +9375,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       const memo = encodeURIComponent(currentPendingOrderId);
       const qrUrl = `https://api.vietqr.io/image/${encodeURIComponent(storeConfig.bankConfig?.bin || "970436")}-${vcbAcc}-compact2.png?amount=${finalBeverageTotal}&addInfo=${memo}&accountName=${vcbName}`;
       const vqrImg = document.getElementById('pay-vietqr-img');
-      if (vqrImg) vqrImg.src = qrUrl;
+      if (vqrImg && vqrImg.getAttribute('src') !== qrUrl) vqrImg.src = qrUrl;
     }
 
     // BACKEND: RENDER BẢNG MÃ GIẢM GIÁ (TAB 7)
@@ -10408,9 +10388,12 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       const imgContainer = document.getElementById('hero-banner-image-container');
       const images = b.images || [];
 
-      if (bannerSlideTimer) clearInterval(bannerSlideTimer);
-
       if (bannerBox && imgContainer) {
+        // Keep existing images and autoplay position when unrelated settings/menu sync arrives.
+        const sliderKey = JSON.stringify([images, b.transitionEffect || 'fade', Number(b.autoplaySpeed) || 3.5]);
+        if (imgContainer.dataset.sliderKey === sliderKey) return;
+        imgContainer.dataset.sliderKey = sliderKey;
+        if (bannerSlideTimer) { clearInterval(bannerSlideTimer); bannerSlideTimer = null; }
         if (images.length > 0) {
           bannerBox.classList.add('has-ad-image');
           imgContainer.style.display = 'block';
