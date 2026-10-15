@@ -64,7 +64,11 @@
     if(failure&&!logout)status('Chưa xác nhận tắt thông báo với máy chủ. Hãy kiểm tra mạng rồi thử lại.');
   }
   async function refresh(){
-    if(refreshing||!admin())return;
+    if(refreshing)return;
+    if(!admin()){
+      if(localStorage.getItem(key)||localStorage.getItem(enabledKey)==='1')await disable({logout:true});
+      return;
+    }
     if(!supported()){status('Trình duyệt này chưa hỗ trợ thông báo nền. Hãy dùng Chrome hoặc Samsung Internet qua HTTPS.');return;}
     if(!localStorage.getItem(key)||localStorage.getItem(enabledKey)!=='1'){report({enabled:false});return;}
     refreshing=true;
@@ -82,6 +86,6 @@
   }
   window.DuynhAdminNotifications={open,close,enable,disable,refresh,test};
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refresh();});
-  document.addEventListener('DOMContentLoaded',()=>{el('admin-push-form')?.addEventListener('submit',enable);if(admin())refresh();});
+  document.addEventListener('DOMContentLoaded',()=>{el('admin-push-form')?.addEventListener('submit',enable);refresh();});
   window.addEventListener('storage',event=>{if(event.key==='duynh_admin_auth'&&!event.newValue)disable({logout:true});});
 })();

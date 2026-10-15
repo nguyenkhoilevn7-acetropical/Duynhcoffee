@@ -3273,6 +3273,14 @@ body {
       margin-top: 8px;
     }
 
+    .tracked-item { display:flex; gap:12px; padding:12px 0; border-bottom:1px solid var(--border); }
+    .tracked-item:last-child { border-bottom:0; }
+    .tracked-item-picture { width:64px; height:64px; flex:0 0 64px; border-radius:10px; overflow:hidden; background:#E8EEDC; display:grid; place-items:center; font-size:26px; }
+    .tracked-item-picture img { width:100%; height:100%; object-fit:cover; }
+    .tracked-item-info { min-width:0; flex:1; overflow-wrap:anywhere; }
+    .tracked-item-name { font-weight:700; color:var(--primary-dark); }
+    .tracked-item-custom { color:#64748B; font-size:0.78rem; }
+    .tracked-item-price { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; margin-top:4px; }
   </style>
 <script src="site-i18n.js" defer></script>
 <script src="admin-notifications.js" defer></script>
@@ -4332,10 +4340,12 @@ body {
         <div id="tracking-order-details" style="font-size: 0.82rem; line-height: 1.6; background: #F8FAF6; border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-top: 14px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <span style="font-weight: 800; font-size: 0.95rem; color: var(--primary-dark);" id="track-order-id-label">ORD-XXXX</span>
-            <span id="track-order-status-badge" class="product-badge">Chờ Xử Lý</span>
+            <span id="track-order-status-badge" class="product-badge" style="position:static;flex-shrink:0;">Chờ Xử Lý</span>
           </div>
           <div>Khách hàng: <b id="track-order-customer"></b> • <span id="track-order-phone"></span></div>
           <div>Địa chỉ nhận: <span id="track-order-address"></span></div>
+          <div style="margin-top:14px;font-weight:800;">Món đã đặt</div>
+          <div id="track-order-items" role="list" aria-label="Món đã đặt"></div>
           <div>Tiền nước: <b id="track-order-beverage" style="color: var(--accent);"></b></div>
           <div>Đơn vị ship: <b id="track-order-partner"></b> (Phí ship trả tài xế: <b id="track-order-ship"></b>)</div>
         </div>
@@ -5181,7 +5191,10 @@ body {
       for (const category of getCategoriesList()) if (category.name_en) pairs[category.name_vi || category.name] = category.name_en;
       const banner = storeConfig?.banner || {};
       for (const key of ['tagline','slogan','description','promoNote']) if (banner[key] && banner[key + '_en']) pairs[banner[key]] = banner[key + '_en'];
-      for (const order of orders) privateValues.push(order.customerName, order.phone, order.deliveryAddress, order.driver?.name, order.driver?.phone);
+      for (const order of orders) {
+        privateValues.push(order.customerName, order.phone, order.deliveryAddress, order.driver?.name, order.driver?.phone);
+        for (const item of order.items || []) if (item.name_en) pairs[item.name_vi || item.name] = item.name_en;
+      }
       api.register(pairs);
       api.protect(privateValues);
     }
@@ -5723,7 +5736,7 @@ body {
 
       const type = payload.type || payload.action;
       let stateChanged = false;
-      const isAdminDevice = isUserAdmin() || isAdminViewActive();
+      const isAdminDevice = isUserAdmin();
 
       switch (type) {
         case 'NEW_ORDER': {
@@ -6379,13 +6392,13 @@ function formatMoney(amount) {
 
     // Phát chuông khi có đơn hàng mới (Không chồng chéo)
     function playNewOrderAlertSound() {
-      if (!kitchenSoundAlertEnabled) return;
+      if (!isUserAdmin() || !kitchenSoundAlertEnabled) return;
       playSoundPreset(selectedNewOrderSoundPreset);
 
       if (isVoiceNewOrderEnabled) {
         setTimeout(() => {
           try {
-            if ('speechSynthesis' in window) {
+            if (isUserAdmin() && 'speechSynthesis' in window) {
               window.speechSynthesis.cancel();
               const utter = new SpeechSynthesisUtterance('Đuỷnh Coffee có đơn hàng mới!');
               utter.lang = 'vi-VN';
@@ -6401,13 +6414,13 @@ function formatMoney(amount) {
 
     // Phát chuông khi duyệt đơn vào bếp (Không chồng chéo)
     function playKitchenPrepAlertSound() {
-      if (!kitchenSoundAlertEnabled) return;
+      if (!isUserAdmin() || !kitchenSoundAlertEnabled) return;
       playSoundPreset(selectedKitchenSoundPreset);
 
       if (isVoiceKitchenEnabled) {
         setTimeout(() => {
           try {
-            if ('speechSynthesis' in window) {
+            if (isUserAdmin() && 'speechSynthesis' in window) {
               window.speechSynthesis.cancel();
               const utter = new SpeechSynthesisUtterance('Bếp ơi, có đơn mới cần pha chế!');
               utter.lang = 'vi-VN';
@@ -7635,6 +7648,65 @@ function openProductCustomModal(itemId) {
       renderLiveTrackingInfo(val, true);
     }
 
+    function renderTrackedOrderItems(order) {
+      const list = document.getElementById('track-order-items');
+      if (!list) return;
+      list.replaceChildren();
+      const items = Array.isArray(order.items) ? order.items.filter(item => item && typeof item === 'object') : [];
+      if (!items.length) {
+        const empty = document.createElement('p');
+        empty.textContent = 'Chưa có chi tiết món cho đơn hàng này.';
+        list.append(empty);
+        return;
+      }
+      for (const item of items) {
+        const product = menu.find(product => String(product.id) === String(item.id));
+        const name = item.name || product?.name || 'Món đã đặt';
+        const row = document.createElement('div');
+        row.className = 'tracked-item';
+        row.setAttribute('role', 'listitem');
+        const picture = document.createElement('div');
+        picture.className = 'tracked-item-picture';
+        picture.textContent = '☕';
+        const source = String(item.image || product?.image || '').trim();
+        // Image URLs are assigned as properties; never interpolate order data into HTML.
+        if (/^(https?:\/\/|data:image\/(?:png|jpe?g|webp|gif|avif);base64,|\/(?!\/)|\.\.?\/)/i.test(source)) {
+          const image = document.createElement('img');
+          image.alt = name;
+          image.loading = 'lazy';
+          image.decoding = 'async';
+          image.onerror = () => picture.replaceChildren(document.createTextNode('☕'));
+          image.src = source;
+          picture.replaceChildren(image);
+        }
+        const info = document.createElement('div');
+        info.className = 'tracked-item-info';
+        const title = document.createElement('div');
+        title.className = 'tracked-item-name';
+        title.textContent = name;
+        info.append(title);
+        if (item.custom) {
+          const custom = document.createElement('div');
+          custom.className = 'tracked-item-custom';
+          custom.textContent = item.custom;
+          info.append(custom);
+        }
+        const quantity = Number(item.qty) || 0;
+        const price = Number(item.price) || 0;
+        const amount = item.total == null ? price * quantity : Number(item.total) || 0;
+        const prices = document.createElement('div');
+        prices.className = 'tracked-item-price';
+        const unit = document.createElement('span');
+        unit.textContent = quantity + ' × ' + formatMoney(price);
+        const total = document.createElement('b');
+        total.textContent = formatMoney(amount);
+        prices.append(unit, total);
+        info.append(prices);
+        row.append(picture, info);
+        list.append(row);
+      }
+    }
+
     function renderLiveTrackingInfo(orderId, showToastAlert = false) {
       const order = findOrderById(orderId);
       if (!order) {
@@ -7658,8 +7730,9 @@ function openProductCustomModal(itemId) {
       if (phoneEl) phoneEl.textContent = order.phone || '--';
       if (addrEl) addrEl.textContent = order.deliveryAddress || '--';
       if (partnerEl) partnerEl.textContent = order.deliveryPartnerName || 'Ahamove Siêu Tốc';
-      if (bevEl) bevEl.textContent = formatMoney(order.beverageTotal || order.total);
-      if (shipEl) shipEl.textContent = formatMoney(order.shippingFee || 18000);
+      if (bevEl) bevEl.textContent = formatMoney(order.beverageTotal ?? order.total ?? 0);
+      if (shipEl) shipEl.textContent = formatMoney(order.shippingFee ?? 18000);
+      renderTrackedOrderItems(order);
 
       let statusText = '1. Đơn Mới (Đã Nhận)';
       let statusBg = '#FEF3C7', statusColor = '#92400E';
@@ -8412,6 +8485,8 @@ async function openPaymentCheckoutModal() {
         items: cart.map(c => ({
           id: c.item.id,
           name: c.item.name,
+          name_en: c.item.name_en || '',
+          image: c.item.image || '',
           qty: c.qty,
           price: c.item.price,
           total: c.item.price * c.qty,
@@ -8441,8 +8516,6 @@ async function openPaymentCheckoutModal() {
       orders.unshift(newOrder);
       localStorage.setItem('duynh_latest_order_id', newOrder.id);
       saveLocalData();
-
-      playNewOrderAlertSound();
 
       cart = [];
       activeDiscount = null;
@@ -8510,6 +8583,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       if (window.DuynhAdminNotifications) window.DuynhAdminNotifications.disable({ logout: true }).catch(() => {});
       sessionStorage.removeItem('duynh_admin_auth');
       localStorage.removeItem('duynh_admin_auth');
+      stopAllActiveAudio();
       
 
 

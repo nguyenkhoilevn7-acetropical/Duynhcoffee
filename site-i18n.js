@@ -6,6 +6,8 @@
 })(function () {
   'use strict';
   const catalog = {
+  "Món đã đặt": "Ordered items",
+  "Chưa có chi tiết món cho đơn hàng này.": "Item details are not available for this order yet.",
   "Đuỷnh Tea & Coffee - Ngon Đến Giọt Cuối Cùng": "Đuỷnh Tea & Coffee - Delicious to the Last Drop",
   "Logo Đuỷnh": "Đuỷnh Logo",
   "NGON ĐẾN GIỌT CUỐI CÙNG": "DELICIOUS TO THE VERY LAST DROP",
