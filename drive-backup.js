@@ -209,6 +209,34 @@ function createBackup({ dir, snapshot, apply, fetchImpl = global.fetch, env = pr
     return true;
   }
   function stop() { clearTimeout(timer); clearTimeout(retryTimer); }
-  return { initialize, changed, flush, handle, status, stop };
+  // A separate private Drive record: never included in public config or menu backups.
+  let pushFileId = null;
+  async function loadPushState() {
+    if (!enabled()) return null;
+    const params = new URLSearchParams({ q: "trashed = false and appProperties has { key='duynhPrivate' and value='admin-push-v1' }",
+      fields: 'files(id)', pageSize: '1' });
+    const result = await (await request('https://www.googleapis.com/drive/v3/files?' + params, { headers: await auth() })).json();
+    pushFileId = result.files?.[0]?.id || null;
+    if (!pushFileId) return null;
+    const r = await request('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(pushFileId) + '?alt=media', { headers: await auth() });
+    const text = await r.text();
+    if (Buffer.byteLength(text) > 1024 * 1024) throw new Error('Push state too large');
+    return JSON.parse(text);
+  }
+  async function savePushState(data) {
+    if (!enabled()) return false;
+    return enqueue(async () => {
+      if (!pushFileId) {
+        const created = await (await request('https://www.googleapis.com/drive/v3/files?fields=id', {
+          method: 'POST', headers: { ...await auth(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'DuynhCoffee-Admin-Notifications.json', mimeType: 'application/json', appProperties: { duynhPrivate: 'admin-push-v1' } }) })).json();
+        pushFileId = created.id;
+      }
+      await request('https://www.googleapis.com/upload/drive/v3/files/' + encodeURIComponent(pushFileId) + '?uploadType=media', {
+        method: 'PATCH', headers: { ...await auth(), 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      return true;
+    });
+  }
+  return { initialize, changed, flush, handle, status, stop, loadPushState, savePushState };
 }
 module.exports = { createBackup, sanitize, validate, TAG };

@@ -15,6 +15,7 @@ const crypto = require('crypto');
 const { createBackup } = require('./drive-backup');
 const { createReceiptVerifier } = require('./receipt-verification');
 const { createReceiptJobs } = require('./receipt-jobs');
+const { createAdminPush } = require('./admin-push');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const ROOT_DIR = __dirname;
@@ -123,6 +124,9 @@ if (!restoredFromDrive && (!fs.existsSync(CONFIG_FILE) || !configCache || typeof
 
 const receiptVerifier = createReceiptVerifier({ readState: () => ({ menu: menuCache, config: configCache, discounts: discountsCache }) });
 const receiptJobs = createReceiptJobs({ verify: body => receiptVerifier.verify(body) });
+const adminPush = createAdminPush({ dir: ROOT_DIR, readConfig: () => configCache, backup: backupService });
+await adminPush.initialize();
+const notifiedOrderIds = new Set(ordersCache.map(order => String(order.id)));
 function mergeConfig(current, patch) {
   return { ...current, ...patch,
     bankConfig: { ...(current.bankConfig || {}), ...(patch.bankConfig || {}) },
@@ -273,6 +277,10 @@ const sseClients = new Set();
 
 // Phát thông điệp Realtime đến tất cả thiết bị (Cả WebSocket và SSE)
 function broadcastRealtime(eventType, data, senderClient = null, senderId = null) {
+  if (eventType === 'NEW_ORDER' && data?.id && !notifiedOrderIds.has(String(data.id))) {
+    notifiedOrderIds.add(String(data.id));
+    adminPush.notifyOrder(data).catch(() => console.error('[Push] Không gửi được thông báo đơn mới'));
+  }
   const now = Date.now();
   if (eventType === 'ORDERS_UPDATE' || eventType === 'NEW_ORDER' || eventType === 'ORDER_STATUS' || eventType === 'ORDER_DISPATCH') ordersVersion = now;
   if (eventType === 'MENU_UPDATE') menuVersion = now;
@@ -584,6 +592,30 @@ const server = http.createServer(async (req, res) => {
   const parsedUrl = url.parse(req.url, true);
   const pathname = parsedUrl.pathname;
   if (await backupService.handle(req, res, parsedUrl)) return;
+  if (pathname.startsWith('/api/admin-push/')) {
+    res.setHeader('Cache-Control', 'no-store');
+    try {
+      if (req.headers.origin && req.headers.origin !== 'https://' + req.headers.host && req.headers.origin !== 'http://' + req.headers.host) {
+        sendJson(res, 403, { error: 'Nguồn yêu cầu không hợp lệ' }); return;
+      }
+      if (pathname === '/api/admin-push/key' && req.method === 'GET') { sendJson(res, 200, { publicKey: adminPush.publicKey }); return; }
+      if (pathname === '/api/admin-push/session' && req.method === 'POST') {
+        const body = await parseRequestBody(req);
+        const token = adminPush.login(body.username || '', body.password || '', req.socket.remoteAddress);
+        sendJson(res, 200, { token }); return;
+      }
+      const token = (req.headers.authorization || '').replace(/^Bearer /, '');
+      if (!adminPush.verify(token)) { sendJson(res, 401, { error: 'Vui lòng xác nhận tài khoản quản trị để bật thông báo.' }); return; }
+      if (pathname === '/api/admin-push/subscription' && req.method === 'POST') {
+        const body = await parseRequestBody(req);
+        sendJson(res, 200, await adminPush.subscribe(token, body.subscription, body.language));
+      } else if (pathname === '/api/admin-push/subscription' && req.method === 'DELETE') sendJson(res, 200, await adminPush.unsubscribe(token));
+      else if (pathname === '/api/admin-push/test' && req.method === 'POST') sendJson(res, 200, await adminPush.test(token));
+      else if (pathname === '/api/admin-push/status' && req.method === 'GET') sendJson(res, 200, adminPush.status(token));
+      else sendJson(res, 404, { error: 'Không tìm thấy API thông báo' });
+    } catch (error) { sendJson(res, error.status || 503, { error: error.message }); }
+    return;
+  }
 
   // ==================== REST API ENDPOINTS ====================
 
@@ -775,6 +807,7 @@ const server = http.createServer(async (req, res) => {
 
       ordersCache = readJsonFile(ORDERS_FILE, ordersCache);
       let order = ordersCache.find(o => o.id === orderId);
+      const isNewReceiptOrder = !order;
 
       try { checkOrder({ ...(order || body.order || {}), ...body, receiptImage }); } catch (error) { sendJson(res, 422, { error: error.message }); return; }
       if (order) {
@@ -794,6 +827,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       writeJsonFile(ORDERS_FILE, ordersCache);
+      if (isNewReceiptOrder) broadcastRealtime('NEW_ORDER', order);
       sendJson(res, 200, { success: true, orderId });
     } catch (err) {
       sendJson(res, 500, { error: err.message });
@@ -971,7 +1005,7 @@ const server = http.createServer(async (req, res) => {
   // Source code and local data are not static assets.
   let normalized;
   try { normalized = path.posix.normalize(decodeURIComponent(cleanPath)); } catch { sendJson(res, 400, { error: 'Đường dẫn không hợp lệ' }); return; }
-  if (normalized.split('/').some(part => part.startsWith('.')) || ['server.js', 'drive-backup.js', 'receipt-verification.js', 'receipt-jobs.js', 'receipt-image.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || normalized.startsWith('/test/') || /\.(tmp|md)$/.test(normalized)) {
+  if (normalized.split('/').some(part => part.startsWith('.')) || ['server.js', 'admin-push.js', 'drive-backup.js', 'receipt-verification.js', 'receipt-jobs.js', 'receipt-image.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || normalized.startsWith('/test/') || /\.(tmp|md)$/.test(normalized)) {
     sendJson(res, 404, { error: 'Không tìm thấy' }); return;
   }
   if (cleanPath === '/' || cleanPath === '/admin' || cleanPath === '/pos') {

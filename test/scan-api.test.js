@@ -4,8 +4,10 @@ const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),net=
 const {spawn}=require('node:child_process');
 test('HTTP scan starts quickly, retries share work, and completed proof is server verified',async()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'duynh-scan-api-'));
- for(const name of ['server.js','drive-backup.js','receipt-jobs.js','index.html'])fs.copyFileSync(path.join(__dirname,'..',name),path.join(dir,name));
+ for(const name of ['server.js','admin-push.js','order-notifications-sw.js','admin-notifications.js','drive-backup.js','receipt-jobs.js','index.html'])fs.copyFileSync(path.join(__dirname,'..',name),path.join(dir,name));
  const verifier=path.join(__dirname,'..','receipt-verification.js');
+ const pushModule=path.join(__dirname,'..','admin-push.js');
+ fs.writeFileSync(path.join(dir,'admin-push.js'),`const real=require(${JSON.stringify(pushModule)});const fs=require('node:fs');module.exports={createAdminPush:options=>real.createAdminPush({...options,sendImpl:async(sub,payload)=>fs.appendFileSync(${JSON.stringify(path.join(dir,'.push-test-log'))},payload+'\\n')})};`);
  fs.writeFileSync(path.join(dir,'receipt-verification.js'),`const real=require(${JSON.stringify(verifier)}); module.exports={createReceiptVerifier:options=>real.createReceiptVerifier({...options,recognize:()=>new Promise(resolve=>setTimeout(()=>resolve('Số tiền 45.000đ\\nNgười nhận DAO KHOI NGUYEN'),80))})};`);
  const port=await new Promise(resolve=>{const s=net.createServer();s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(()=>resolve(p));});});
  const child=spawn(process.execPath,['server.js'],{cwd:dir,env:{PATH:process.env.PATH,PORT:String(port)}});
@@ -23,6 +25,15 @@ test('HTTP scan starts quickly, retries share work, and completed proof is serve
  const completed=await(await fetch(base+'/api/receipt-scans/'+pending.jobId)).json();
  assert.equal(completed.status,'complete');assert.equal(completed.result.isValid,true);assert.ok(completed.result.verificationToken);
  const cached=await(await post('/api/receipt-scans',body)).json();assert.equal(cached.status,'complete');assert.equal(cached.jobId,pending.jobId);
+ const session=await(await post('/api/admin-push/session',{username:'admin',password:'duynh2026'})).json();
+ const crypto=require('node:crypto'),curve=crypto.createECDH('prime256v1');curve.generateKeys();
+ const sub={endpoint:'https://fcm.googleapis.com/fcm/send/test',keys:{p256dh:curve.getPublicKey().toString('base64url'),auth:crypto.randomBytes(16).toString('base64url')}};
+ const subscription=await fetch(base+'/api/admin-push/subscription',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.token},body:JSON.stringify({subscription:sub,language:'vi'})});assert.equal(subscription.status,200);
+ const order={id:'NOTIFY-ONCE',items:[{id:1,qty:1}],total:45000,receiptImage:body.image,verificationToken:completed.result.verificationToken};
+ assert.equal((await post('/api/orders',{...order,id:'INVALID-NOTIFY',verificationToken:'wrong'})).status,422);
+ assert.equal(fs.existsSync(path.join(dir,'.push-test-log')),false);
+ assert.equal((await post('/api/orders',order)).status,200);assert.equal((await post('/api/orders',order)).status,200);
+ const messages=fs.readFileSync(path.join(dir,'.push-test-log'),'utf8').trim().split('\n');assert.equal(messages.length,1);assert.match(messages[0],/Có đơn hàng mới/);
  await post('/api/config',{bankConfig:{accountHolder:'DAO KHUE NGUYEN'}});
  const changed=await(await post('/api/receipt-scans',body)).json();assert.notEqual(changed.jobId,pending.jobId);
  await new Promise(resolve=>setTimeout(resolve,120));

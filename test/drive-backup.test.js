@@ -6,6 +6,25 @@ const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const {createBackup, sanitize, TAG} = require('../drive-backup');
+test('private notification registrations use a separate app-owned Drive record and survive reload',async()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'duynh-private-drive-'));let file=null,bytes='',created=0;const calls=[];
+ const fetchImpl=async(url,opts={})=>{
+  calls.push([url,opts]);
+  if(url.includes('oauth2.googleapis.com/token'))return Response.json({access_token:'a',expires_in:3600});
+  if(url.includes('/upload/drive/')){assert.equal(opts.method,'PATCH');bytes=opts.body;return Response.json({id:file});}
+  if(opts.method==='POST'){const meta=JSON.parse(opts.body);assert.deepEqual(meta.appProperties,{duynhPrivate:'admin-push-v1'});created++;file='private-id';return Response.json({id:file});}
+  if(url.includes('alt=media'))return new Response(bytes);
+  assert.match(decodeURIComponent(url),/duynhPrivate/);return Response.json({files:file?[{id:file}]:[]});
+ };
+ const env={GOOGLE_CLIENT_ID:'c',GOOGLE_CLIENT_SECRET:'s',GOOGLE_DRIVE_REFRESH_TOKEN:'r'};
+ const options={dir,env,fetchImpl,snapshot:()=>{throw Error('must not read public menu snapshot');},apply:()=>{throw Error('must not replace menu');}};
+ const first=createBackup(options),next=createBackup(options);
+ try{
+  assert.equal(await first.loadPushState(),null);const data={schema:'duynh-admin-push-v1',subscriptions:[{endpoint:'private'}]};
+  assert.equal(await first.savePushState(data),true);assert.deepEqual(await next.loadPushState(),data);
+  await next.savePushState({...data,subscriptions:[]});assert.equal(created,1);assert.deepEqual(JSON.parse(bytes).subscriptions,[]);
+ }finally{first.stop();next.stop();fs.rmSync(dir,{recursive:true,force:true});}
+});
 const env = { GOOGLE_CLIENT_ID:'client', GOOGLE_CLIENT_SECRET:'secret', GOOGLE_DRIVE_REFRESH_TOKEN:'refresh',
   GOOGLE_REDIRECT_URI:'https://example.test/api/backup/google/callback', BACKUP_ADMIN_KEY:'x'.repeat(40) };
 function fixture() {

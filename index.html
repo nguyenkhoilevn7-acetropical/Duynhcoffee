@@ -3275,6 +3275,7 @@ body {
 
   </style>
 <script src="site-i18n.js" defer></script>
+<script src="admin-notifications.js" defer></script>
 </head>
 <body>
 
@@ -3383,6 +3384,15 @@ body {
         </div>
       </div>
 
+      <section style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:12px;padding:12px;margin-bottom:16px;" aria-label="Thông báo đơn hàng khi khóa màn hình">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="nav-btn" onclick="DuynhAdminNotifications.open()">🔔 Bật thông báo khi khóa màn hình</button>
+          <button type="button" class="nav-btn" id="admin-push-test" onclick="DuynhAdminNotifications.test()" disabled>Gửi thông báo thử</button>
+          <button type="button" class="nav-btn" id="admin-push-disable" onclick="DuynhAdminNotifications.disable()" disabled>Tắt trên máy này</button>
+        </div>
+        <p id="admin-push-status" role="status" style="margin:8px 0;font-size:0.85rem;">Chưa bật thông báo khi khóa màn hình.</p>
+        <p style="font-size:0.8rem;color:#475569;margin:0;">Bật riêng trên từng máy quản trị. Âm báo khi khóa màn hình dùng âm thông báo của điện thoại. Hãy cho phép âm thanh, rung và hiển thị trên màn hình khóa; tắt chế độ Không làm phiền nếu cần nghe chuông.</p>
+      </section>
       <!-- STATS CARDS -->
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px;">
         <div style="background: #FFF; border: 1px solid var(--border); border-radius: 14px; padding: 14px; box-shadow: var(--shadow);">
@@ -4334,6 +4344,18 @@ body {
   </div>
 
   <!-- ==================== MODAL ĐĂNG NHẬP ADMIN ==================== -->
+  <div id="admin-push-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-card" style="max-width:480px;">
+      <div class="modal-header"><h3>🔔 Thông báo khi khóa màn hình</h3><button type="button" class="modal-close" onclick="DuynhAdminNotifications.close()" aria-label="Đóng">✕</button></div>
+      <form id="admin-push-form" class="modal-body">
+        <p>Xác nhận tài khoản quản trị để nhận đơn mới trên máy này. Sau đó chọn Cho phép khi trình duyệt hỏi quyền thông báo.</p>
+        <label for="admin-push-username">Tài khoản:</label><input id="admin-push-username" class="form-control" autocomplete="username" value="admin" required>
+        <label for="admin-push-password">Mật khẩu:</label><input id="admin-push-password" class="form-control" type="password" autocomplete="current-password" required>
+        <p id="admin-push-error" role="alert" style="color:#B91C1C;"></p>
+        <button type="submit" id="admin-push-confirm" class="nav-btn">Xác nhận và bật thông báo</button>
+      </form>
+    </div>
+  </div>
   <div id="admin-login-modal" class="modal-overlay" style="display: none;">
     <div class="modal-card" style="max-width: 380px;">
       <div class="modal-header">
@@ -8485,6 +8507,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     }
 
     function logoutAdmin() {
+      if (window.DuynhAdminNotifications) window.DuynhAdminNotifications.disable({ logout: true }).catch(() => {});
       sessionStorage.removeItem('duynh_admin_auth');
       localStorage.removeItem('duynh_admin_auth');
       
@@ -10922,6 +10945,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
           return;
         }
         document.getElementById('view-backend').classList.add('active');
+        if (window.DuynhAdminNotifications) window.DuynhAdminNotifications.refresh();
         renderAllBackendTabs();
         window.location.hash = '#admin';
       } else {

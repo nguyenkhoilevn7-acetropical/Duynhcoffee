@@ -914,6 +914,35 @@
 };
   catalog["Siêu Tốc"] = "Express";
   Object.assign(catalog, {
+    "Thông báo đơn hàng khi khóa màn hình": "Lock-screen order notifications",
+    "🔔 Bật thông báo khi khóa màn hình": "🔔 Enable lock-screen notifications",
+    "Bật thông báo khi khóa màn hình": "Enable lock-screen notifications",
+    "Gửi thông báo thử": "Send test notification",
+    "Tắt trên máy này": "Disable on this device",
+    "Chưa bật thông báo khi khóa màn hình.": "Lock-screen notifications are not enabled.",
+    "Bật riêng trên từng máy quản trị. Âm báo khi khóa màn hình dùng âm thông báo của điện thoại. Hãy cho phép âm thanh, rung và hiển thị trên màn hình khóa; tắt chế độ Không làm phiền nếu cần nghe chuông.": "Enable this on each admin device. Lock-screen alerts use the phone's notification sound. Allow sound, vibration and lock-screen notifications; turn off Do Not Disturb to hear alerts.",
+    "🔔 Thông báo khi khóa màn hình": "🔔 Lock-screen notifications",
+    "Xác nhận tài khoản quản trị để nhận đơn mới trên máy này. Sau đó chọn Cho phép khi trình duyệt hỏi quyền thông báo.": "Confirm your admin account to receive new orders on this device. Then choose Allow when the browser requests notification permission.",
+    "Xác nhận và bật thông báo": "Confirm and enable notifications",
+    "Đã bật thông báo khi khóa màn hình trên máy này.": "Lock-screen notifications are enabled on this device.",
+    "Đã bật trên máy này; chưa sao lưu thiết bị lên Drive. Hãy mở lại quản trị sau khi triển khai mới.": "Enabled on this device; device registration has not been saved to Drive. Reopen Admin after a new deployment.",
+    "Trình duyệt này chưa hỗ trợ thông báo nền. Hãy dùng Chrome hoặc Samsung Internet qua HTTPS.": "This browser does not support background notifications. Use Chrome or Samsung Internet over HTTPS.",
+    "Thông báo đang bị chặn. Hãy cho phép thông báo của website trong cài đặt trình duyệt.": "Notifications are blocked. Allow this website's notifications in your browser settings.",
+    "Chưa được cấp quyền thông báo. Hãy chọn Cho phép để nhận đơn khi khóa màn hình.": "Notification permission has not been granted. Choose Allow to receive orders on the lock screen.",
+    "Chưa xác nhận tắt thông báo với máy chủ. Hãy kiểm tra mạng rồi thử lại.": "The server has not confirmed that notifications are disabled. Check your connection and try again.",
+    "Phiên thông báo đã hết hạn. Hãy bấm Bật thông báo khi khóa màn hình.": "Your notification session expired. Select Enable lock-screen notifications.",
+    "Đã gửi thông báo thử. Hãy kiểm tra âm báo và thông báo của điện thoại.": "Test notification sent. Check your phone's notification and sound.",
+    "Không kết nối được máy chủ thông báo.": "Unable to connect to the notification server.",
+    "Chưa khởi động được thông báo nền. Vui lòng thử lại.": "Background notifications could not start. Please try again.",
+    "Vui lòng xác nhận tài khoản quản trị để bật thông báo.": "Confirm your admin account to enable notifications.",
+    "Thiết bị nhận thông báo không hợp lệ.": "Invalid notification subscription.",
+    "Đã đủ 100 thiết bị nhận thông báo.": "The limit of 100 notification devices has been reached.",
+    "Phiên thông báo đã hết hạn.": "Your notification session expired.",
+    "Hãy bật thông báo trên máy này trước.": "Enable notifications on this device first.",
+    "Chưa gửi được thông báo thử. Vui lòng bật lại thông báo.": "Unable to send the test notification. Enable notifications again.",
+    "Thử đăng nhập quá nhiều lần. Vui lòng đợi 15 phút.": "Too many sign-in attempts. Please wait 15 minutes."
+  });
+  Object.assign(catalog, {
     "Ngân Hàng TMCP Ngoại Thương Việt Nam (Vietcombank)": "Joint Stock Commercial Bank for Foreign Trade of Vietnam (Vietcombank)",
     "Giao Nhanh": "Express Delivery",
     "Chuyển khoản": "Bank transfer"
