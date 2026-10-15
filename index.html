@@ -3425,6 +3425,9 @@ body {
         <button type="button" class="backend-tab-btn" id="btn-tab-prep" onclick="switchBackendTab('tab-prep', this)">
           ☕ Đang Pha Chế <span class="tab-badge" id="badge-count-prep">0</span>
         </button>
+        <button type="button" class="backend-tab-btn" id="btn-tab-shipping" onclick="switchBackendTab('tab-shipping', this)">
+          🛵 Đang Giao Hàng <span class="tab-badge" id="badge-count-shipping">0</span>
+        </button>
         <button type="button" class="backend-tab-btn" id="btn-tab-done" onclick="switchBackendTab('tab-done', this)">
           🛵 Đã Hoàn Tất <span class="tab-badge" id="badge-count-done">0</span>
         </button>
@@ -3471,6 +3474,11 @@ body {
         <div class="backend-orders-grid" id="grid-orders-prep"></div>
       </div>
 
+      <div id="tab-shipping" class="backend-tab-content">
+        <p>Đơn chỉ hoàn tất khi hãng xác nhận đã giao đến khách.</p>
+        <p id="delivery-connection-status" role="status">Đang kiểm tra kết nối giao hàng...</p>
+        <div class="backend-orders-grid" id="grid-orders-shipping"></div>
+      </div>
       <!-- TAB 3: ĐÃ HOÀN TẤT -->
       <div id="tab-done" class="backend-tab-content">
         <div class="backend-orders-grid" id="grid-orders-done"></div>
@@ -3497,6 +3505,7 @@ body {
               <option value="all">Tất cả trạng thái</option>
               <option value="new">Đơn mới</option>
               <option value="prep">Đang pha chế</option>
+              <option value="shipping">Đang giao hàng</option>
               <option value="done">Đã hoàn tất</option>
               <option value="cancelled">Đã hủy</option>
             </select>
@@ -5498,7 +5507,8 @@ body {
       switch(status) {
         case 'new': return 'Đơn mới';
         case 'prep': return 'Đang pha chế';
-        case 'done': return 'Đã giao shipper';
+        case 'shipping': return 'Đang giao hàng';
+        case 'done': return 'Đã giao đến khách';
         case 'cancelled': return 'Đã hủy';
         default: return status || 'Đang xử lý';
       }
@@ -5766,26 +5776,32 @@ body {
           const p = payload.data || payload;
           const orderId = p.orderId || payload.orderId;
           const status = p.status || payload.status;
+          if (status === 'done' && source === 'local_tab') {
+            if (typeof pullFullSyncFromServer === 'function') pullFullSyncFromServer();
+            break;
+          }
           const completedAtIso = p.completedAtIso || payload.completedAtIso;
           const cancelledAtIso = p.cancelledAtIso || payload.cancelledAtIso;
           const cancelReason = p.cancelReason || payload.cancelReason || p.reason;
           if (orderId) {
             const ord = findOrderById(orderId);
-            if (ord && ord.status !== status) {
+            if (ord && (ord.status !== status || p.order)) {
+              const statusChanged = ord.status !== status;
+              if (p.order) Object.assign(ord, p.order);
               ord.status = status;
               if (completedAtIso) ord.completedAtIso = completedAtIso;
               if (cancelledAtIso) ord.cancelledAtIso = cancelledAtIso;
               if (cancelReason) ord.cancelReason = cancelReason;
               stateChanged = true;
 
-              const lastPlacedId = (localStorage.getItem('last_placed_order_id') || '').trim();
+              const lastPlacedId = (localStorage.getItem('duynh_latest_order_id') || localStorage.getItem('last_placed_order_id') || '').trim();
               const isTrackingThis = (lastPlacedId && lastPlacedId.toUpperCase() === String(orderId).toUpperCase());
               const isTrackingModalOpen = document.getElementById('order-tracking-modal')?.style.display === 'flex';
 
-              if (isAdminDevice) {
+              if (isAdminDevice && statusChanged) {
                 playAudioChime(620, 0.15);
                 showSmsToast("🔄 CẬP NHẬT TRẠNG THÁI ĐƠN!", `Đơn #${orderId} đã chuyển sang: ${getStatusBadgeText(status)}`);
-              } else if (isTrackingThis) {
+              } else if (isTrackingThis && statusChanged) {
                 // Khách hàng đang theo dõi đơn của chính mình
                 playAudioChime(620, 0.15);
                 showSmsToast("🛵 ĐƠN HÀNG CỦA BẠN!", `Đơn #${orderId} đã chuyển sang: ${getStatusBadgeText(status)}`);
@@ -7769,7 +7785,10 @@ function openProductCustomModal(itemId) {
       if (order.status === 'prep') {
         statusText = '2. Đang Pha Chế';
         statusBg = '#E0F2FE'; statusColor = '#0369A1';
-      } else if (order.status === 'done' || order.deliveryStatus === 'delivered') {
+      } else if (order.status === 'shipping') {
+        statusText = order.deliveryStatus === 'failed' ? 'Giao hàng gặp sự cố — quán đang xử lý' : '3. Shipper Đang Giao Hàng';
+        statusBg = '#FFF7ED'; statusColor = '#C2410C';
+      } else if (order.status === 'done') {
         statusText = '4. Đã Giao Thành Công';
         statusBg = '#DCFCE7'; statusColor = '#15803D';
       } else if (order.status === 'cancelled') {
@@ -7796,9 +7815,11 @@ function openProductCustomModal(itemId) {
       });
 
       if (order.status === 'new') {
+        if (s1) s1.classList.add('active');
+      } else if (order.status === 'prep') {
         if (s1) s1.classList.add('done');
         if (s2) s2.classList.add('active');
-      } else if (order.status === 'prep') {
+      } else if (order.status === 'shipping') {
         if (s1) s1.classList.add('done');
         if (s2) s2.classList.add('done');
         if (s3) s3.classList.add('active');
@@ -7811,10 +7832,11 @@ function openProductCustomModal(itemId) {
 
       if (order.trackingCode && driverBox) {
         driverBox.style.display = 'block';
-        driverBox.innerHTML = `
-          <div style="font-weight: 800; color: #C2410C;">🛵 ` + (order.deliveryPartnerName || 'Shipper') + ` • Mã vận đơn: ` + order.trackingCode + `</div>
-          <div>Tài xế: <b>` + (order.driver?.name || 'Nguyễn Văn Hùng') + `</b> • SĐT: <a href="tel:` + (order.driver?.phone || '0903124556') + `" style="color: #0284C7; font-weight:700;">` + (order.driver?.phone || '0903 124 556') + `</a> • 🏍️ ` + (order.driver?.vehicle || 'Wave Alpha') + `</div>
-        `;
+        const shipment = document.createElement('div');
+        shipment.textContent = '🛵 ' + (order.deliveryPartnerName || 'Shipper') + ' • Mã vận đơn: ' + order.trackingCode;
+        const driver = document.createElement('div');
+        driver.textContent = 'Tài xế: ' + (order.driver?.name || 'Chờ thông tin từ hãng') + ' • SĐT: ' + (order.driver?.phone || '--');
+        driverBox.replaceChildren(shipment, driver);
       } else if (driverBox) {
         driverBox.style.display = 'none';
       }
@@ -8583,29 +8605,27 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       document.getElementById('admin-login-modal').style.display = 'none';
     }
 
-    function executeAdminLogin() {
-      const user = (document.getElementById('admin-login-user')?.value || '').trim();
-      const pass = (document.getElementById('admin-login-pass')?.value || '').trim();
+    async function executeAdminLogin() {
+      const user = (document.getElementById('admin-login-user')?.value || '').trim() || 'admin';
+      const passwordInput = document.getElementById('admin-login-pass');
+      const pass = passwordInput?.value || '';
       const errBox = document.getElementById('admin-login-error');
-
-      const adminAcc = storeConfig.adminAccount || { username: 'admin', password: 'duynh2026' };
-
-      // Chấp nhận pass duynh2026 (không phân biệt chữ hoa thường) và chấp nhận user là admin hoặc để trống
-      const isUserMatch = (!user || user.toLowerCase() === 'admin' || user === adminAcc.username);
-      const isPassMatch = (pass === 'duynh2026' || pass.toLowerCase() === 'duynh2026' || pass === adminAcc.password);
-
-      if (isUserMatch && isPassMatch) {
+      try {
+        const response = await fetch(getCloudApiUrl('/api/admin-push/session'), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: user, password: pass }), signal: AbortSignal.timeout(25000)
+        });
+        const result = await response.json();
+        if (!response.ok || !result.token) throw new Error(result.error || 'Chưa xác nhận được tài khoản quản trị.');
+        localStorage.setItem('duynh_admin_api_token', result.token);
         sessionStorage.setItem('duynh_admin_auth', '1');
-        localStorage.setItem('duynh_admin_auth', '1'); // Lưu localStorage cho điện thoại
+        localStorage.setItem('duynh_admin_auth', '1');
+        if (passwordInput) passwordInput.value = '';
         closeAdminLoginModal();
         switchView('backend');
-        showSmsToast("🔓 ĐĂNG NHẬP THÀNH CÔNG!", "Chào mừng Chủ quán đến với cổng Quản trị Đuỷnh Tea & Coffee.");
-      } else {
-        if (errBox) {
-          errBox.style.display = 'block';
-          errBox.textContent = "Tài khoản hoặc mật khẩu không chính xác! Vui lòng thử lại.";
-        }
-        playAudioChime(300, 0.2);
+        showSmsToast('🔓 ĐĂNG NHẬP THÀNH CÔNG!', 'Chào mừng Chủ quán đến với cổng Quản trị Đuỷnh Tea & Coffee.');
+      } catch (error) {
+        if (errBox) { errBox.style.display = 'block'; errBox.textContent = error.message; }
       }
     }
 
@@ -8613,6 +8633,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       if (window.DuynhAdminNotifications) window.DuynhAdminNotifications.disable({ logout: true }).catch(() => {});
       sessionStorage.removeItem('duynh_admin_auth');
       localStorage.removeItem('duynh_admin_auth');
+      localStorage.removeItem('duynh_admin_api_token');
       stopAllActiveAudio();
       
 
@@ -8860,22 +8881,22 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       }).join('');
 
       let dispatchSection = '';
-      if (o.trackingCode) {
+      if (o.deliveryCarrierOrderId) {
         dispatchSection = `
           <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 10px; padding: 8px 12px; margin-top: 10px;">
             <div style="font-size: 0.82rem; font-weight: 700; color: #166534;">📦 ${o.deliveryPartnerName || 'Ahamove'} • Mã: <b>${o.trackingCode}</b></div>
-            <div style="font-size: 0.78rem; color: #15803D; margin-top: 2px;">Tài xế: <b>${o.driver ? o.driver.name : 'Đang điều phối'}</b> (${o.driver ? o.driver.phone : '--'})</div>
+            <div style="font-size: 0.78rem; color: #15803D; margin-top: 2px;">Tài xế: <b>${o.driver ? escapeDeliveryText(o.driver.name) : 'Đang điều phối'}</b> (${escapeDeliveryText(o.driver?.phone || '--')})</div>
           </div>
         `;
       } else {
         dispatchSection = `
           <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed #CBD5E1;">
-            <div style="font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 6px;">🛵 Gọi Shipper Giao Món:</div>
+            <div style="font-size: 0.82rem; font-weight: 700; color: #475569; margin-bottom: 6px;">🛵 Liên kết vận đơn thật:</div>
             <div style="display: flex; gap: 8px;">
-              <button type="button" class="nav-btn" style="flex: 1; justify-content: center; font-size: 0.8rem; background: #FFF7ED; color: #C2410C; border-color: #FDBA74;" onclick="assignDeliveryPartner('${o.id}', 'ahamove')">
+              <button type="button" class="nav-btn" style="flex: 1; justify-content: center; font-size: 0.8rem; background: #FFF7ED; color: #C2410C; border-color: #FDBA74;" onclick="dispatchOrderToPartner('${o.id}', 'ahamove')">
                 Ahamove Siêu Tốc
               </button>
-              <button type="button" class="nav-btn" style="flex: 1; justify-content: center; font-size: 0.8rem; background: #EFF6FF; color: #1D4ED8; border-color: #93C5FD;" onclick="assignDeliveryPartner('${o.id}', 'lalamove')">
+              <button type="button" class="nav-btn" style="flex: 1; justify-content: center; font-size: 0.8rem; background: #EFF6FF; color: #1D4ED8; border-color: #93C5FD;" onclick="dispatchOrderToPartner('${o.id}', 'lalamove')">
                 Lalamove
               </button>
             </div>
@@ -8926,7 +8947,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
           <div style="display: flex; gap: 8px; margin-top: 12px;">
             <button type="button" class="btn-checkout-now" style="width: 100%; justify-content: center; height: 44px; font-size: 0.95rem; font-weight: 800; background: var(--accent);" onclick="completeOrder('${o.id}')">
-              ✅ HOÀN TẤT ĐƠN ➔
+              🛵 GIAO CHO SHIPPER ➔
             </button>
           </div>
         </div>
@@ -8944,7 +8965,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         <div class="backend-order-card" style="border-left: 4px solid #10B981; background: #FDFEFE;" id="card-${o.id}">
           <div>
             <div style="display: flex; align-items: center; justify-content: space-between; background: #ECFDF5; color: #047857; padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 800; margin-bottom: 10px;">
-              <div><span>✅ ĐÃ GIAO CHO SHIPPER</span></div>
+              <div><span>✅ ĐÃ GIAO ĐẾN KHÁCH</span></div>
               <span style="font-size: 0.75rem; color: #059669;">⏰ ${o.time || '--:--'}</span>
             </div>
 
@@ -8961,7 +8982,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
             ${o.trackingCode ? `
               <div style="font-size: 0.75rem; color: #047857; margin-bottom: 6px;">
-                🛵 <b>${o.deliveryPartnerName || 'Ahamove'}</b>: ${o.trackingCode} (${o.driver?.name || 'Shipper'} - ${o.driver?.phone || ''})
+                🛵 <b>${o.deliveryPartnerName || 'Ahamove'}</b>: ${escapeDeliveryText(o.trackingCode)} (${escapeDeliveryText(o.driver?.name || 'Shipper')} - ${escapeDeliveryText(o.driver?.phone || '')})
               </div>
             ` : ''}
 
@@ -8995,41 +9016,76 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       `;
     }
 
-    // ĐẨY ĐƠN SANG ĐỐI TÁC GIAO HÀNG
-    function dispatchOrderToPartner(orderId, partner) {
-      const order = findOrderById(orderId);
-      if (!order) return;
+    async function deliveryAdminRequest(path, body = {}) {
+      const token = localStorage.getItem('duynh_admin_api_token') || localStorage.getItem('duynh_admin_push_token');
+      if (!isUserAdmin() || !token) {
+        document.getElementById('admin-login-modal').style.display = 'flex';
+        throw new Error('Vui lòng đăng nhập lại quản trị để liên kết giao hàng.');
+      }
+      const response = await fetch(getCloudApiUrl(path), {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify(body), signal: AbortSignal.timeout(25000)
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        if (response.status === 401) {
+          localStorage.removeItem('duynh_admin_api_token');
+          document.getElementById('admin-login-modal').style.display = 'flex';
+        }
+        throw new Error(result.error || 'Chưa đồng bộ được hãng giao hàng.');
+      }
+      const order = findOrderById(result.order?.id);
+      if (order && result.order) { for (const key of Object.keys(order)) delete order[key]; Object.assign(order, result.order); }
+      saveLocalData();renderAllBackendTabs();return result;
+    }
 
-      const trackingCode = (partner === 'ahamove') 
-        ? `AHA-SG-${Math.floor(10000 + Math.random() * 90000)}`
-        : `LALA-SG-${Math.floor(10000 + Math.random() * 90000)}`;
+    async function dispatchOrderToPartner(orderId, partner) {
+      const carrierOrderId = prompt('Nhập mã vận đơn thật đã tạo trên ứng dụng của hãng:');
+      if (!carrierOrderId?.trim()) return;
+      try {
+        await deliveryAdminRequest('/api/orders/' + encodeURIComponent(orderId) + '/dispatch', { partner, carrierOrderId: carrierOrderId.trim() });
+        showSmsToast('Đã liên kết vận đơn', 'Trạng thái sẽ được đồng bộ từ hãng giao hàng.');
+      } catch (error) { showSmsToast('Chưa liên kết được vận đơn', error.message); }
+    }
+    window.dispatchOrderToPartner = dispatchOrderToPartner;
 
-      const drivers = [
-        { name: 'Nguyễn Văn Hùng', phone: '0903 124 556', vehicle: 'Honda Wave Alpha 59P1-123.45' },
-        { name: 'Trần Minh Quân', phone: '0918 890 221', vehicle: 'Yamaha Sirius 59L2-678.90' },
-        { name: 'Lê Hoàng Phúc', phone: '0987 654 321', vehicle: 'Honda Vision 59C1-889.99' },
-        { name: 'Phạm Quốc Bảo', phone: '0932 778 899', vehicle: 'Air Blade 59E1-456.78' }
-      ];
-      const driver = drivers[Math.floor(Math.random() * drivers.length)];
+    async function syncDeliveryOrder(orderId) {
+      try { await deliveryAdminRequest('/api/orders/' + encodeURIComponent(orderId) + '/delivery-sync'); }
+      catch (error) { showSmsToast('Chưa đồng bộ được giao hàng', error.message); }
+    }
+    window.syncDeliveryOrder = syncDeliveryOrder;
 
-      order.deliveryPartner = partner;
-      order.deliveryPartnerName = (partner === 'ahamove') ? 'Ahamove Siêu Tốc' : 'Lalamove Giao Nhanh';
-      order.deliveryStatus = 'assigned';
-      order.trackingCode = trackingCode;
-      order.driver = driver;
-      order.dispatchedAtIso = new Date().toISOString();
-      saveLocalData();
-      broadcastMeshEvent('ORDER_DISPATCH', { orderId, deliveryPartner: partner, deliveryPartnerName: order.deliveryPartnerName, trackingCode, driver });
+    let deliveryConnectionCheckedAt = 0;
+    async function updateDeliveryConnectionStatus() {
+      const element = document.getElementById('delivery-connection-status');
+      if (!element || Date.now() - deliveryConnectionCheckedAt < 60000) return;
+      deliveryConnectionCheckedAt = Date.now();
+      try {
+        const response = await fetch(getCloudApiUrl('/api/delivery/status'), { cache: 'no-store', signal: AbortSignal.timeout(12000) });
+        if (!response.ok) throw new Error();
+        const data = await response.json();
+        element.textContent = data.ahamove || data.lalamove ?
+          'Hãng đã cấu hình: ' + [data.ahamove ? 'Ahamove' : '', data.lalamove ? 'Lalamove' : ''].filter(Boolean).join(', ') :
+          'Chưa kết nối API giao hàng. Đơn đang giao sẽ chờ xác nhận từ hãng.';
+      } catch (_) { element.textContent = 'Chưa kiểm tra được kết nối giao hàng.'; }
+    }
 
-      fetch(`/api/orders/${orderId}/dispatch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ partner })
-      }).catch(() => {});
-
-      playAudioChime(700, 0.15);
-      showSmsToast(`🛵 ĐÃ ĐẨY ĐƠN SANG ${order.deliveryPartnerName.toUpperCase()}!`, `Mã VĐ: ${trackingCode} • Tài xế: ${driver.name} (${driver.phone}) đang đến tiệm lấy nước!`);
-      renderAllBackendTabs();
+    function escapeDeliveryText(value) {
+      return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function createAdminShippingOrderCard(order) {
+      const id = escapeDeliveryText(order.id);
+      const items = (order.items || []).map(item => '<div>' + escapeDeliveryText(item.qty) + ' × ' + escapeDeliveryText(item.name) + ' — ' + formatMoney(item.total ?? item.price * item.qty) + '</div>').join('');
+      const linked = !!order.deliveryCarrierOrderId;
+      const label = order.deliveryStatus === 'failed' ? 'GIAO HÀNG GẶP SỰ CỐ' : 'SHIPPER ĐANG GIAO HÀNG';
+      const linkButtons = linked ? '<button type="button" class="nav-btn" onclick="syncDeliveryOrder(' + escapeDeliveryText(JSON.stringify(order.id)) + ')">Kiểm tra với hãng</button>' :
+        '<button type="button" class="nav-btn" onclick="dispatchOrderToPartner(' + escapeDeliveryText(JSON.stringify(order.id)) + ', &quot;ahamove&quot;)">Liên kết Ahamove</button>' +
+        '<button type="button" class="nav-btn" onclick="dispatchOrderToPartner(' + escapeDeliveryText(JSON.stringify(order.id)) + ', &quot;lalamove&quot;)">Liên kết Lalamove</button>';
+      return '<article class="backend-order-card" style="padding:16px;border-left:4px solid #EA580C;">' +
+        '<b>' + label + '</b><h3>' + id + '</h3><p>' + escapeDeliveryText(order.customerName) + '</p>' + items +
+        '<p>' + escapeDeliveryText(order.deliveryPartnerName || '') + ' • ' + escapeDeliveryText(order.trackingCode || 'Chưa liên kết vận đơn thật') + '</p>' +
+        '<p>Đã bàn giao cho shipper; chưa xác nhận khách đã nhận.</p>' +
+        (order.deliverySyncError ? '<p>' + escapeDeliveryText(order.deliverySyncError) + '</p>' : '') + linkButtons + '</article>';
     }
 
     // DUYỆT ĐƠN (NEW -> PREP)
@@ -9053,25 +9109,15 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       renderAllBackendTabs();
     }
 
-    // HOÀN TẤT ĐƠN (PREP -> DONE)
-    function completeOrder(orderId) {
+    // Bàn giao cho shipper chưa phải là giao thành công đến khách.
+    async function completeOrder(orderId) {
       const order = findOrderById(orderId);
-      if (!order) return;
-
-      order.status = 'done';
-      order.completedAtIso = new Date().toISOString();
-      saveLocalData();
-      broadcastMeshEvent('ORDER_STATUS', { orderId, status: 'done', completedAtIso: order.completedAtIso });
-
-      fetch(`/api/orders/${orderId}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'done' })
-      }).catch(() => {});
-
-      playSuccessChime();
-      showSmsToast("✅ ĐÃ HOÀN TẤT & BÀN GIAO SHIPPER!", `Đơn ${orderId} đã giao cho tài xế ${order.deliveryPartnerName || 'Ahamove'} đi phát.`);
-      renderAllBackendTabs();
+      if (!order || order.status !== 'prep') return;
+      try {
+        await deliveryAdminRequest('/api/orders/' + encodeURIComponent(orderId) + '/status', { status: 'shipping' });
+        playSuccessChime();
+        showSmsToast('🛵 ĐÃ GIAO CHO SHIPPER', 'Đơn đang giao; chờ hãng xác nhận khách đã nhận.');
+      } catch (error) { showSmsToast('Chưa bàn giao được đơn', error.message); }
     }
 
     function restoreOrder(orderId) {
@@ -9285,6 +9331,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       if (badgeEl) {
         if (order.status === 'new') { badgeEl.textContent = 'MỚI'; badgeEl.style.background = '#FEF3C7'; badgeEl.style.color = '#B45309'; }
         else if (order.status === 'prep') { badgeEl.textContent = 'ĐANG PHA CHẾ'; badgeEl.style.background = '#E0F2FE'; badgeEl.style.color = '#0369A1'; }
+        else if (order.status === 'shipping') { badgeEl.textContent = 'ĐANG GIAO HÀNG'; badgeEl.style.background = '#FFF7ED'; badgeEl.style.color = '#C2410C'; }
         else if (order.status === 'done') { badgeEl.textContent = 'HOÀN TẤT'; badgeEl.style.background = '#DCFCE7'; badgeEl.style.color = '#15803D'; }
         else if (order.status === 'cancelled') { badgeEl.textContent = 'ĐÃ HỦY'; badgeEl.style.background = '#FEE2E2'; badgeEl.style.color = '#B91C1C'; }
         else { badgeEl.textContent = order.status; }
@@ -9743,6 +9790,11 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
       const prepOrders = orders.filter(o => o.status === 'prep');
       const doneOrders = orders.filter(o => o.status === 'done');
+      const shippingOrders = orders.filter(o => o.status === 'shipping');
+      document.getElementById('badge-count-shipping').textContent = shippingOrders.length;
+      const shippingGrid = document.getElementById('grid-orders-shipping');
+      shippingGrid.innerHTML = shippingOrders.length ? shippingOrders.map(createAdminShippingOrderCard).join('') : '<p>Chưa có đơn đang giao.</p>';
+      updateDeliveryConnectionStatus();
       const cancelledOrders = orders.filter(o => o.status === 'cancelled');
 
       const badgeNew = document.getElementById('badge-count-new');
@@ -9816,7 +9868,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       if (!tbody) return;
 
       tbody.innerHTML = orders.map(o => `
-        <tr>
+        <tr data-order-status="${o.status}">
           <td><b>${o.id}</b></td>
           <td>${o.time || '--'}</td>
           <td><b>${o.customerName || 'Khách'}</b><br><span style="font-size:0.75rem; color:#64748B;">${o.phone || ''}</span></td>
@@ -9827,9 +9879,9 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
           <td><b style="color:#C2410C;">${formatMoney(o.shippingFee || 18000)}</b></td>
           <td>
             <span style="font-size:0.75rem; font-weight:800; padding:3px 8px; border-radius:12px; 
-              background:${o.status==='new'?'#FEF3C7':o.status==='prep'?'#E0F2FE':o.status==='done'?'#DCFCE7':'#FEE2E2'};
-              color:${o.status==='new'?'#92400E':o.status==='prep'?'#0369A1':o.status==='done'?'#15803D':'#B91C1C'};">
-              ${o.status==='new'?'Đơn mới':o.status==='prep'?'Đang pha chế':o.status==='done'?'Đã giao shipper':'Đã hủy'}
+              background:${o.status==='new'?'#FEF3C7':o.status==='prep'?'#E0F2FE':o.status==='shipping'?'#FFF7ED':o.status==='done'?'#DCFCE7':'#FEE2E2'};
+              color:${o.status==='new'?'#92400E':o.status==='prep'?'#0369A1':o.status==='shipping'?'#C2410C':o.status==='done'?'#15803D':'#B91C1C'};">
+              ${getStatusBadgeText(o.status)}
             </span>
           </td>
           <td>
@@ -9860,7 +9912,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         const matchText = text.includes(query);
         let matchStatus = true;
         if (statusFilter !== 'all') {
-          matchStatus = text.includes(statusFilter === 'new' ? 'đơn mới' : statusFilter === 'prep' ? 'đang pha chế' : statusFilter === 'done' ? 'đã giao shipper' : 'đã hủy');
+          matchStatus = r.dataset.orderStatus === statusFilter;
         }
         r.style.display = (matchText && matchStatus) ? '' : 'none';
       });

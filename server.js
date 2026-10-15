@@ -16,6 +16,7 @@ const { createBackup } = require('./drive-backup');
 const { createReceiptVerifier } = require('./receipt-verification');
 const { createReceiptJobs } = require('./receipt-jobs');
 const { createAdminPush } = require('./admin-push');
+const { createDelivery, protectOrderWrite, transition } = require('./delivery');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const ROOT_DIR = __dirname;
@@ -127,6 +128,9 @@ const receiptJobs = createReceiptJobs({ verify: body => receiptVerifier.verify(b
 const adminPush = createAdminPush({ dir: ROOT_DIR, readConfig: () => configCache, backup: backupService });
 await adminPush.initialize();
 const notifiedOrderIds = new Set(ordersCache.map(order => String(order.id)));
+const delivery = createDelivery({ getOrders: () => ordersCache,
+  saveOrders: () => writeJsonFile(ORDERS_FILE, ordersCache), broadcast: broadcastRealtime });
+setInterval(() => delivery.poll().catch(() => {}), 60000).unref();
 function mergeConfig(current, patch) {
   return { ...current, ...patch,
     bankConfig: { ...(current.bankConfig || {}), ...(patch.bankConfig || {}) },
@@ -134,7 +138,7 @@ function mergeConfig(current, patch) {
 }
 function checkOrder(order) {
   receiptVerifier.assertVerified(order);
-  return { ...order, verificationToken: undefined, paymentStatus: 'receipt_verified' };
+  return protectOrderWrite({ ...order, verificationToken: undefined, paymentStatus: 'receipt_verified' }, ordersCache.find(o => o.id === order.id));
 }
 // Quản lý phiên bản dữ liệu và mã nguồn (Data & Code Versioning)
 let codeVersion = Date.now();
@@ -365,34 +369,16 @@ function handleClientWsMessage(payload, senderClient) {
       ordersCache = readJsonFile(ORDERS_FILE, ordersCache);
       const order = ordersCache.find(o => o.id === orderId);
       if (order) {
-        order.status = status;
-        if (status === 'done') order.completedAtIso = new Date().toISOString();
-        if (status === 'cancelled') {
-          order.cancelledAtIso = new Date().toISOString();
-          if (cancelReason) order.cancelReason = cancelReason;
-        }
+        if (status === 'shipping' && !adminPush.verify(p.adminToken || payload.adminToken)) return;
+        try { transition(order, status, cancelReason); } catch (_) { return; }
         writeJsonFile(ORDERS_FILE, ordersCache);
         console.log(`[WebSocket] Trạng thái đơn ${orderId} -> ${status}`);
         broadcastRealtime('ORDER_STATUS', { orderId, status, cancelReason, order }, senderClient, payload.senderId);
       }
     }
   } else if (type === 'ORDER_DISPATCH') {
-    const p = payload.data || payload;
-    const orderId = p.orderId || payload.orderId;
-    if (orderId) {
-      ordersCache = readJsonFile(ORDERS_FILE, ordersCache);
-      const order = ordersCache.find(o => o.id === orderId);
-      if (order) {
-        order.deliveryStatus = 'assigned';
-        order.deliveryPartner = p.deliveryPartner || order.deliveryPartner;
-        order.trackingCode = p.trackingCode || order.trackingCode;
-        if (p.driver) order.driver = p.driver;
-        order.dispatchedAtIso = new Date().toISOString();
-        writeJsonFile(ORDERS_FILE, ordersCache);
-        console.log(`[WebSocket] Điều phối đơn ${orderId}`);
-        broadcastRealtime('ORDER_DISPATCH', { orderId, order }, senderClient, payload.senderId);
-      }
-    }
+    // Carrier linkage is accepted only by the authenticated REST endpoint.
+    return;
   } else if (type === 'REQUEST_FULL_SYNC') {
     senderClient.send(JSON.stringify({
       type: 'FULL_SYNC',
@@ -595,6 +581,22 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 200, { ok: true, codeVersion, uptimeSeconds: Math.floor(process.uptime()) });
     return;
   }
+  if (pathname === '/api/delivery/status' && req.method === 'GET') {
+    sendJson(res, 200, { ahamove: delivery.configured('ahamove'), lalamove: delivery.configured('lalamove') }); return;
+  }
+  const carrierCallback = pathname.match(/^\/api\/delivery\/webhooks\/(ahamove|lalamove)$/);
+  if (carrierCallback && req.method === 'POST') {
+    try { sendJson(res, 200, await delivery.callback(carrierCallback[1], await parseRequestBody(req))); }
+    catch (error) { sendJson(res, error.status || 502, { error: 'Chưa kiểm tra được trạng thái từ hãng giao hàng.' }); }
+    return;
+  }
+  const refreshDeliveryMatch = pathname.match(/^\/api\/orders\/([^/]+)\/delivery-sync$/);
+  if (refreshDeliveryMatch && req.method === 'POST') {
+    if (!adminPush.verify((req.headers.authorization || '').replace(/^Bearer /, ''))) { sendJson(res, 401, { error: 'Vui lòng đăng nhập lại quản trị để liên kết giao hàng.' }); return; }
+    try { const order = await delivery.refresh(decodeURIComponent(refreshDeliveryMatch[1])); sendJson(res, order ? 200 : 404, order ? { success: true, order } : { error: 'Không tìm thấy đơn hàng.' }); }
+    catch (error) { sendJson(res, error.status || 502, { error: error.message }); }
+    return;
+  }
   if (await backupService.handle(req, res, parsedUrl)) return;
   if (pathname.startsWith('/api/admin-push/')) {
     res.setHeader('Cache-Control', 'no-store');
@@ -758,13 +760,13 @@ const server = http.createServer(async (req, res) => {
   // 2. POST /api/orders
   if (req.method === 'POST' && pathname === '/api/orders') {
     try {
-      const body = await parseRequestBody(req);
+      let body = await parseRequestBody(req);
       if (!body || !body.id) {
         sendJson(res, 400, { error: 'Dữ liệu đơn hàng thiếu mã đơn (id)' });
         return;
       }
 
-      try { Object.assign(body, checkOrder(body)); } catch (error) { sendJson(res, 422, { error: error.message }); return; }
+      try { body = checkOrder(body); } catch (error) { sendJson(res, 422, { error: error.message }); return; }
       ordersCache = readJsonFile(ORDERS_FILE, ordersCache);
       const existingIdx = ordersCache.findIndex(o => o.id === body.id);
       if (existingIdx >= 0) {
@@ -813,14 +815,15 @@ const server = http.createServer(async (req, res) => {
       let order = ordersCache.find(o => o.id === orderId);
       const isNewReceiptOrder = !order;
 
-      try { checkOrder({ ...(order || body.order || {}), ...body, receiptImage }); } catch (error) { sendJson(res, 422, { error: error.message }); return; }
+      let verifiedOrder;
+      try { verifiedOrder = checkOrder({ ...(order || body.order || {}), ...body, id: orderId, receiptImage }); } catch (error) { sendJson(res, 422, { error: error.message }); return; }
       if (order) {
         order.receiptImage = receiptImage;
         order.paymentStatus = 'receipt_submitted';
         order.receiptUploadedAt = new Date().toISOString();
       } else {
         order = {
-          ...(body.order || {}),
+          ...verifiedOrder,
           id: orderId,
           status: 'new',
           paymentStatus: 'receipt_submitted',
@@ -846,6 +849,7 @@ const server = http.createServer(async (req, res) => {
       const orderId = decodeURIComponent(statusMatch[1]);
       const body = await parseRequestBody(req);
       const newStatus = body.status;
+      if (newStatus === 'shipping' && !adminPush.verify((req.headers.authorization || '').replace(/^Bearer /, ''))) { sendJson(res, 401, { error: 'Vui lòng đăng nhập lại quản trị để bàn giao shipper.' }); return; }
 
       ordersCache = readJsonFile(ORDERS_FILE, ordersCache);
       const order = ordersCache.find(o => o.id === orderId);
@@ -855,20 +859,14 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      order.status = newStatus;
-      if (newStatus === 'done') {
-        order.completedAtIso = new Date().toISOString();
-      } else if (newStatus === 'cancelled') {
-        order.cancelledAtIso = new Date().toISOString();
-        if (body.reason) order.cancelReason = body.reason;
-      }
+      transition(order, newStatus, body.reason);
 
       writeJsonFile(ORDERS_FILE, ordersCache);
       console.log(`[API] Trạng thái đơn ${orderId} -> ${newStatus}`);
       broadcastRealtime('ORDER_STATUS', { orderId, status: newStatus, order });
-      sendJson(res, 200, { success: true, orderId, status: newStatus });
+      sendJson(res, 200, { success: true, orderId, status: newStatus, order });
     } catch (err) {
-      sendJson(res, 500, { error: err.message });
+      sendJson(res, err.status || 500, { error: err.message });
     }
     return;
   }
@@ -876,35 +874,14 @@ const server = http.createServer(async (req, res) => {
   // 4b. POST /api/orders/:id/dispatch
   const dispatchMatch = pathname.match(/^\/api\/orders\/([^\/]+)\/dispatch$/);
   if (req.method === 'POST' && dispatchMatch) {
+    if (!adminPush.verify((req.headers.authorization || '').replace(/^Bearer /, ''))) { sendJson(res, 401, { error: 'Vui lòng đăng nhập lại quản trị để liên kết giao hàng.' }); return; }
     try {
       const orderId = decodeURIComponent(dispatchMatch[1]);
       const body = await parseRequestBody(req);
-      const partner = body.partner || 'ahamove';
-
-      ordersCache = readJsonFile(ORDERS_FILE, ordersCache);
-      const order = ordersCache.find(o => o.id === orderId);
-      if (!order) {
-        sendJson(res, 404, { error: `Không tìm thấy đơn ${orderId}` });
-        return;
-      }
-
-      const trackingCode = (partner === 'ahamove')
-        ? `AHA-SG-${Math.floor(10000 + Math.random() * 90000)}`
-        : `LALA-SG-${Math.floor(10000 + Math.random() * 90000)}`;
-
-      const driver = { name: 'Nguyễn Văn Hùng', phone: '0903 124 556', vehicle: 'Wave Alpha 59P1-123.45' };
-      order.deliveryPartner = partner;
-      order.deliveryPartnerName = (partner === 'ahamove') ? 'Ahamove Siêu Tốc' : 'Lalamove Giao Nhanh';
-      order.deliveryStatus = 'assigned';
-      order.trackingCode = trackingCode;
-      order.driver = driver;
-      order.dispatchedAtIso = new Date().toISOString();
-
-      writeJsonFile(ORDERS_FILE, ordersCache);
-      broadcastRealtime('ORDER_DISPATCH', { orderId, deliveryPartner: partner, deliveryPartnerName: order.deliveryPartnerName, trackingCode, driver });
-      sendJson(res, 200, { success: true, orderId, partner, trackingCode, driver });
+      const order = await delivery.bind(orderId, body.partner, String(body.carrierOrderId || '').trim());
+      sendJson(res, 200, { success: true, orderId, order });
     } catch (err) {
-      sendJson(res, 500, { error: err.message });
+      sendJson(res, err.status || 502, { error: err.message });
     }
     return;
   }
@@ -1009,7 +986,7 @@ const server = http.createServer(async (req, res) => {
   // Source code and local data are not static assets.
   let normalized;
   try { normalized = path.posix.normalize(decodeURIComponent(cleanPath)); } catch { sendJson(res, 400, { error: 'Đường dẫn không hợp lệ' }); return; }
-  if (normalized.split('/').some(part => part.startsWith('.')) || ['server.js', 'admin-push.js', 'drive-backup.js', 'receipt-verification.js', 'receipt-jobs.js', 'receipt-image.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || normalized.startsWith('/test/') || /\.(tmp|md)$/.test(normalized)) {
+  if (normalized.split('/').some(part => part.startsWith('.')) || ['server.js', 'delivery.js', 'admin-push.js', 'drive-backup.js', 'receipt-verification.js', 'receipt-jobs.js', 'receipt-image.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || normalized.startsWith('/test/') || /\.(tmp|md)$/.test(normalized)) {
     sendJson(res, 404, { error: 'Không tìm thấy' }); return;
   }
   if (cleanPath === '/' || cleanPath === '/admin' || cleanPath === '/pos') {

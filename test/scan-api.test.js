@@ -4,7 +4,7 @@ const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),net=
 const {spawn}=require('node:child_process');
 test('HTTP scan starts quickly, retries share work, and completed proof is server verified',async()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'duynh-scan-api-'));
- for(const name of ['server.js','admin-push.js','order-notifications-sw.js','admin-notifications.js','drive-backup.js','receipt-jobs.js','index.html'])fs.copyFileSync(path.join(__dirname,'..',name),path.join(dir,name));
+ for(const name of ['server.js','delivery.js','admin-push.js','order-notifications-sw.js','admin-notifications.js','drive-backup.js','receipt-jobs.js','index.html'])fs.copyFileSync(path.join(__dirname,'..',name),path.join(dir,name));
  const verifier=path.join(__dirname,'..','receipt-verification.js');
  const pushModule=path.join(__dirname,'..','admin-push.js');
  fs.writeFileSync(path.join(dir,'admin-push.js'),`const real=require(${JSON.stringify(pushModule)});const fs=require('node:fs');module.exports={createAdminPush:options=>real.createAdminPush({...options,sendImpl:async(sub,payload)=>fs.appendFileSync(${JSON.stringify(path.join(dir,'.push-test-log'))},payload+'\\n')})};`);
@@ -33,6 +33,25 @@ test('HTTP scan starts quickly, retries share work, and completed proof is serve
  assert.equal((await post('/api/orders',{...order,id:'INVALID-NOTIFY',verificationToken:'wrong'})).status,422);
  assert.equal(fs.existsSync(path.join(dir,'.push-test-log')),false);
  assert.equal((await post('/api/orders',order)).status,200);assert.equal((await post('/api/orders',order)).status,200);
+ const status=(value,auth=false)=>fetch(base+'/api/orders/NOTIFY-ONCE/status',{method:'POST',headers:{'Content-Type':'application/json',...(auth?{Authorization:'Bearer '+session.token}:{})},body:JSON.stringify({status:value})});
+ assert.equal((await status('done')).status,409);
+ assert.equal((await status('shipping')).status,401);
+ assert.equal((await status('prep')).status,200);
+ assert.equal((await status('shipping',true)).status,200);
+ assert.equal((await status('done',true)).status,409);
+ const forged={...order,status:'done',deliveryStatus:'delivered',deliveryCarrierOrderId:'FAKE',completedAtIso:'fake'};
+ assert.equal((await post('/api/orders',forged)).status,200);
+ assert.equal((await post('/api/sync',{orders:[forged]})).status,200);
+ const WebSocket=require('ws'),socket=new WebSocket(base.replace('http:','ws:')+'/ws');
+ await new Promise((resolve,reject)=>{socket.once('open',resolve);socket.once('error',reject);});
+ socket.send(JSON.stringify({type:'ORDER_STATUS',orderId:order.id,status:'done'}));
+ socket.send(JSON.stringify({type:'ORDER_DISPATCH',orderId:order.id,deliveryPartner:'lalamove',trackingCode:'FAKE',driver:{name:'Fake'}}));
+ await new Promise(resolve=>setTimeout(resolve,30));
+ await new Promise(resolve=>{socket.once('close',resolve);socket.close();});
+ let stored=(await(await fetch(base+'/api/orders')).json()).find(o=>o.id===order.id);
+ assert.equal(stored.status,'shipping');assert.equal(stored.completedAtIso,undefined);assert.equal(stored.deliveryCarrierOrderId,undefined);
+ const ignored=await(await post('/api/delivery/webhooks/lalamove',{data:{order:{orderId:'FAKE',status:'COMPLETED'}}})).json();assert.equal(ignored.ignored,true);
+ assert.equal((await post('/api/orders/NOTIFY-ONCE/dispatch',{partner:'lalamove',carrierOrderId:'123456'})).status,401);
  const messages=fs.readFileSync(path.join(dir,'.push-test-log'),'utf8').trim().split('\n');assert.equal(messages.length,1);assert.match(messages[0],/Có đơn hàng mới/);
  await post('/api/config',{bankConfig:{accountHolder:'DAO KHUE NGUYEN'}});
  const changed=await(await post('/api/receipt-scans',body)).json();assert.notEqual(changed.jobId,pending.jobId);
