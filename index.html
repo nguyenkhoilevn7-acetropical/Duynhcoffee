@@ -3523,6 +3523,11 @@ body {
             </button>
           </div>
         </div>
+        <div style="padding:12px; margin-bottom:12px; border:1px solid var(--border); border-radius:12px;">
+          <b>Thứ tự danh mục trên trang bán hàng</b>
+          <div id="admin-category-order" style="display:flex; flex-direction:column; gap:8px; margin-top:10px;"></div>
+          <p id="menu-order-status" role="status" aria-live="polite" style="font-size:0.85rem; margin-top:8px;">Dùng Trước / Sau để đổi thứ tự. Thứ tự món áp dụng cho cả Tất Cả Món và từng danh mục.</p>
+        </div>
         <div class="table-responsive">
           <table class="data-table">
             <thead>
@@ -4481,6 +4486,10 @@ body {
           <label>Tên món:</label>
           <input type="text" id="edit-menu-name" class="form-control">
         </div>
+        <div class="form-group">
+          <label for="edit-menu-position">Vị trí hiển thị món:</label>
+          <select id="edit-menu-position" class="form-control"></select>
+        </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div class="form-group">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
@@ -4493,6 +4502,10 @@ body {
               <option value="bakery">🥐 Bánh & Tráng Miệng</option>
               <option value="__new__">➕ Thêm danh mục mới...</option>
             </select>
+            <div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;">
+              <button type="button" class="nav-btn" onclick="moveMenuCategory(document.getElementById('edit-menu-category').value, -1)">↑ Danh mục trước</button>
+              <button type="button" class="nav-btn" onclick="moveMenuCategory(document.getElementById('edit-menu-category').value, 1)">↓ Danh mục sau</button>
+            </div>
             <div id="inline-category-box-edit" style="display: none; margin-top: 8px; padding: 10px; background: #F8FAFC; border: 1px dashed #059669; border-radius: 10px;">
               <div style="font-weight: 700; font-size: 0.8rem; color: #065F46; margin-bottom: 6px; display: flex; justify-content: space-between;">
                 <span>✨ Tạo Danh Mục Tùy Chọn Mới:</span>
@@ -4570,6 +4583,10 @@ body {
           <label>Tên món:</label>
           <input type="text" id="add-menu-name" class="form-control" placeholder="VD: Trà Xoài Nhiệt Đới Đuỷnh">
         </div>
+        <div class="form-group">
+          <label for="add-menu-position">Vị trí hiển thị món:</label>
+          <select id="add-menu-position" class="form-control"></select>
+        </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div class="form-group">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
@@ -4582,6 +4599,10 @@ body {
               <option value="bakery">🥐 Bánh & Tráng Miệng</option>
               <option value="__new__">➕ Thêm danh mục mới...</option>
             </select>
+            <div style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;">
+              <button type="button" class="nav-btn" onclick="moveMenuCategory(document.getElementById('add-menu-category').value, -1)">↑ Danh mục trước</button>
+              <button type="button" class="nav-btn" onclick="moveMenuCategory(document.getElementById('add-menu-category').value, 1)">↓ Danh mục sau</button>
+            </div>
             <div id="inline-category-box-add" style="display: none; margin-top: 8px; padding: 10px; background: #F8FAFC; border: 1px dashed #059669; border-radius: 10px;">
               <div style="font-weight: 700; font-size: 0.8rem; color: #065F46; margin-bottom: 6px; display: flex; justify-content: space-between;">
                 <span>✨ Tạo Danh Mục Tùy Chọn Mới:</span>
@@ -5229,25 +5250,7 @@ body {
     }
 
     function hasMenuChanged(oldMenu, newMenu) {
-      if (!Array.isArray(oldMenu) || !Array.isArray(newMenu)) return true;
-      if (oldMenu.length !== newMenu.length) return true;
-      for (let i = 0; i < oldMenu.length; i++) {
-        const a = oldMenu[i];
-        const b = newMenu[i];
-        if (!a || !b) return true;
-        if (String(a.id) !== String(b.id) || 
-            a.price !== b.price || 
-            a.stock !== b.stock || 
-            a.isAvailable !== b.isAvailable || 
-            a.isBestSeller !== b.isBestSeller || 
-            a.name !== b.name ||
-            a.image !== b.image ||
-            a.description !== b.description ||
-            a.category !== b.category) {
-          return true;
-        }
-      }
-      return false;
+      return JSON.stringify(oldMenu) !== JSON.stringify(newMenu);
     }
 
     function hasOrdersChanged(oldOrders, newOrders) {
@@ -5529,7 +5532,9 @@ body {
         bankConfig: { ...(storeConfig.bankConfig || {}), ...(config.bankConfig || {}) } };
       lastConfigVersion = version || lastConfigVersion;
       if (JSON.stringify(nextConfig) === JSON.stringify(storeConfig)) return false;
+      const categoriesChanged = JSON.stringify([storeConfig.categories, storeConfig.categoryOrder]) !== JSON.stringify([nextConfig.categories, nextConfig.categoryOrder]);
       storeConfig = nextConfig;
+      if (categoriesChanged && typeof refreshCategoryViews === 'function') refreshCategoryViews();
       if (config.banner) {
         bannerUploadedImages = Array.isArray(config.banner.images) ? [...config.banner.images] : [];
         try { localStorage.setItem('duynh_custom_banner_backup', JSON.stringify(config.banner)); } catch (_) {}
@@ -6612,7 +6617,9 @@ function toggleKitchenSoundAlert() {
           if (c && c.id && c.name) map.set(c.id, { ...c });
         });
       }
-      return Array.from(map.values());
+      const order = Array.isArray(storeConfig?.categoryOrder) ? storeConfig.categoryOrder : [];
+      const rank = new Map(order.map((id, i) => [String(id), i]));
+      return Array.from(map.values()).sort((a, b) => (rank.get(String(a.id)) ?? order.length) - (rank.get(String(b.id)) ?? order.length));
     }
 
     function getCategoryDisplayName(catId) {
@@ -6670,7 +6677,7 @@ function toggleKitchenSoundAlert() {
       }
     }
 
-    function executeCreateCustomCategory(context) {
+    async function executeCreateCustomCategory(context) {
       const nameInp = document.getElementById(`new-cat-name-${context}`);
       const iconInp = document.getElementById(`new-cat-icon-${context}`);
       if (!nameInp) return;
@@ -6687,24 +6694,11 @@ function toggleKitchenSoundAlert() {
 
       const newCat = { id, name, icon };
 
-      if (!storeConfig) storeConfig = {};
-      if (!Array.isArray(storeConfig.categories)) storeConfig.categories = [];
-
-      const existingIdx = storeConfig.categories.findIndex(c => c.id === id);
-      if (existingIdx >= 0) {
-        storeConfig.categories[existingIdx] = newCat;
-      } else {
-        storeConfig.categories.push(newCat);
-      }
-
-      try {
-        localStorage.setItem('duynh_config', JSON.stringify(storeConfig));
-        localStorage.setItem('duynh_custom_categories', JSON.stringify(storeConfig.categories));
-      } catch(e) {}
-
-      if (typeof debouncedSaveConfigToServer === 'function') {
-        debouncedSaveConfigToServer();
-      }
+      const categories = [...(Array.isArray(storeConfig.categories) ? storeConfig.categories : [])];
+      const existingIdx = categories.findIndex(c => c.id === id);
+      if (existingIdx >= 0) categories[existingIdx] = newCat;
+      else categories.push(newCat);
+      if (!await saveCategoryPatch({ categories })) return;
 
       populateCategorySelectDropdowns(id, 'both');
       toggleInlineCategoryCreator(context, false);
@@ -6726,6 +6720,122 @@ function toggleKitchenSoundAlert() {
         html += `<button type="button" class="cat-btn ${currentCategory===c.id?'active':''}" onclick="filterCategory('${c.id}', this)">${c.icon || '🏷️'} ${c.name}</button>`;
       });
       container.innerHTML = html;
+    }
+
+    // ==================== SHARED MENU DISPLAY ORDER ====================
+    let menuOrderSaving = false;
+    let categoryOrderSaving = false;
+    function orderText(value) {
+      return String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    }
+    function menuOrderStatus(message) {
+      const el = document.getElementById('menu-order-status');
+      if (el) el.textContent = message;
+    }
+    function positionMenuItem(items, id, position) {
+      const original = items.findIndex(m => String(m.id) === String(id));
+      if (original < 0 || position === 'keep') return [...items];
+      const result = [...items];
+      const [item] = result.splice(original, 1);
+      if (position === 'start') result.unshift(item);
+      else if (position === 'end') result.push(item);
+      else {
+        const colon = position.indexOf(':');
+        const target = result.findIndex(m => String(m.id) === position.slice(colon + 1));
+        if (target < 0) return [...items];
+        result.splice(target + (position.startsWith('after:') ? 1 : 0), 0, item);
+      }
+      return result;
+    }
+    function populateMenuPositions(context, itemId) {
+      const select = document.getElementById(`${context}-menu-position`);
+      if (!select) return;
+      const options = menu.filter(m => String(m.id) !== String(itemId));
+      select.innerHTML = (context === 'edit' ? '<option value="keep">Giữ vị trí hiện tại</option>' : '') +
+        '<option value="end">Cuối thực đơn</option><option value="start">Đầu thực đơn</option>' +
+        options.map(m => `<option value="before:${orderText(m.id)}">Trước: ${orderText(m.name)}</option><option value="after:${orderText(m.id)}">Sau: ${orderText(m.name)}</option>`).join('');
+      select.value = context === 'edit' ? 'keep' : 'end';
+    }
+    function renderAdminCategoryOrder() {
+      const el = document.getElementById('admin-category-order');
+      if (!el) return;
+      const cats = getCategoriesList();
+      el.innerHTML = cats.map((c, i) => `<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <span style="flex:1; min-width:150px;">${i + 1}. ${orderText(c.icon || '🏷️')} ${orderText(c.name)}</span>
+        <button type="button" class="nav-btn" ${i === 0 ? 'disabled' : ''} onclick="moveMenuCategoryAt(${i}, -1)">↑ Trước</button>
+        <button type="button" class="nav-btn" ${i === cats.length - 1 ? 'disabled' : ''} onclick="moveMenuCategoryAt(${i}, 1)">↓ Sau</button>
+      </div>`).join('');
+    }
+    function refreshCategoryViews() {
+      renderCategoryFilterPills();
+      populateCategorySelectDropdowns();
+      renderAdminCategoryOrder();
+      if (typeof isAdminViewActive === 'function' && isAdminViewActive()) renderAdminMenuTable();
+    }
+    async function saveCategoryPatch(patch) {
+      if (!isUserAdmin() || categoryOrderSaving) return false;
+      categoryOrderSaving = true;
+      menuOrderStatus('Đang lưu danh mục...');
+      try {
+        const response = await fetch(getCloudApiUrl('/api/config'), {
+          method:'POST', headers:{'Content-Type':'application/json'}, cache:'no-store', body:JSON.stringify(patch)
+        });
+        const result = await response.json();
+        if (!response.ok || result.success !== true || !result.config) throw new Error(result.error || 'Chưa nhận được xác nhận lưu danh mục');
+        applyServerConfig(result.config, result.configVersion);
+        saveLocalData();
+        refreshCategoryViews();
+        menuOrderStatus('Đã lưu danh mục và gửi đồng bộ đến các thiết bị.');
+        return true;
+      } catch (error) {
+        menuOrderStatus('Chưa lưu được danh mục. Vui lòng thử lại.');
+        showSmsToast('Chưa lưu được danh mục', error.message);
+        return false;
+      } finally { categoryOrderSaving = false; }
+    }
+    async function moveMenuCategory(id, direction) {
+      const cats = getCategoriesList();
+      const index = cats.findIndex(c => String(c.id) === String(id));
+      const target = index + direction;
+      if (index < 0 || target < 0 || target >= cats.length || ![-1,1].includes(direction)) return false;
+      [cats[index], cats[target]] = [cats[target], cats[index]];
+      return saveCategoryPatch({categoryOrder:cats.map(c => c.id)});
+    }
+    function moveMenuCategoryAt(index, direction) {
+      const category = getCategoriesList()[index];
+      if (category) return moveMenuCategory(category.id, direction);
+    }
+    async function saveOrderedMenu(draft) {
+      if (!isUserAdmin() || menuOrderSaving || !Array.isArray(draft)) return false;
+      menuOrderSaving = true;
+      menuOrderStatus('Đang lưu thực đơn...');
+      try {
+        const response = await fetch(getCloudApiUrl('/api/menu'), {
+          method:'POST', headers:{'Content-Type':'application/json'}, cache:'no-store', body:JSON.stringify(draft)
+        });
+        const result = await response.json();
+        if (!response.ok || result.success !== true) throw new Error(result.error || 'Chưa nhận được xác nhận lưu thực đơn');
+        menu = draft;
+        lastMenuVersion = result.menuVersion || lastMenuVersion;
+        try { localStorage.setItem('duynh_menu_customized', 'true'); } catch (_) {}
+        saveLocalData();
+        renderAdminMenuTable();
+        renderCustomerProducts();
+        menuOrderStatus('Đã lưu thứ tự món và gửi đồng bộ đến các thiết bị.');
+        return true;
+      } catch (error) {
+        menuOrderStatus('Chưa lưu được thực đơn. Vui lòng thử lại.');
+        showSmsToast('Chưa lưu được thực đơn', error.message);
+        return false;
+      } finally { menuOrderSaving = false; }
+    }
+    async function moveMenuItem(id, direction) {
+      const index = menu.findIndex(m => String(m.id) === String(id));
+      const target = index + direction;
+      if (index < 0 || target < 0 || target >= menu.length || ![-1,1].includes(direction)) return false;
+      const draft = [...menu];
+      [draft[index], draft[target]] = [draft[target], draft[index]];
+      return saveOrderedMenu(draft);
     }
 
     // =========================================================================
@@ -9646,7 +9756,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       const tbody = document.getElementById('tbody-admin-menu');
       if (!tbody) return;
 
-      tbody.innerHTML = menu.map(m => {
+      renderAdminCategoryOrder();
+      tbody.innerHTML = menu.map((m, menuIndex) => {
         const isAvail = (m.isAvailable !== false && (m.stock === undefined || m.stock > 0));
         const stockQty = (m.stock !== undefined) ? m.stock : 50;
         let stockBadge = `<span class="product-stock-tag stock-ok">${stockQty} ly (Còn)</span>`;
@@ -9684,6 +9795,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
             </td>
             <td>
               <div style="display:flex; gap:6px;">
+                <button type="button" class="nav-btn" ${menuIndex === 0 ? 'disabled' : ''} onclick="moveMenuItem(${m.id}, -1)" aria-label="Đưa món ${menuIndex + 1} lên trước">↑ Trước</button>
+                <button type="button" class="nav-btn" ${menuIndex === menu.length - 1 ? 'disabled' : ''} onclick="moveMenuItem(${m.id}, 1)" aria-label="Đưa món ${menuIndex + 1} xuống sau">↓ Sau</button>
                 <button type="button" class="nav-btn" style="padding:4px 8px; font-size:0.75rem;" onclick="openEditMenuModal(${m.id})">
                   ✏️ Sửa
                 </button>
@@ -9741,6 +9854,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       document.getElementById('edit-menu-image-preview').src = item.image || '';
 
       document.getElementById('edit-menu-modal-title').textContent = `Chỉnh Sửa Món #${item.id} - ${item.name}`;
+      populateMenuPositions('edit', item.id);
       document.getElementById('edit-menu-modal').style.display = 'flex';
     }
 
@@ -9774,10 +9888,11 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     }
     window.handleProductImageFileChange = handleProductImageFileChange;
 
-    function saveProductChanges() {
+    async function saveProductChanges() {
       const idStr = document.getElementById('edit-menu-id').value;
-      const item = menu.find(m => String(m.id) === String(idStr));
-      if (!item) return;
+      const original = menu.find(m => String(m.id) === String(idStr));
+      if (!original) return;
+      const item = { ...original };
 
       item.name = document.getElementById('edit-menu-name').value.trim() || item.name;
       item.category = document.getElementById('edit-menu-category').value;
@@ -9788,27 +9903,14 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       item.description = document.getElementById('edit-menu-desc').value.trim();
       const newImg = document.getElementById('edit-menu-image-url').value.trim();
       if (newImg) item.image = newImg;
+      if (item.name !== original.name) item.name_en = translateFnbText(item.name);
+      if (item.description !== original.description) item.description_en = translateFnbText(item.description);
 
-      localPendingItems.set(item.id, { item: { ...item }, time: Date.now() });
-
-      lastMenuVersion = Date.now();
-      localStorage.setItem('duynh_menu_customized', 'true');
-      localStorage.setItem('duynh_custom_menu_backup', JSON.stringify(menu));
-      saveLocalData();
-      try { localStorage.setItem('duynh_menu_version', String(lastMenuVersion)); } catch(e) {}
-
-      broadcastMeshEvent('MENU_UPDATE', { menu, menuVersion: lastMenuVersion });
-      try {
-        fetch(getCloudApiUrl('/api/menu'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(menu)
-        }).catch(() => {});
-      } catch(e) {}
+      const draft = menu.map(m => String(m.id) === String(item.id) ? item : m);
+      const positioned = positionMenuItem(draft, item.id, document.getElementById('edit-menu-position')?.value || 'keep');
+      if (!await saveOrderedMenu(positioned)) return;
 
       closeEditMenuModal();
-      renderAdminMenuTable();
-      renderCustomerProducts();
       playSuccessChime();
       showSmsToast("💾 ĐÃ CẬP NHẬT MÓN!", `Món "${item.name}" đã được lưu vào thực đơn & kho hàng.`);
     }
@@ -9819,6 +9921,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       document.getElementById('add-menu-desc').value = '';
       document.getElementById('add-menu-stock').value = '50';
       populateCategorySelectDropdowns('tea', 'add');
+      populateMenuPositions('add');
       toggleInlineCategoryCreator('add', false);
       clearAddMenuImage();
       document.getElementById('add-menu-modal').style.display = 'flex';
@@ -9871,7 +9974,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     }
     window.handleAddProductImageFileChange = handleAddProductImageFileChange;
 
-    function executeAddNewProduct() {
+    async function executeAddNewProduct() {
       const name = document.getElementById('add-menu-name').value.trim();
       const price = parseInt(document.getElementById('add-menu-price').value, 10);
       const category = document.getElementById('add-menu-category').value;
@@ -9918,31 +10021,10 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         image: img
       };
 
-      // Đăng ký vào hàng đợi bảo vệ pending
-      localPendingItems.set(newId, { item: { ...newItem }, time: Date.now() });
-
-      menu.push(newItem);
-      lastMenuVersion = Date.now();
-      localStorage.setItem('duynh_menu_customized', 'true');
-      localStorage.setItem('duynh_custom_menu_backup', JSON.stringify(menu));
-      saveLocalData();
-      try { localStorage.setItem('duynh_menu_version', String(lastMenuVersion)); } catch(e) {}
-
-      // Đồng bộ ngay lập tức hai chiều: WebSocket + HTTP POST chuẩn (không dùng keepalive tránh giới hạn 64KB)
-      broadcastMeshEvent('MENU_UPDATE', { menu, menuVersion: lastMenuVersion });
-      try {
-        fetch(getCloudApiUrl('/api/menu'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(menu)
-        }).then(r => r.json()).then(res => {
-          console.log('✅ Đã lưu món mới lên Render Cloud:', res);
-        }).catch(() => {});
-      } catch(e) {}
+      const draft = positionMenuItem([...menu, newItem], newId, document.getElementById('add-menu-position')?.value || 'end');
+      if (!await saveOrderedMenu(draft)) return;
 
       closeAddMenuModal();
-      renderAdminMenuTable();
-      renderCustomerProducts();
       playSuccessChime();
       showSmsToast("➕ ĐÃ THÊM MÓN MỚI!", `Món "${name}" đã được lưu bền vững vào thực đơn & Render Cloud.`);
     }
