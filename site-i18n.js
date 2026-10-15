@@ -6,6 +6,9 @@
 })(function () {
   'use strict';
   const catalog = {
+  "Kết nối chưa ổn định. Vui lòng thử lại cùng ảnh để tiếp tục xác minh.": "The connection is unstable. Please retry with the same image to continue verification.",
+  "Máy chủ tạm thời chưa trả được kết quả xác minh.": "The server is temporarily unable to return the verification result.",
+  "Đường truyền chậm, đang tự kết nối lại để xác minh...": "The connection is slow. Reconnecting automatically to verify...",
   "Món đã đặt": "Ordered items",
   "Chưa có chi tiết món cho đơn hàng này.": "Item details are not available for this order yet.",
   "Đuỷnh Tea & Coffee - Ngon Đến Giọt Cuối Cùng": "Đuỷnh Tea & Coffee - Delicious to the Last Drop",
