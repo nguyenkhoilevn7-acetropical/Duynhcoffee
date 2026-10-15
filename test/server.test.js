@@ -12,6 +12,7 @@ test('HTTP menu/config save succeeds, empty values survive restart, private sour
  const base='http://127.0.0.1:'+port;
  try{
  await start();
+ const health=await fetch(base+'/api/health');assert.equal(health.status,200);assert.equal((await health.json()).ok,true);
  const bundle=await fetch(base+'/site-i18n.js');assert.equal(bundle.status,200);assert.match(bundle.headers.get('content-type'),/javascript/);assert.match(await bundle.text(),/DuynhI18n/);
  const worker=await fetch(base+'/order-notifications-sw.js');assert.equal(worker.status,200);assert.match(worker.headers.get('content-type'),/javascript/);assert.match(await worker.text(),/showNotification/);
  assert.ok((await(await fetch(base+'/api/admin-push/key')).json()).publicKey);

@@ -156,16 +156,28 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
     const activeWorker = worker;
     const { prepareReceipt } = require('./receipt-image');
     const prepared = prepareReceipt(Buffer.from(image.split(',')[1], 'base64'), image.match(/^data:image\/(\w+)/)[1]);
-    // Remove pale watermarks and decorative backgrounds before recognizing text.
+    await activeWorker.setParameters({ tessedit_pageseg_mode: '6' });
+    // Keep full-resolution field rows on screenshots; normalize shadows on photos.
     const first = await activeWorker.recognize(prepared.cleaned);
     const comparison = compareReceipt(first.data.text, amount, holder);
     if (!shouldRetryOcr(comparison, first.data.confidence)) return { text: first.data.text, passes: 1 };
-    // Do not discard faint text on unfamiliar receipts: retry the original
-    // colors with both languages only when the quick pass is inconclusive.
+    // Sparse-text mode tolerates photographed screens and separated bank fields.
+    // Each pass is compared as one complete receipt; never join matching fields
+    // from different passes or infer missing text from the expected recipient.
     await activeWorker.reinitialize('eng+vie', 1);
     try {
-      const fallback = await activeWorker.recognize(prepared.original);
-      return { text: fallback.data.text, passes: 2 };
+      await activeWorker.setParameters({ tessedit_pageseg_mode: '11' });
+      const fallback = await activeWorker.recognize(prepared.photo || prepared.original);
+      const next=compareReceipt(fallback.data.text,amount,holder);
+      if(next.isValid || !shouldRetryOcr(next,fallback.data.confidence))return {text:fallback.data.text,passes:2};
+      // Retain unfiltered color text when glare/lighting normalization is unhelpful.
+      await activeWorker.setParameters({ tessedit_pageseg_mode: '6' });
+      const last=await activeWorker.recognize(prepared.original);
+      const candidates=[{text:first.data.text,passes:1,result:comparison},{text:fallback.data.text,passes:2,result:next},
+        {text:last.data.text,passes:3,result:compareReceipt(last.data.text,amount,holder)}];
+      const score=x=>Number(x.result.recipientReadable)+Number(x.result.amountReadable);
+      candidates.sort((a,b)=>score(b)-score(a));
+      return {text:candidates[0].text,passes:3};
     } finally { await activeWorker.reinitialize('vie', 1); }
   }
   async function verify(body) {

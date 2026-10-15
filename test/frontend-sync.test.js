@@ -89,7 +89,7 @@ function receiptDecoder(width, height, fails = false) {
   }
   const s = { Image, URL: { createObjectURL:()=> 'blob:receipt', revokeObjectURL:()=> revoked++ },
     document: {createElement() {
-      const c={width:0,height:0,getContext:()=>({drawImage(...args){draws.push(args.slice(1));}}),toDataURL:()=> 'data:image/png;base64,ok'};
+      const c={width:0,height:0,getContext:()=>({fillRect(){},drawImage(...args){draws.push(args.slice(1));}}),toDataURL:(mime,quality)=> {assert.equal(mime,'image/jpeg');assert.equal(quality,0.94);return 'data:image/jpeg;base64,ok';}};
       canvases.push(c); return c;
     }} };
   vm.createContext(s);
@@ -97,10 +97,10 @@ function receiptDecoder(width, height, fails = false) {
   return {s,canvases,draws,images,get revoked(){return revoked;}};
 }
 test('receipt keeps one resize pass, no enlargement, and releases resources before verification',async()=>{
-  for (const [w,h,ew,eh] of [[1477,1536,865,900],[300,500,300,500],[2000,1000,900,450]]) {
+  for (const [w,h,ew,eh] of [[1477,1536,1477,1536],[300,500,300,500],[2000,1000,1600,800]]) {
     const ctx=receiptDecoder(w,h);
     await ctx.s.compressReceiptImage({},data=>{
-      assert.equal(data,'data:image/png;base64,ok');assert.equal(ctx.canvases[0].width,0);assert.equal(ctx.revoked,1);
+      assert.equal(data,'data:image/jpeg;base64,ok');assert.equal(ctx.canvases[0].width,0);assert.equal(ctx.revoked,1);
     });
     assert.equal(ctx.draws.length,1);assert.deepEqual(ctx.draws[0],[0,0,ew,eh]);assert.equal(ctx.images[0].onload,null);
   }

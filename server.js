@@ -591,6 +591,10 @@ const server = http.createServer(async (req, res) => {
 
   const parsedUrl = url.parse(req.url, true);
   const pathname = parsedUrl.pathname;
+  if (pathname === '/api/health' && req.method === 'GET') {
+    sendJson(res, 200, { ok: true, codeVersion, uptimeSeconds: Math.floor(process.uptime()) });
+    return;
+  }
   if (await backupService.handle(req, res, parsedUrl)) return;
   if (pathname.startsWith('/api/admin-push/')) {
     res.setHeader('Cache-Control', 'no-store');
