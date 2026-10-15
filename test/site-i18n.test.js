@@ -46,6 +46,8 @@ test('custom bilingual menu and category text can update after live sync',async(
 });
 test('all current food/drink names and full descriptions translate to English',()=>{
  const api=require('../site-i18n.js');
+ assert.equal(api.translate('Ngân Hàng TMCP Ngoại Thương Việt Nam (Vietcombank)','en'),'Joint Stock Commercial Bank for Foreign Trade of Vietnam (Vietcombank)');
+ assert.equal(api.translate('Lalamove Giao Nhanh','en'),'Lalamove Express Delivery');
  const source=html.slice(html.indexOf('    const DEFAULT_INITIAL_MENU = '));
  const menu=JSON.parse(source.slice(source.indexOf('['),source.indexOf('];')+1));
  for(const item of menu){
