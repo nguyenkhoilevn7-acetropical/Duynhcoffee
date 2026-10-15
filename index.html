@@ -3274,6 +3274,7 @@ body {
     }
 
   </style>
+<script src="site-i18n.js" defer></script>
 </head>
 <body>
 
@@ -4483,8 +4484,15 @@ body {
       <div class="modal-body">
         <input type="hidden" id="edit-menu-id">
         <div class="form-group">
-          <label>Tên món:</label>
+          <label>Tên món (Tiếng Việt)</label>
           <input type="text" id="edit-menu-name" class="form-control">
+        </div>
+        <div class="form-group">
+          <label for="edit-menu-name-en">Tên món (Tiếng Anh)</label>
+          <input type="text" id="edit-menu-name-en" class="form-control" placeholder="Tên món tiếng Anh">
+          <label for="edit-menu-desc-en">Mô tả (Tiếng Anh)</label>
+          <textarea id="edit-menu-desc-en" class="form-control" placeholder="Mô tả tiếng Anh"></textarea>
+          <small>Giữ trống để dùng bản dịch có sẵn.</small>
         </div>
         <div class="form-group">
           <label for="edit-menu-position">Vị trí hiển thị món:</label>
@@ -4511,6 +4519,7 @@ body {
                 <span>✨ Tạo Danh Mục Tùy Chọn Mới:</span>
                 <span style="cursor: pointer; color: #94A3B8;" onclick="toggleInlineCategoryCreator('edit', false)">✕</span>
               </div>
+              <input type="text" id="new-cat-name-en-edit" class="form-control" placeholder="Tên danh mục (Tiếng Anh)" style="margin-bottom:6px;">
               <div style="display: flex; gap: 6px;">
                 <input type="text" id="new-cat-name-edit" class="form-control" style="font-size: 0.85rem;" placeholder="VD: Trà Sữa / Nước Ép">
                 <input type="text" id="new-cat-icon-edit" class="form-control" style="width: 55px; font-size: 1rem; text-align: center;" placeholder="🧋" value="🧋">
@@ -4543,7 +4552,7 @@ body {
           </label>
         </div>
         <div class="form-group">
-          <label>Mô tả hương vị:</label>
+          <label>Mô tả (Tiếng Việt)</label>
           <textarea id="edit-menu-desc" class="form-control" rows="2"></textarea>
         </div>
         <div class="form-group">
@@ -4580,8 +4589,15 @@ body {
       </div>
       <div class="modal-body">
         <div class="form-group">
-          <label>Tên món:</label>
+          <label>Tên món (Tiếng Việt)</label>
           <input type="text" id="add-menu-name" class="form-control" placeholder="VD: Trà Xoài Nhiệt Đới Đuỷnh">
+        </div>
+        <div class="form-group">
+          <label for="add-menu-name-en">Tên món (Tiếng Anh)</label>
+          <input type="text" id="add-menu-name-en" class="form-control" placeholder="Tên món tiếng Anh">
+          <label for="add-menu-desc-en">Mô tả (Tiếng Anh)</label>
+          <textarea id="add-menu-desc-en" class="form-control" placeholder="Mô tả tiếng Anh"></textarea>
+          <small>Giữ trống để dùng bản dịch có sẵn.</small>
         </div>
         <div class="form-group">
           <label for="add-menu-position">Vị trí hiển thị món:</label>
@@ -4608,6 +4624,7 @@ body {
                 <span>✨ Tạo Danh Mục Tùy Chọn Mới:</span>
                 <span style="cursor: pointer; color: #94A3B8;" onclick="toggleInlineCategoryCreator('add', false)">✕</span>
               </div>
+              <input type="text" id="new-cat-name-en-add" class="form-control" placeholder="Tên danh mục (Tiếng Anh)" style="margin-bottom:6px;">
               <div style="display: flex; gap: 6px;">
                 <input type="text" id="new-cat-name-add" class="form-control" style="font-size: 0.85rem;" placeholder="VD: Trà Sữa / Nước Ép">
                 <input type="text" id="new-cat-icon-add" class="form-control" style="width: 55px; font-size: 1rem; text-align: center;" placeholder="🧋" value="🧋">
@@ -4625,7 +4642,7 @@ body {
           <input type="number" id="add-menu-stock" class="form-control" value="50">
         </div>
         <div class="form-group">
-          <label>Mô tả hương vị:</label>
+          <label>Mô tả (Tiếng Việt)</label>
           <textarea id="add-menu-desc" class="form-control" rows="2" placeholder="Xoài cát chín mọng hòa quyện cùng trà lài ủ lạnh..."></textarea>
         </div>
         <div class="form-group">
@@ -4833,8 +4850,8 @@ body {
     window.getSafeDrinkImage = getSafeDrinkImage;
 
     // =========================================================================
-    // 🌐 BỘ DỊCH THUẬT SONG NGỮ TỰ ĐỘNG THỜI GIAN THỰC (LIVE AI TRANSLATION ENGINE)
-    // TỰ ĐỘNG DỊCH TIẾNG VIỆT <-> TIẾNG ANH CHO TOÀN BỘ GIAO DIỆN & MÓN ĂN MỚI
+    // 🌐 GIAO DIỆN SONG NGỮ VIỆT / ANH
+    // BẢN DỊCH GIAO DIỆN, NỘI DUNG ĐỘNG VÀ CÁC TRƯỜNG NỘI DUNG SONG NGỮ
     // =========================================================================
     let currentLang = localStorage.getItem('duynh_lang') || 'vi';
 
@@ -4948,6 +4965,10 @@ body {
     function translateFnbText(vietnameseText) {
       if (!vietnameseText || typeof vietnameseText !== 'string') return '';
       const trimmed = vietnameseText.trim();
+      if (window.DuynhI18n) {
+        const translated = window.DuynhI18n.translate(trimmed, 'en');
+        if (translated !== trimmed) return translated;
+      }
       if (EXACT_DISH_NAMES[trimmed]) return EXACT_DISH_NAMES[trimmed];
 
       let res = trimmed;
@@ -5112,7 +5133,7 @@ body {
       if (currentLang === 'en') {
         return item.name_en || translateFnbText(item.name);
       }
-      return cleanCorruptedText(item.name);
+      return cleanCorruptedText(item.name_vi || (window.DuynhI18n ? window.DuynhI18n.translate(item.name, 'vi') : item.name));
     }
     window.getItemLocalizedName = getItemLocalizedName;
 
@@ -5121,86 +5142,50 @@ body {
       if (currentLang === 'en') {
         return item.description_en || translateFnbText(item.description || 'Fresh ingredients every day.');
       }
-      return cleanCorruptedText(item.description || 'Thơm ngon mát lạnh, nguyên liệu tươi mỗi ngày.');
+      const original = item.description_vi || item.description || 'Thơm ngon mát lạnh, nguyên liệu tươi mỗi ngày.';
+      return cleanCorruptedText(window.DuynhI18n ? window.DuynhI18n.translate(original, 'vi') : original);
     }
     window.getItemLocalizedDesc = getItemLocalizedDesc;
 
     // HÀM CHUYỂN ĐỔI NGÔN NGỮ LIVE (TIẾNG VIỆT <-> ENGLISH)
-    function setLanguage(lang) {
-      currentLang = (lang === 'en') ? 'en' : 'vi';
-      try {
-        localStorage.setItem('duynh_lang', currentLang);
-      } catch(e) {}
-
-      // 1. Cập nhật nút chuyển đổi ngôn ngữ
-      const flagEl = document.getElementById('lang-flag');
-      const labelEl = document.getElementById('lang-label');
-      if (flagEl) flagEl.textContent = (currentLang === 'en') ? '🇬🇧' : '🇻🇳';
-      if (labelEl) labelEl.textContent = (currentLang === 'en') ? 'EN' : 'VI';
-
-      // 2. Cập nhật các phần tử cố định trên giao diện
-      applyLanguageToStaticDom();
-
-      // 3. Vẽ lại các phần tử động
-      try { renderCustomerProducts(); } catch(e) {}
-      try { renderFrontendBanner(); } catch(e) {}
-      try { renderCartDrawerItems(); } catch(e) {}
-      try { renderAllBackendTabs(); } catch(e) {}
-
-      // 4. Thông báo toast mượt mà
-      if (currentLang === 'en') {
-        showSmsToast("🌐 LANGUAGE SWITCHED", "Switched to English successfully!");
-      } else {
-        showSmsToast("🌐 CHUYỂN ĐỔI NGÔN NGỮ", "Đã chuyển sang Tiếng Việt thành công!");
+    function registerSiteTranslationData() {
+      const api = window.DuynhI18n;
+      if (!api) return;
+      const pairs = {}, privateValues = [storeConfig?.bankConfig?.accountHolder, storeConfig?.bankConfig?.accountNumber];
+      for (const item of menu) {
+        if (item.name_en) pairs[item.name_vi || item.name] = item.name_en;
+        if (item.description_en) pairs[item.description_vi || item.description] = item.description_en;
       }
+      for (const category of getCategoriesList()) if (category.name_en) pairs[category.name_vi || category.name] = category.name_en;
+      const banner = storeConfig?.banner || {};
+      for (const key of ['tagline','slogan','description','promoNote']) if (banner[key] && banner[key + '_en']) pairs[banner[key]] = banner[key + '_en'];
+      for (const order of orders) privateValues.push(order.customerName, order.phone, order.deliveryAddress, order.driver?.name, order.driver?.phone);
+      api.register(pairs);
+      api.protect(privateValues);
+    }
+    function setLanguage(lang) {
+      currentLang = lang === 'en' ? 'en' : 'vi';
+      try { localStorage.setItem('duynh_lang', currentLang); } catch (_) {}
+      const flag = document.getElementById('lang-flag'), label = document.getElementById('lang-label');
+      if (flag) flag.textContent = currentLang === 'en' ? '🇬🇧' : '🇻🇳';
+      if (label) label.textContent = currentLang === 'en' ? 'EN' : 'VI';
+      registerSiteTranslationData();
+      renderCategoryFilterPills();
+      renderCustomerProducts();
+      renderCartDrawerItems();
+      if (typeof isAdminViewActive === 'function' && isAdminViewActive()) renderAllBackendTabs();
+      if (document.getElementById('checkout-modal')?.style.display === 'flex') renderCheckoutItemsPreview();
+      applyLanguageToStaticDom();
     }
     window.setLanguage = setLanguage;
-
-    function toggleLanguage() {
-      setLanguage(currentLang === 'vi' ? 'en' : 'vi');
-    }
+    function toggleLanguage() { setLanguage(currentLang === 'vi' ? 'en' : 'vi'); }
     window.toggleLanguage = toggleLanguage;
-
     function applyLanguageToStaticDom() {
-      const isEn = (currentLang === 'en');
-      
-      // Header brand
-      const sub = document.querySelector('.brand-sub');
-      if (sub) sub.textContent = t('brandSub');
-
-      // Header buttons
-      const trackBtn = document.querySelector('.btn-track-header span:last-child');
-      if (trackBtn) trackBtn.textContent = t('trackBtn');
-
-      const cartBtn = document.querySelector('.cart-pill-btn span:first-child');
-      if (cartBtn) cartBtn.textContent = '🛍️ ' + t('cartBtn');
-
-      // Category pills
-      const catBtns = document.querySelectorAll('.cat-btn');
-      if (catBtns && catBtns.length >= 4) {
-        catBtns[0].textContent = t('catAll');
-        catBtns[1].textContent = t('catTea');
-        catBtns[2].textContent = t('catCoffee');
-        catBtns[3].textContent = t('catBakery');
-      }
-
-      // Drawer Header
-      const drawerTitle = document.querySelector('.cart-drawer-header h3');
-      if (drawerTitle) drawerTitle.textContent = t('cartTitle');
-
-      const drawerCheckoutBtn = document.querySelector('.btn-checkout-now');
-      if (drawerCheckoutBtn && typeof drawerCheckoutBtn.getAttribute === 'function' && drawerCheckoutBtn.getAttribute('onclick')?.includes('openCheckoutModal')) {
-        drawerCheckoutBtn.textContent = t('cartCheckout');
-      }
-
-      // Footer
-      const adminLink = document.querySelector('.discreet-admin-link');
-      if (adminLink) adminLink.textContent = t('footerAdminLink');
-
-      const syncBadge = document.getElementById('global-cloud-badge');
-      if (syncBadge && syncBadge.textContent.includes('đồng bộ')) {
-        syncBadge.textContent = t('footerSyncBadge');
-      }
+      document.documentElement.lang = currentLang;
+      const flag = document.getElementById('lang-flag'), label = document.getElementById('lang-label');
+      if (flag) flag.textContent = currentLang === 'en' ? '🇬🇧' : '🇻🇳';
+      if (label) label.textContent = currentLang === 'en' ? 'EN' : 'VI';
+      if (window.DuynhI18n) window.DuynhI18n.setLanguage(currentLang);
     }
     window.applyLanguageToStaticDom = applyLanguageToStaticDom;
 
@@ -5954,6 +5939,7 @@ body {
         }
       }
 
+      if ((stateChanged || ['HANDSHAKE','FULL_SYNC','RESPONSE_FULL_SYNC','CONFIG_UPDATE','MENU_UPDATE'].includes(type)) && typeof registerSiteTranslationData === 'function') registerSiteTranslationData();
       if (stateChanged) {
         debouncedSaveLocalData();
         if (isAdminDevice) {
@@ -6692,7 +6678,8 @@ function toggleKitchenSoundAlert() {
       let id = removeVietnameseDiacritics(name).toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
       if (!id) id = 'cat_' + Date.now();
 
-      const newCat = { id, name, icon };
+      const nameEn = document.getElementById(`new-cat-name-en-${context}`)?.value.trim();
+      const newCat = { id, name, icon, name_en: nameEn || translateFnbText(name) };
 
       const categories = [...(Array.isArray(storeConfig.categories) ? storeConfig.categories : [])];
       const existingIdx = categories.findIndex(c => c.id === id);
@@ -6703,6 +6690,8 @@ function toggleKitchenSoundAlert() {
       populateCategorySelectDropdowns(id, 'both');
       toggleInlineCategoryCreator(context, false);
       nameInp.value = '';
+      const englishNameInput = document.getElementById(`new-cat-name-en-${context}`);
+      if (englishNameInput) englishNameInput.value = '';
 
       renderCategoryFilterPills();
       renderAdminMenuTable();
@@ -9842,6 +9831,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
       document.getElementById('edit-menu-id').value = item.id;
       document.getElementById('edit-menu-name').value = item.name;
+      document.getElementById('edit-menu-name-en').value = item.name_en || translateFnbText(item.name);
+      document.getElementById('edit-menu-desc-en').value = item.description_en || translateFnbText(item.description || '');
       populateCategorySelectDropdowns(item.category, 'edit');
       toggleInlineCategoryCreator('edit', false);
       document.getElementById('edit-menu-category').value = item.category;
@@ -9903,8 +9894,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       item.description = document.getElementById('edit-menu-desc').value.trim();
       const newImg = document.getElementById('edit-menu-image-url').value.trim();
       if (newImg) item.image = newImg;
-      if (item.name !== original.name) item.name_en = translateFnbText(item.name);
-      if (item.description !== original.description) item.description_en = translateFnbText(item.description);
+      item.name_en = document.getElementById('edit-menu-name-en')?.value.trim() || translateFnbText(item.name);
+      item.description_en = document.getElementById('edit-menu-desc-en')?.value.trim() || translateFnbText(item.description);
 
       const draft = menu.map(m => String(m.id) === String(item.id) ? item : m);
       const positioned = positionMenuItem(draft, item.id, document.getElementById('edit-menu-position')?.value || 'keep');
@@ -9917,6 +9908,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
     function openAddMenuModal() {
       document.getElementById('add-menu-name').value = '';
+      document.getElementById('add-menu-name-en').value = '';
+      document.getElementById('add-menu-desc-en').value = '';
       document.getElementById('add-menu-price').value = '';
       document.getElementById('add-menu-desc').value = '';
       document.getElementById('add-menu-stock').value = '50';
@@ -10004,8 +9997,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
       // Sinh ID độc nhất vô nhị dựa trên timestamp + random (chống 100% đụng độ ID giữa các máy)
       const newId = generateUniqueMenuItemId();
-      const autoNameEn = translateFnbText(name);
-      const autoDescEn = desc ? translateFnbText(desc) : 'Freshly prepared daily with premium ingredients.';
+      const autoNameEn = document.getElementById('add-menu-name-en')?.value.trim() || translateFnbText(name);
+      const autoDescEn = document.getElementById('add-menu-desc-en')?.value.trim() || (desc ? translateFnbText(desc) : 'Freshly prepared daily with premium ingredients.');
 
       const newItem = {
         id: newId,
@@ -10154,6 +10147,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
 
     function renderCustomerProducts() {
+      if (typeof registerSiteTranslationData === 'function') registerSiteTranslationData();
       const grid = document.getElementById('customer-products-grid');
       if (!grid) return;
 

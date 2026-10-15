@@ -4,7 +4,7 @@ const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),net=
 const {spawn}=require('node:child_process');
 test('HTTP menu/config save succeeds, empty values survive restart, private source blocked',async()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'duynh-server-'));
- for(const name of ['server.js','drive-backup.js','receipt-verification.js','receipt-jobs.js','index.html','backup.html','privacy.html','terms.html'])fs.copyFileSync(path.join(__dirname,'..',name),path.join(dir,name));
+ for(const name of ['server.js','drive-backup.js','receipt-verification.js','receipt-jobs.js','index.html','site-i18n.js','backup.html','privacy.html','terms.html'])fs.copyFileSync(path.join(__dirname,'..',name),path.join(dir,name));
  const port=await new Promise(resolve=>{const s=net.createServer();s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(()=>resolve(p));});});
  let child;
  async function start(){child=spawn(process.execPath,['server.js'],{cwd:dir,env:{PATH:process.env.PATH,PORT:String(port)}});await new Promise((resolve,reject)=>{child.stderr.on('data',d=>console.error(String(d)));child.stdout.on('data',()=>resolve());child.on('exit',c=>reject(Error('Exit '+c)));setTimeout(()=>reject(Error('Startup timeout')),5000).unref();});}
@@ -12,6 +12,7 @@ test('HTTP menu/config save succeeds, empty values survive restart, private sour
  const base='http://127.0.0.1:'+port;
  try{
  await start();
+ const bundle=await fetch(base+'/site-i18n.js');assert.equal(bundle.status,200);assert.match(bundle.headers.get('content-type'),/javascript/);assert.match(await bundle.text(),/DuynhI18n/);
  const menu=[{id:91,name:'Regression tea',price:23000,image:'x'.repeat(60)}];
  let r=await fetch(base+'/api/menu',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(menu)});
  assert.equal(r.status,200);assert.equal((await r.json()).success,true);assert.deepEqual(await(await fetch(base+'/api/menu')).json(),menu);
