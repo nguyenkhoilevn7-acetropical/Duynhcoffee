@@ -1947,7 +1947,6 @@
 
 /* ==================== TINH CHỈNH VỪA VẶN NÚT & CHỮ (FIT WEB TỰ NHIÊN) ==================== */
 html, body {
-  overflow-x: clip;
   width: 100%;
   max-width: 100vw;
 }
@@ -2288,18 +2287,21 @@ input, select, textarea {
    - Bảng tùy chọn món (Modal) cuộn mượt mà không bị kẹt hay khựng
    ========================================================================= */
 
+/* Keep one document scroller. A second body scroll container can trap touch gestures. */
 html {
-  overflow-x: clip !important;
-  overflow-y: scroll !important;
-  -webkit-overflow-scrolling: touch !important;
-  scroll-behavior: smooth !important;
+  overflow-x: hidden;
+  overflow-y: auto;
+  touch-action: auto;
+  overscroll-behavior-y: auto;
+  scroll-behavior: auto;
+}
+html.modal-open {
+  overflow: hidden;
 }
 
 body {
-  overflow-x: clip !important;
-  overflow-y: auto !important;
-  -webkit-overflow-scrolling: touch !important;
-  touch-action: pan-y !important;
+  overflow: visible;
+  touch-action: auto;
   min-height: 100vh !important;
   min-height: 100dvh !important;
 }
@@ -2307,12 +2309,12 @@ body {
 /* Đảm bảo danh sách sản phẩm cuộn tự do không bị chặn */
 .view-container {
   overflow: visible !important;
-  touch-action: pan-y !important;
+  touch-action: auto;
 }
 
 .products-grid {
   overflow: visible !important;
-  touch-action: pan-y !important;
+  touch-action: auto;
 }
 
 /* MODAL CHỌN MÓN & THANH TOÁN: BẮT BUỘC CUỘN MƯỢT TỪNG PIXEL */
@@ -3122,17 +3124,6 @@ body {
     }
 
   
-    /* ==================== SIÊU TỐI ƯU HÓA CUỘN TRANG 60 FPS (HARDWARE ACCELERATION) ==================== */
-    html, body {
-      -webkit-overflow-scrolling: touch !important;
-      overscroll-behavior-y: none;
-    }
-    .products-grid {
-      contain: layout style;
-    }
-    .product-card {
-      contain: content;
-    }
 
     /* ==================== AI SCANNER & RECEIPT VERIFICATION ANIMATION ==================== */
     .receipt-scanner-frame {
@@ -8104,6 +8095,7 @@ function openProductCustomModal(itemId) {
     let activeModalCount = 0;
     function lockScreenScroll() {
       activeModalCount++;
+      document.documentElement.classList.add('modal-open');
       document.body.classList.add('modal-open');
       document.body.style.overflow = 'hidden';
     }
@@ -8114,6 +8106,7 @@ function openProductCustomModal(itemId) {
         activeModalCount = Math.max(0, activeModalCount - 1);
       }
       if (activeModalCount === 0) {
+        document.documentElement.classList.remove('modal-open');
         document.body.classList.remove('modal-open');
         document.body.style.overflow = '';
       }
@@ -8127,12 +8120,11 @@ async function openPaymentCheckoutModal() {
         if (!response.ok) throw new Error('Không lấy được thông tin thanh toán mới nhất');
         applyServerConfig(await response.json());
       } catch (error) { alert(error.message); return; }
-      lockScreenScroll();
-      hideFloatingCartNow();
       if (!cart || cart.length === 0) {
         alert("Giỏ hàng của bạn đang trống! Vui lòng chọn món trước khi thanh toán.");
         return;
       }
+      hideFloatingCartNow();
       closeCartDrawer();
 
       const beverageTotal = cart.reduce((s, c) => s + (c.item.price * c.qty), 0);
@@ -8197,14 +8189,17 @@ async function openPaymentCheckoutModal() {
 
       const modal = document.getElementById('checkout-modal');
       if (modal) {
+        if (modal.style.display !== 'flex') lockScreenScroll();
         modal.style.display = 'flex';
       }
     }
 
     function closePaymentCheckoutModal() {
-      unlockScreenScroll();
       const modal = document.getElementById('checkout-modal');
-      if (modal) modal.style.display = 'none';
+      if (modal && modal.style.display === 'flex') {
+        modal.style.display = 'none';
+        unlockScreenScroll();
+      }
     }
 
     // GỬI ĐƠN HÀNG (BẮT BUỘC HÓA ĐƠN & PHẢI QUA NHẬN DIỆN THÔNG MINH)

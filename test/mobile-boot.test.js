@@ -61,3 +61,37 @@ test('WebSocket connection accepts server handshake without requesting duplicate
   s.initWebSocketSync();socket.onopen();socket.onmessage({data:JSON.stringify({type:'HANDSHAKE',menu:[{id:1}]})});
   assert.equal(received,1);assert.equal(sent.length,0);
 });
+
+test('modal locks the document scroller and restores it after nested or forced closes', () => {
+  const classes=()=>{const names=new Set();return {add:n=>names.add(n),remove:n=>names.delete(n),contains:n=>names.has(n)};};
+  const root={classList:classes()},body={classList:classes(),style:{overflow:''}};
+  const s={window:{},document:{documentElement:root,body}};
+  vm.createContext(s);
+  vm.runInContext(html.slice(html.indexOf('    let activeModalCount'),html.indexOf('async function openPaymentCheckoutModal')),s);
+  s.lockScreenScroll();s.lockScreenScroll();s.unlockScreenScroll();
+  assert.equal(root.classList.contains('modal-open'),true);
+  s.unlockScreenScroll();assert.equal(root.classList.contains('modal-open'),false);assert.equal(body.style.overflow,'');
+  s.lockScreenScroll();s.lockScreenScroll();s.unlockScreenScroll(true);
+  assert.equal(root.classList.contains('modal-open'),false);assert.equal(body.classList.contains('modal-open'),false);
+  s.unlockScreenScroll();assert.equal(root.classList.contains('modal-open'),false);
+});
+
+test('checkout never leaks scroll locks on empty cart, duplicate opens or missing modal',async()=>{
+  const rootNames=new Set(),bodyNames=new Set();const cl=set=>({add:n=>set.add(n),remove:n=>set.delete(n)});
+  let modal={style:{display:'none'}};
+  const s={window:{},document:{documentElement:{classList:cl(rootNames)},body:{classList:cl(bodyNames),style:{}},
+    getElementById:id=>id==='checkout-modal'?modal:null},
+    fetch:async()=>({ok:true,json:async()=>({})}),getCloudApiUrl:()=>'/config',applyServerConfig(){},alert(){},
+    cart:[],orders:[],storeConfig:{bankConfig:{}},currentDistanceKm:0,currentDeliveryAddress:'',
+    hideFloatingCartNow(){},closeCartDrawer(){},calculateShippingFees:()=>({feeAhamove:1,feeLalamove:1}),
+    formatMoney:String,updateShipFeeDisplay(){},updateGoogleMapsPreview(){},updateCheckoutFinancials(){}};
+  vm.createContext(s);
+  vm.runInContext(html.slice(html.indexOf('    let activeModalCount'),html.indexOf('    // GỬI ĐƠN HÀNG')),s);
+  await s.openPaymentCheckoutModal();assert.equal(rootNames.has('modal-open'),false);
+  s.cart=[{qty:1,item:{price:45000}}];
+  await Promise.all([s.openPaymentCheckoutModal(),s.openPaymentCheckoutModal()]);
+  assert.equal(rootNames.has('modal-open'),true);
+  s.closePaymentCheckoutModal();assert.equal(rootNames.has('modal-open'),false);
+  s.lockScreenScroll();s.closePaymentCheckoutModal();assert.equal(rootNames.has('modal-open'),true);
+  s.unlockScreenScroll();modal=null;await s.openPaymentCheckoutModal();assert.equal(rootNames.has('modal-open'),false);
+});
