@@ -104,13 +104,26 @@ function shouldRetryOcr(comparison, confidence) {
   const readable = (comparison.matchedRecipient || comparison.recipientReadable) && (comparison.matchedAmount || comparison.amountReadable);
   return !readable || !Number.isFinite(confidence) || confidence < 70;
 }
+const toppingPrices = new Map([['TRAN CHAU TRANG',8000],['KEM MACCHIATO',12000],['THACH CU NANG',8000],['DAO MIENG GION',10000]]);
+function unitPrice(entry,item) {
+  // Prices come from our catalog, never from client-supplied topping prices.
+  const toppings=entry.toppings===undefined?[]:entry.toppings;
+  if (!Array.isArray(toppings) || toppings.length>toppingPrices.size) throw new Error('Topping không hợp lệ');
+  let extras=0;const seen=new Set();
+  for (const topping of toppings) {
+    const key=normalize(topping && typeof topping==='object' ? topping.id || topping.name : '');
+    if (!toppingPrices.has(key) || seen.has(key) || item.category==='bakery') throw new Error('Topping không hợp lệ');
+    seen.add(key);extras+=toppingPrices.get(key);
+  }
+  return Number(item.price)+extras;
+}
 function calculateAmount(items, menu, discounts, code) {
   if (!Array.isArray(items) || !items.length || items.length > 100) throw new Error('Giỏ hàng không hợp lệ');
   let total = 0;
   for (const entry of items) {
     const item = menu.find(m => String(m.id) === String(entry.id));
     if (!item || !Number.isInteger(entry.qty) || entry.qty < 1 || entry.qty > 100 || !Number.isSafeInteger(Number(item.price)) || Number(item.price) < 0) throw new Error('Món hoặc số lượng không hợp lệ');
-    total += Number(item.price) * entry.qty;
+    total += unitPrice(entry,item) * entry.qty;
   }
   if (code) {
     const discount = discounts.find(d => String(d.code).toUpperCase() === String(code).toUpperCase());
@@ -194,6 +207,7 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
     try {
       const text = await Promise.race([ocr(image, amount, holder), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Máy chủ chưa đọc xong biên lai. Chưa thể kết luận số tiền hoặc tên người nhận sai; vui lòng thử lại.')), deadlineMs); })]);
       const result = compareReceipt(text.text, amount, holder);
+      result.expectedAmount = amount;
       result.ocrPasses = text.passes;
       result.processingMs = Date.now() - processingStarted;
       if (result.isValid) {
@@ -216,6 +230,10 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
     const proof = JSON.parse(Buffer.from(parts[0], 'base64url'));
     const state = readState();
     const amount = calculateAmount(order.items, state.menu, state.discounts, order.discount && order.discount.code);
+    for (const entry of order.items) {
+      const price=unitPrice(entry,state.menu.find(m=>String(m.id)===String(entry.id)));
+      if ((entry.price!==undefined && Number(entry.price)!==price) || (entry.total!==undefined && Number(entry.total)!==price*entry.qty)) throw new Error('Giá món hoặc topping đã thay đổi. Vui lòng kiểm tra giỏ hàng và quét lại biên lai');
+    }
     if (proof.expires < now() || proof.image !== hash(String(order.receiptImage || '')) || proof.amount !== amount || Number(order.total) !== amount || proof.holder !== normalize(state.config.bankConfig && state.config.bankConfig.accountHolder)) throw new Error('Giỏ hàng hoặc người nhận đã thay đổi. Vui lòng quét lại biên lai');
     return true;
   }

@@ -87,3 +87,20 @@ test('wallet OCR text reads the actual 45000 amount and ignores the balance noti
   assert.equal(compareReceipt(receipt.replace('45.000d','46.000d'),45000,'DAO KHOI NGUYEN').isValid,false);
   assert.equal(compareReceipt(receipt,45000,'DAO KHUE NGUYEN').isValid,false);
 });
+
+test('45000 receipt cannot approve 53000 drink with 8000 topping; correct amount and recipient can',async()=>{
+ const state={menu:[{id:1,price:45000,category:'tea'}],config:{bankConfig:{accountHolder:'DAO KHOI NGUYEN'}},discounts:[]};
+ let recognized=text;const service=createReceiptVerifier({readState:()=>state,recognize:async()=>recognized});
+ const image='data:image/png;base64,YWJj',items=[{id:1,qty:1,toppings:[{id:'Trân Châu Trắng',price:0}]}];
+ assert.equal(calculateAmount(items,state.menu,[],null),53000);
+ const wrong=await service.verify({image,items});assert.equal(wrong.isValid,false);assert.equal(wrong.detectedAmount,45000);assert.equal(wrong.expectedAmount,53000);assert.equal(wrong.verificationToken,undefined);
+ recognized=text.replace('45.000','53.000');const good=await service.verify({image,items});assert.equal(good.isValid,true);
+ const order={items:[{...items[0],price:53000,total:53000}],total:53000,receiptImage:image,verificationToken:good.verificationToken};assert.equal(service.assertVerified(order),true);
+ assert.throws(()=>service.assertVerified({...order,items:[{id:1,qty:1}],total:45000}));
+ const base=await service.verify({image,items:[{id:1,qty:1}]});assert.equal(base.isValid,false);
+ recognized=text;const baseGood=await service.verify({image,items:[{id:1,qty:1}]});
+ assert.throws(()=>service.assertVerified({...order,items:[{id:1,qty:1,price:53000,total:53000}],total:45000,verificationToken:baseGood.verificationToken}));
+ recognized=text.replace('45.000','53.000').replace('ĐÀO KHÔI NGUYÊN','TRAN VAN AN');assert.equal((await service.verify({image,items})).isValid,false);
+ assert.equal(calculateAmount([{...items[0],qty:2}],state.menu,[{code:'OFF',percent:10}], 'OFF'),95400);
+ for (const toppings of [[{id:'unknown'}],[{id:'Trân Châu Trắng'},{id:'Trân Châu Trắng'}],null]) assert.throws(()=>calculateAmount([{id:1,qty:1,toppings}],state.menu,[],null));
+});

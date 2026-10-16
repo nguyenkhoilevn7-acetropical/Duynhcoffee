@@ -5556,7 +5556,7 @@ body {
     let receiptVerificationContext = null;
     let receiptScanGeneration = 0;
     function paymentContext() {
-      return JSON.stringify({ items: cart.map(c => ({ id: c.item.id, qty: c.qty, price: c.item.price })),
+      return JSON.stringify({ items: cart.map(c => ({ id: c.item.id, qty: c.qty, price: c.item.price, toppings: c.toppings || [] })),
         discount: activeDiscount ? activeDiscount.code : null, bank: storeConfig.bankConfig });
     }
     function invalidateReceiptVerification() {
@@ -7057,7 +7057,7 @@ function toggleKitchenSoundAlert() {
       }
       try {
         if (onProgressCallback) onProgressCallback(25, 'Đang gửi ảnh biên lai...');
-        const items = order ? order.items.map(i => ({ id: i.id, qty: i.qty })) : cart.map(c => ({ id: c.item.id, qty: c.qty }));
+        const items = order ? order.items.map(i => ({ id: i.id, qty: i.qty, toppings: i.toppings || [] })) : cart.map(c => ({ id: c.item.id, qty: c.qty, toppings: c.toppings || [] }));
         const upload = {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: base64Str, items, discountCode: order ? order.discount?.code : activeDiscount?.code })
@@ -7089,7 +7089,14 @@ function toggleKitchenSoundAlert() {
             if (onProgressCallback) onProgressCallback(65, 'Đường truyền chậm, đang tự kết nối lại để xác minh...');
           }
         }
-        if (job.status === 'complete') return job.result;
+        if (job.status === 'complete') {
+          const result=job.result;
+          if (result?.isValid === true && (result.matchedAmount !== true || result.matchedRecipient !== true || result.detectedAmount !== expAmt || result.expectedAmount !== expAmt || !result.verificationToken)) {
+            return { ...result, isValid:false, matchedAmount:false, verificationToken:undefined,
+              reason:'Số tiền máy chủ xác minh chưa khớp tổng tiền cần thanh toán. Vui lòng kiểm tra giỏ hàng và quét lại biên lai.' };
+          }
+          return result;
+        }
         throw new Error(job.error || 'Máy chủ vẫn đang xử lý. Tải lại cùng ảnh để nhận tác vụ đang chạy; chưa có kết luận sai thông tin.');
       } catch (error) {
         return { isValid: false, verificationUnavailable: true, reason: retryable(error) ? 'Kết nối chưa ổn định. Vui lòng thử lại cùng ảnh để tiếp tục xác minh.' : error.message };
@@ -7116,6 +7123,8 @@ function toggleKitchenSoundAlert() {
 
       clearActiveReceiptScanTimers();
       isReceiptValid = false;
+      receiptVerificationToken = null;
+      receiptVerificationContext = null;
 
       const idleBox = document.getElementById('receipt-upload-idle-state');
       const prevBox = document.getElementById('receipt-upload-preview-state');
@@ -7232,7 +7241,7 @@ function toggleKitchenSoundAlert() {
               </div>
               <div style="font-size: 0.79rem; color: #15803D; margin-top: 5px; line-height: 1.55; background: #FFFFFF; padding: 8px 10px; border-radius: 8px; border: 1px solid #86EFAC;">
                 • <b>Tên người hưởng:</b> ✅ <b>${resObj && resObj.matchedHolder ? resObj.matchedHolder : storeConfig.bankConfig?.accountHolder}</b> (khớp)<br>
-                • <b>Số tiền thanh toán:</b> ✅ <b>${formatMoney(beverageTotal)}</b> (khớp chính xác đơn hàng)
+                • <b>Số tiền thanh toán:</b> ✅ <b>${formatMoney(resObj.detectedAmount)}</b> (khớp chính xác đơn hàng)
               </div>
             `;
           }
@@ -7248,6 +7257,8 @@ function toggleKitchenSoundAlert() {
         function rejectReceiptFail(resObj) {
           clearActiveReceiptScanTimers();
           isReceiptValid = false;
+          receiptVerificationToken = null;
+          receiptVerificationContext = null;
           const reasonMsg = (resObj && resObj.reason)
             ? resObj.reason
             : `Hình ảnh không khớp người thụ hưởng (${storeConfig.bankConfig?.accountHolder}) hoặc không khớp số tiền (${formatMoney(beverageTotal)})!`;
@@ -7305,6 +7316,7 @@ function toggleKitchenSoundAlert() {
               <div style="font-size: 0.79rem; color: #7F1D1D; line-height: 1.6; background: #FFFFFF; padding: 9px 11px; border-radius: 8px; border: 1px solid #FCA5A5; text-align: left;">
                 <div>• <b>1. Tên người hưởng:</b> ${recipientOk ? '✅ Khớp tên người nhận' : `❌ <b>Không khớp</b> — Cần đúng tên <b>${storeConfig.bankConfig?.accountHolder}</b>`}</div>
                 <div>• <b>2. Số tiền:</b> ${amountOk ? '✅ Khớp ' + formatMoney(beverageTotal) : '❌ <b>Không khớp</b> — Cần đúng <b>' + formatMoney(beverageTotal) + '</b>'}</div>
+                ${Number.isSafeInteger(resObj?.detectedAmount) ? '<div>Đọc được trên biên lai: <b>' + formatMoney(resObj.detectedAmount) + '</b></div>' : ''}
                 <div style="margin-top: 6px; padding-top: 5px; border-top: 1px dashed #FECACA; color: #B91C1C; font-weight: 700;">
                   👉 Kết luận: ${reasonMsg}
                 </div>
@@ -8562,6 +8574,7 @@ async function openPaymentCheckoutModal() {
           qty: c.qty,
           price: c.item.price,
           total: c.item.price * c.qty,
+          toppings: (c.toppings || []).map(t => ({ id:t.id || t.name })),
           custom: c.custom || 'Mặc định'
         }))
       };

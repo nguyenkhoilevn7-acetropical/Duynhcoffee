@@ -6,6 +6,7 @@
 })(function () {
   'use strict';
   const catalog = {
+  "Đọc được trên biên lai:": "Read from receipt:",
   "Đang lưu món...": "Saving item...",
   "Lưu món": "Save item",
   "AI chưa sẵn sàng; đã lưu nội dung hiện có.": "AI is unavailable; the current content has been saved.",

@@ -3,14 +3,14 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 const source=html.slice(html.indexOf('    async function runClientVerifyData'),html.indexOf('    function handleReceiptImageUpload'));
 const response=(data,status=200)=>({ok:status<400,status,json:async()=>data});
-const pending=id=>({jobId:id,status:'pending'}),complete=(id,isValid=true)=>({jobId:id,status:'complete',result:{isValid,matchedAmount:isValid,matchedRecipient:isValid,...(isValid?{verificationToken:'server-proof'}:{})}});
+const pending=id=>({jobId:id,status:'pending'}),complete=(id,isValid=true)=>({jobId:id,status:'complete',result:{isValid,matchedAmount:isValid,matchedRecipient:isValid,...(isValid?{verificationToken:'server-proof',detectedAmount:45000,expectedAmount:45000}:{})}});
 function setup(handler){
  let clock=0,next=0;const calls=[],timeouts=[],timers=new Map(),progress=[];
  const s={AbortController,TypeError,Date:{now:()=>clock},cart:[{item:{id:1},qty:1}],activeDiscount:null,getCloudApiUrl:p=>p,
   setTimeout(fn,ms){const id=++next;timers.set(id,fn);timeouts.push(ms);if(ms<=5000)queueMicrotask(()=>{if(timers.delete(id)){clock+=ms;fn();}});return id;},
   clearTimeout:id=>timers.delete(id),fetch:async(path,options)=>{calls.push({path,options});return handler({path,options,index:calls.length,budget:timeouts.at(-1),advance:ms=>clock+=ms});}};
  vm.createContext(s);vm.runInContext(source,s);
- return {calls,timeouts,progress,run:()=>s.runClientVerifyData('data:image/jpeg;base64,YWJj',45000,(...args)=>progress.push(args)),get clock(){return clock;}};
+ return {s,calls,timeouts,progress,run:(amount=45000)=>s.runClientVerifyData('data:image/jpeg;base64,YWJj',amount,(...args)=>progress.push(args)),get clock(){return clock;}};
 }
 test('lost upload response retries identical input and receives completed server job automatically',async()=>{
  const f=setup(({index,advance})=>{if(index===1){advance(45000);throw Object.assign(Error('upload timeout'),{name:'AbortError'});}return response(complete('same'));});
@@ -42,4 +42,17 @@ test('validation errors are not retried and never unlock payment',async()=>{
 test('persistent disconnection terminates within the overall deadline and never invents a verification token',async()=>{
  const f=setup(({advance,budget})=>{advance(budget);throw Object.assign(Error('timeout'),{name:'AbortError'});}),result=await f.run();
  assert.ok(f.clock<=180000);assert.ok(f.calls.length<=4);assert.equal(result.isValid,false);assert.equal(result.verificationUnavailable,true);assert.equal(result.verificationToken,undefined);
+});
+
+test('a success flag for 45000 cannot approve a checkout that expects 53000 or omits evidence',async()=>{
+ for (const fields of [{detectedAmount:45000,expectedAmount:53000},{detectedAmount:53000,expectedAmount:45000},{detectedAmount:undefined},{expectedAmount:undefined}]) {
+  const f=setup(()=>{const job=complete('wrong');Object.assign(job.result,fields);return response(job);});
+  const result=await f.run();assert.equal(result.isValid,false);assert.equal(result.matchedAmount,false);assert.equal(result.verificationToken,undefined);
+ }
+});
+
+test('client sends selected toppings and compares the same 53000 payable amount',async()=>{
+ const f=setup(({options})=>{const body=JSON.parse(options.body);assert.equal(body.items[0].toppings[0].id,'Trân Châu Trắng');const job=complete('with-topping');job.result.detectedAmount=job.result.expectedAmount=53000;return response(job);});
+ f.s.cart[0].toppings=[{id:'Trân Châu Trắng',price:8000}];assert.equal((await f.run(53000)).isValid,true);
+ const legacy=setup(()=>response(complete('base-price-only')));const result=await legacy.run(53000);assert.equal(result.isValid,false);assert.equal(result.verificationToken,undefined);
 });
