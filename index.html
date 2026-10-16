@@ -4617,7 +4617,7 @@ body {
             <img id="edit-menu-image-preview" src="" style="max-height: 100px; max-width: 160px; border-radius: 10px; border: 2px solid var(--border); display: block; object-fit: cover;">
           </div>
         </div>
-        <button type="button" class="btn-checkout-now" onclick="saveProductChanges()">
+        <button type="button" id="edit-menu-save" class="btn-checkout-now" onclick="saveProductChanges()">
           💾 Lưu Cập Nhật Món
         </button>
       </div>
@@ -4711,7 +4711,7 @@ body {
             <button type="button" onclick="clearAddMenuImage()" title="Xóa ảnh" style="position: absolute; top: -6px; right: -6px; background: #DC2626; color: #fff; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">✕</button>
           </div>
         </div>
-        <button type="button" class="btn-checkout-now" onclick="executeAddNewProduct()">
+        <button type="button" id="add-menu-save" class="btn-checkout-now" onclick="executeAddNewProduct()">
           ➕ Thêm Món Vào Hệ Thống
         </button>
       </div>
@@ -10185,13 +10185,29 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     }
     window.handleProductImageFileChange = handleProductImageFileChange;
 
+    function menuSaveBusy(context, busy) {
+      const button = menuAIEl(context, 'save');
+      if (!button) return;
+      if (busy) {
+        button.dataset.idleLabel = button.textContent;
+        button.disabled = true;
+        button.textContent = 'Đang lưu món...';
+      } else {
+        button.disabled = false;
+        button.textContent = button.dataset.idleLabel || 'Lưu món';
+      }
+    }
     let menuAISaving = false;
     async function saveProductChanges(manual = false) {
       if (menuAISaving) return;
       menuAISaving = true;
       try {
+      menuSaveBusy('edit', true);
+      let aiReady = false;
       if (manual === true) cancelMenuAIWork('edit');
-      else if (!await ensureMenuAI('edit')) return;
+      else aiReady = await ensureMenuAI('edit');
+      // AI availability never prevents the owner from saving a valid dish.
+      cancelMenuAIWork('edit');
       const idStr = document.getElementById('edit-menu-id').value;
       const original = menu.find(m => String(m.id) === String(idStr));
       if (!original) return;
@@ -10217,8 +10233,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
       closeEditMenuModal();
       playSuccessChime();
-      showSmsToast("💾 ĐÃ CẬP NHẬT MÓN!", `Món "${item.name}" đã được lưu vào thực đơn & kho hàng.`);
-      } finally { menuAISaving = false; }
+      showSmsToast("💾 ĐÃ CẬP NHẬT MÓN!", `Món "${item.name}" đã được lưu vào thực đơn & kho hàng.${!aiReady && manual !== true ? ' AI chưa sẵn sàng; đã lưu nội dung hiện có.' : ''}`);
+      } finally { menuAISaving = false; menuSaveBusy('edit', false); }
     }
 
     function openAddMenuModal() {
@@ -10291,12 +10307,17 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       if (menuAISaving) return;
       menuAISaving = true;
       try {
+      menuSaveBusy('add', true);
+      let aiReady = false;
       if (manual === true) cancelMenuAIWork('add');
-      else if (!await ensureMenuAI('add')) return;
+      else aiReady = await ensureMenuAI('add');
+      // AI availability never prevents the owner from saving a valid dish.
+      cancelMenuAIWork('add');
       const name = document.getElementById('add-menu-name').value.trim();
       const price = parseInt(document.getElementById('add-menu-price').value, 10);
       const category = document.getElementById('add-menu-category').value;
-      const stock = parseInt(document.getElementById('add-menu-stock').value, 10) || 50;
+      const parsedStock = parseInt(document.getElementById('add-menu-stock').value, 10);
+      const stock = Number.isFinite(parsedStock) ? Math.max(0, parsedStock) : 50;
       const desc = document.getElementById('add-menu-desc').value.trim();
 
       const urlInput = document.getElementById('add-menu-image-url');
@@ -10344,8 +10365,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
       closeAddMenuModal();
       playSuccessChime();
-      showSmsToast("➕ ĐÃ THÊM MÓN MỚI!", `Món "${name}" đã được lưu bền vững vào thực đơn & Render Cloud.`);
-      } finally { menuAISaving = false; }
+      showSmsToast("➕ ĐÃ THÊM MÓN MỚI!", `Món "${name}" đã được lưu bền vững vào thực đơn & Render Cloud.${!aiReady && manual !== true ? ' AI chưa sẵn sàng; đã lưu nội dung hiện có.' : ''}`);
+      } finally { menuAISaving = false; menuSaveBusy('add', false); }
     }
 
     function openQuickRestockModal(itemId) {

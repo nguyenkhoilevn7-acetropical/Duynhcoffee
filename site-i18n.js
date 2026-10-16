@@ -6,6 +6,9 @@
 })(function () {
   'use strict';
   const catalog = {
+  "Đang lưu món...": "Saving item...",
+  "Lưu món": "Save item",
+  "AI chưa sẵn sàng; đã lưu nội dung hiện có.": "AI is unavailable; the current content has been saved.",
   "Lưu nội dung đã nhập khi AI chưa sẵn sàng": "Save entered content while AI is unavailable",
   "Thử lại AI": "Retry AI",
   "Đang Giao Hàng": "Out for Delivery",

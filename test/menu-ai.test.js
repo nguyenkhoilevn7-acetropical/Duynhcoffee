@@ -52,3 +52,25 @@ test('AI preserves a manual English edit in flight and an owner-written Vietname
  const job=s.generateMenuAI('edit');await Promise.resolve();e['edit-menu-name-en'].value='My special tea';pending[0](output);assert.equal(await job,true);
  assert.equal(e['edit-menu-name-en'].value,'My special tea');assert.equal(e['edit-menu-desc'].value,'Công thức riêng của quán.');assert.equal(e['edit-menu-desc-en'].value,output.description_en);
 });
+
+test('save closes add/edit modals after server acknowledgement even if Gemini is unavailable; failed save stays open',async()=>{
+ const html=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8');
+ for(const context of ['add','edit'])for(const serverOK of [true,false]){
+  const elements={};for(const field of ['id','name','name-en','desc','desc-en','image-url','price','stock','category','status','position','save'])elements[context+'-menu-'+field]={value:'',textContent:'Lưu',dataset:{},style:{}};
+  const set=(field,value)=>elements[context+'-menu-'+field].value=value;
+  set('id','1');set('name','Trà xoài');set('price','45000');set('stock','0');set('category','tea');set('status','1');set('image-url','data:image/jpeg;base64,'+'A'.repeat(80));elements[context+'-menu-bestseller']={checked:false};
+  let closeCount=0,saveCount=0,acknowledge;
+  const s={window:{location:{host:'example.test'}},document:{getElementById:id=>elements[id]},menuAISaving:false,menu:[{id:1,name:'Old Tea',description:'Old description'}],
+   ensureMenuAI:async()=>false,cancelMenuAIWork(){},menuSaveBusy(){},translateFnbText:t=>t,positionMenuItem:a=>a,
+   generateUniqueMenuItemId:()=>2,getCategoryFallbackSvg:()=>'',alert(){},playSuccessChime(){},showSmsToast(){},
+   closeAddMenuModal(){closeCount++;},closeEditMenuModal(){closeCount++;},
+   saveOrderedMenu:async()=>{saveCount++;return new Promise(resolve=>acknowledge=resolve);}};
+  vm.createContext(s);
+  const method=context==='add'?'executeAddNewProduct':'saveProductChanges';
+  const end=context==='add'?'    function openQuickRestockModal':'    function openAddMenuModal';
+  vm.runInContext(html.slice(html.indexOf('    async function '+method),html.indexOf(end)),s);
+  const saving=s[method]();await new Promise(resolve=>setImmediate(resolve));assert.equal(saveCount,1,context);assert.equal(closeCount,0,'must wait for real persistence');
+  const duplicate=s[method]();await duplicate;assert.equal(saveCount,1,'duplicate save blocked');
+  acknowledge(serverOK);await saving;assert.equal(closeCount,serverOK?1:0);assert.equal(s.menuAISaving,false);
+ }
+});
