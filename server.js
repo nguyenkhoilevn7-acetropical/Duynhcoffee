@@ -17,6 +17,8 @@ const { createReceiptVerifier } = require('./receipt-verification');
 const { createReceiptJobs } = require('./receipt-jobs');
 const { createAdminPush } = require('./admin-push');
 const { createDelivery, protectOrderWrite, transition } = require('./delivery');
+const { createMenuAI } = require('./menu-ai');
+const menuAI = createMenuAI();
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const ROOT_DIR = __dirname;
@@ -581,6 +583,18 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 200, { ok: true, codeVersion, uptimeSeconds: Math.floor(process.uptime()) });
     return;
   }
+  if (pathname === '/api/menu-ai/status' || pathname === '/api/menu-ai/generate') {
+    res.setHeader('Cache-Control', 'no-store');
+    if (!adminPush.verify((req.headers.authorization || '').replace(/^Bearer /, ''))) {
+      sendJson(res, 401, { error: 'Vui lòng đăng nhập lại quản trị để dùng AI menu.' }); return;
+    }
+    try {
+      if (pathname.endsWith('/status') && req.method === 'GET') sendJson(res, 200, menuAI.status());
+      else if (pathname.endsWith('/generate') && req.method === 'POST') sendJson(res, 200, await menuAI.generate(await parseRequestBody(req)));
+      else sendJson(res, 405, { error: 'Phương thức không hợp lệ.' });
+    } catch (error) { sendJson(res, error.status || 503, { error: error.message }); }
+    return;
+  }
   if (pathname === '/api/delivery/status' && req.method === 'GET') {
     sendJson(res, 200, { ahamove: delivery.configured('ahamove'), lalamove: delivery.configured('lalamove') }); return;
   }
@@ -986,7 +1000,7 @@ const server = http.createServer(async (req, res) => {
   // Source code and local data are not static assets.
   let normalized;
   try { normalized = path.posix.normalize(decodeURIComponent(cleanPath)); } catch { sendJson(res, 400, { error: 'Đường dẫn không hợp lệ' }); return; }
-  if (normalized.split('/').some(part => part.startsWith('.')) || ['server.js', 'delivery.js', 'admin-push.js', 'drive-backup.js', 'receipt-verification.js', 'receipt-jobs.js', 'receipt-image.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || normalized.startsWith('/test/') || /\.(tmp|md)$/.test(normalized)) {
+  if (normalized.split('/').some(part => part.startsWith('.')) || ['server.js', 'menu-ai.js', 'delivery.js', 'admin-push.js', 'drive-backup.js', 'receipt-verification.js', 'receipt-jobs.js', 'receipt-image.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || normalized.startsWith('/test/') || /\.(tmp|md)$/.test(normalized)) {
     sendJson(res, 404, { error: 'Không tìm thấy' }); return;
   }
   if (cleanPath === '/' || cleanPath === '/admin' || cleanPath === '/pos') {

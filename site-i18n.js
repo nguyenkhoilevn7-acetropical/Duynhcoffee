@@ -6,6 +6,8 @@
 })(function () {
   'use strict';
   const catalog = {
+  "Lưu nội dung đã nhập khi AI chưa sẵn sàng": "Save entered content while AI is unavailable",
+  "Thử lại AI": "Retry AI",
   "Đang Giao Hàng": "Out for Delivery",
   "Đang giao hàng": "Out for delivery",
   "Đã giao đến khách": "Delivered to customer",

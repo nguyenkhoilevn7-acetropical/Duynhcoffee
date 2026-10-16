@@ -71,7 +71,7 @@ test('menu sync detects category, order and translated text changes',()=>{
 test('real server broadcasts edits and display order to two live clients, HTTP fallback and reconnect after restart',async()=>{
  const os=require('node:os'),net=require('node:net'),{spawn}=require('node:child_process'),WS=require('ws');
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'duynh-menu-order-'));
- for(const name of ['server.js','delivery.js','admin-push.js','order-notifications-sw.js','admin-notifications.js','drive-backup.js','receipt-verification.js','receipt-jobs.js','index.html']) fs.copyFileSync(path.join(__dirname,'..',name),path.join(dir,name));
+ for(const name of ['server.js','menu-ai.js','delivery.js','admin-push.js','order-notifications-sw.js','admin-notifications.js','drive-backup.js','receipt-verification.js','receipt-jobs.js','index.html']) fs.copyFileSync(path.join(__dirname,'..',name),path.join(dir,name));
  const port=await new Promise(resolve=>{const n=net.createServer();n.listen(0,'127.0.0.1',()=>{const p=n.address().port;n.close(()=>resolve(p));});});
  const base='http://127.0.0.1:'+port;let child;const sockets=[];
  async function start(){child=spawn(process.execPath,['server.js'],{cwd:dir,env:{PATH:process.env.PATH,PORT:String(port)},stdio:['ignore','pipe','pipe']});
@@ -106,7 +106,7 @@ test('editing a product saves all fields and selected position only on server ac
   const {s,elements,writes}=client();
   const values={'edit-menu-id':'1','edit-menu-name':'New tea','edit-menu-category':'coffee','edit-menu-price':'49000','edit-menu-stock':'12','edit-menu-status':'1','edit-menu-desc':'New description','edit-menu-image-url':'https://example.test/new.jpg','edit-menu-position':'after:3'};
   for(const [id,value] of Object.entries(values))elements.set(id,{value});elements.set('edit-menu-bestseller',{checked:true});
-  Object.assign(s,{translateFnbText:t=>'EN '+t,closeEditMenuModal(){},playSuccessChime(){}});
+  Object.assign(s,{menuAISaving:false,ensureMenuAI:async()=>true,translateFnbText:t=>'EN '+t,closeEditMenuModal(){},playSuccessChime(){}});
   if(fails)s.fetch=async()=>({ok:false,json:async()=>({error:'save failed'})});
   vm.runInContext(html.slice(html.indexOf('    async function saveProductChanges'),html.indexOf('    function openAddMenuModal')),s);
   await s.saveProductChanges();

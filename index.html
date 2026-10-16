@@ -4533,6 +4533,9 @@ body {
           <input type="text" id="edit-menu-name-en" class="form-control" placeholder="Tên món tiếng Anh">
           <label for="edit-menu-desc-en">Mô tả (Tiếng Anh)</label>
           <textarea id="edit-menu-desc-en" class="form-control" placeholder="Mô tả tiếng Anh"></textarea>
+          <button id="edit-menu-ai-manual" type="button" class="nav-btn" style="display:none" onclick="saveProductChanges(true)">Lưu nội dung đã nhập khi AI chưa sẵn sàng</button>
+          <p id="edit-menu-ai-status" role="status" aria-live="polite" style="font-size:0.85rem;color:#475569"></p>
+          <button type="button" class="nav-btn" onclick="retryMenuAI('edit')">Thử lại AI</button>
           <small>Giữ trống để dùng bản dịch có sẵn.</small>
         </div>
         <div class="form-group">
@@ -4638,6 +4641,9 @@ body {
           <input type="text" id="add-menu-name-en" class="form-control" placeholder="Tên món tiếng Anh">
           <label for="add-menu-desc-en">Mô tả (Tiếng Anh)</label>
           <textarea id="add-menu-desc-en" class="form-control" placeholder="Mô tả tiếng Anh"></textarea>
+          <button id="add-menu-ai-manual" type="button" class="nav-btn" style="display:none" onclick="executeAddNewProduct(true)">Lưu nội dung đã nhập khi AI chưa sẵn sàng</button>
+          <p id="add-menu-ai-status" role="status" aria-live="polite" style="font-size:0.85rem;color:#475569"></p>
+          <button type="button" class="nav-btn" onclick="retryMenuAI('add')">Thử lại AI</button>
           <small>Giữ trống để dùng bản dịch có sẵn.</small>
         </div>
         <div class="form-group">
@@ -10004,6 +10010,123 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       showSmsToast("❤️‍🔥 CẬP NHẬT BEST SELLER!", `Món "${item.name}" đã ${item.isBestSeller ? 'BẬT' : 'TẮT'} huy hiệu Best Seller.`);
     }
 
+    // AI drafts stay inside the modal until an acknowledged menu save.
+    const menuAIStates = {};
+    const menuAIEl = (context, field) => document.getElementById(context + '-menu-' + field);
+    function menuAISnapshot(context) {
+      return JSON.stringify(['name','image-url','desc'].map(field => menuAIEl(context,field)?.value.trim() || ''));
+    }
+    function menuAIMessage(context, message) {
+      const el = menuAIEl(context,'ai-status');
+      if (el) el.textContent = message;
+    }
+    function resetMenuAI(context) {
+      const previous = menuAIStates[context];
+      if (previous) { clearTimeout(previous.timer); previous.closed = true; }
+      menuAIEl(context,'ai-manual').style.display = 'none';
+      menuAIStates[context] = { signature: menuAISnapshot(context), ok: context === 'edit', customDescription: false };
+      menuAIMessage(context, 'AI Gemini miễn phí: nhập tên và tải ảnh để tự tạo mô tả Việt–Anh.');
+    }
+    function scheduleMenuAI(context, field) {
+      const state = menuAIStates[context];
+      if (!state || state.closed) return;
+      if (field === 'desc') state.customDescription = true;
+      if (field === 'name') menuAIEl(context,'name-en').value = '';
+      // Never display a stale English description as the translation of an edited dish.
+      menuAIEl(context,'desc-en').value = '';
+      state.ok = false;
+      clearTimeout(state.timer);
+      menuAIMessage(context, 'Đang chờ nhập xong để tạo nội dung Việt–Anh...');
+      state.timer = setTimeout(() => generateMenuAI(context), 1200);
+    }
+    async function menuAIImage(context) {
+      const image = menuAIEl(context,'image-url').value.trim();
+      if (!image || image.startsWith('data:image/svg')) return '';
+      if (image.startsWith('data:image/')) return image;
+      // Load public image URLs in the browser, never proxy arbitrary URLs through Render.
+      return new Promise((resolve,reject) => {
+        const imageEl = new Image(); imageEl.crossOrigin = 'anonymous';
+        const timer = setTimeout(() => { imageEl.onload = imageEl.onerror = null; reject(Error('Chưa tải được ảnh. Hãy tải ảnh từ điện thoại rồi thử lại.')); }, 12000);
+        imageEl.onerror = () => { clearTimeout(timer); reject(Error('Link ảnh không cho AI đọc. Hãy tải ảnh từ điện thoại.')); };
+        imageEl.onload = () => {
+          clearTimeout(timer);
+          try {
+            const canvas = document.createElement('canvas');
+            const scale = Math.min(1,600/Math.max(imageEl.width,imageEl.height));
+            canvas.width = Math.max(1,Math.round(imageEl.width*scale)); canvas.height = Math.max(1,Math.round(imageEl.height*scale));
+            canvas.getContext('2d').drawImage(imageEl,0,0,canvas.width,canvas.height);
+            resolve(canvas.toDataURL('image/jpeg',0.85));
+          } catch (_) { reject(Error('Không đọc được ảnh từ link này. Hãy tải ảnh từ điện thoại.')); }
+        };
+        imageEl.src = image;
+      });
+    }
+    async function generateMenuAI(context) {
+      const state = menuAIStates[context];
+      if (!state || state.closed) return false;
+      clearTimeout(state.timer);
+      const signature = menuAISnapshot(context);
+      if (!menuAIEl(context,'name').value.trim()) return false;
+      if (state.ok && state.signature === signature) return true;
+      if (state.pending && state.pendingSignature === signature) return state.pending;
+      const ticket = {}; state.ticket = ticket; state.pendingSignature = signature;
+      const untouched = Object.fromEntries(['name-en','desc','desc-en'].map(field => [field,menuAIEl(context,field).value]));
+      menuAIMessage(context, 'AI đang đọc tên, ảnh và viết mô tả Việt–Anh...');
+      state.pending = (async () => {
+        try {
+          const image = await menuAIImage(context);
+          if (state.closed || state.ticket !== ticket || menuAISnapshot(context) !== signature) return false;
+          const response = await fetch(getCloudApiUrl('/api/menu-ai/generate'), {
+            method: 'POST', headers: {'Content-Type':'application/json', Authorization:'Bearer '+(localStorage.getItem('duynh_admin_api_token') || localStorage.getItem('duynh_admin_push_token') || '')},
+            body: JSON.stringify({name:menuAIEl(context,'name').value.trim(),image,description:state.customDescription ? untouched.desc : ''}),
+            signal: AbortSignal.timeout(50000)
+          });
+          const result = await response.json();
+          if (!response.ok) throw Error(result.error || 'Chưa tạo được nội dung AI. Vui lòng thử lại.');
+          if (state.closed || state.ticket !== ticket || menuAISnapshot(context) !== signature) return false;
+          for (const [field,key] of [['name-en','name_en'],['desc','description'],['desc-en','description_en']]) {
+            if (typeof result[key] !== 'string' || !result[key].trim()) throw Error('AI chưa trả đủ nội dung Việt–Anh.');
+          }
+          for (const [field,key] of [['name-en','name_en'],['desc','description'],['desc-en','description_en']]) {
+            const el = menuAIEl(context,field);
+            if (el.value === untouched[field] && !(field === 'desc' && state.customDescription)) el.value = result[key];
+          }
+          state.signature = menuAISnapshot(context); state.ok = true;
+          menuAIMessage(context, 'Đã tạo nội dung Việt–Anh. Anh có thể sửa trước khi lưu.');
+          return true;
+        } catch (error) {
+          if (!state.closed && state.ticket === ticket && menuAISnapshot(context) === signature) {
+            state.ok = false;
+            menuAIEl(context,'ai-manual').style.display = '';
+            menuAIMessage(context, error.name === 'TimeoutError' ? 'AI phản hồi chậm. Bấm Thử lại AI.' : error.message);
+          }
+          return false;
+        } finally { if (state.ticket === ticket) state.pending = null; }
+      })();
+      return state.pending;
+    }
+    async function ensureMenuAI(context) {
+      const state = menuAIStates[context];
+      if (!state) return true;
+      const signature = menuAISnapshot(context);
+      if (state.ok && signature === state.signature) return true;
+      return generateMenuAI(context);
+    }
+    function cancelMenuAIWork(context) {
+      const state = menuAIStates[context];
+      if (state) { clearTimeout(state.timer); state.ticket = {}; state.pending = null; }
+    }
+    function closeMenuAI(context) {
+      const state = menuAIStates[context];
+      if (state) { state.closed = true; clearTimeout(state.timer); }
+    }
+    window.retryMenuAI = context => generateMenuAI(context);
+    document.addEventListener('DOMContentLoaded', () => {
+      for (const context of ['add','edit']) for (const field of ['name','desc','category']) {
+        menuAIEl(context,field)?.addEventListener('input', () => scheduleMenuAI(context,field));
+      }
+    });
+
     function openEditMenuModal(itemId) {
       const item = menu.find(m => m.id === itemId);
       if (!item) return;
@@ -10025,14 +10148,17 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
       document.getElementById('edit-menu-modal-title').textContent = `Chỉnh Sửa Món #${item.id} - ${item.name}`;
       populateMenuPositions('edit', item.id);
+      resetMenuAI('edit');
       document.getElementById('edit-menu-modal').style.display = 'flex';
     }
 
     function closeEditMenuModal() {
+      closeMenuAI('edit');
       document.getElementById('edit-menu-modal').style.display = 'none';
     }
 
     function previewEditMenuImageUrl(url) {
+      scheduleMenuAI('edit', 'image');
       const prev = document.getElementById('edit-menu-image-preview');
       if (url && url.trim()) {
         prev.src = url.trim();
@@ -10053,12 +10179,19 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
           prev.src = dataUrl;
           prev.style.display = 'block';
         }
+        scheduleMenuAI('edit', 'image');
         if (status) status.textContent = `✅ Đã tải ảnh mới: ${file.name} (Tối ưu thành công)`;
       });
     }
     window.handleProductImageFileChange = handleProductImageFileChange;
 
-    async function saveProductChanges() {
+    let menuAISaving = false;
+    async function saveProductChanges(manual = false) {
+      if (menuAISaving) return;
+      menuAISaving = true;
+      try {
+      if (manual === true) cancelMenuAIWork('edit');
+      else if (!await ensureMenuAI('edit')) return;
       const idStr = document.getElementById('edit-menu-id').value;
       const original = menu.find(m => String(m.id) === String(idStr));
       if (!original) return;
@@ -10073,6 +10206,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       item.description = document.getElementById('edit-menu-desc').value.trim();
       const newImg = document.getElementById('edit-menu-image-url').value.trim();
       if (newImg) item.image = newImg;
+      item.name_vi = item.name;
+      item.description_vi = item.description;
       item.name_en = document.getElementById('edit-menu-name-en')?.value.trim() || translateFnbText(item.name);
       item.description_en = document.getElementById('edit-menu-desc-en')?.value.trim() || translateFnbText(item.description);
 
@@ -10083,6 +10218,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       closeEditMenuModal();
       playSuccessChime();
       showSmsToast("💾 ĐÃ CẬP NHẬT MÓN!", `Món "${item.name}" đã được lưu vào thực đơn & kho hàng.`);
+      } finally { menuAISaving = false; }
     }
 
     function openAddMenuModal() {
@@ -10096,14 +10232,17 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       populateMenuPositions('add');
       toggleInlineCategoryCreator('add', false);
       clearAddMenuImage();
+      resetMenuAI('add');
       document.getElementById('add-menu-modal').style.display = 'flex';
     }
 
     function closeAddMenuModal() {
+      closeMenuAI('add');
       document.getElementById('add-menu-modal').style.display = 'none';
     }
 
     function previewAddMenuImageUrl(url) {
+      scheduleMenuAI('add', 'image');
       const prevWrap = document.getElementById('add-menu-preview-wrap');
       const prev = document.getElementById('add-menu-image-preview');
       if (url && url.trim()) {
@@ -10126,6 +10265,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       if (prev) prev.src = '';
       const status = document.getElementById('add-menu-file-status');
       if (status) status.textContent = 'Chưa chọn ảnh (Hệ thống tự động nén tối ưu hiển thị siêu nhanh)';
+      scheduleMenuAI('add', 'image');
     }
     window.clearAddMenuImage = clearAddMenuImage;
 
@@ -10141,12 +10281,18 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         const prevWrap = document.getElementById('add-menu-preview-wrap');
         if (prev) prev.src = dataUrl;
         if (prevWrap) prevWrap.style.display = 'block';
+        scheduleMenuAI('add', 'image');
         if (status) status.textContent = `✅ Đã tải ảnh: ${file.name} (Tối ưu thành công)`;
       });
     }
     window.handleAddProductImageFileChange = handleAddProductImageFileChange;
 
-    async function executeAddNewProduct() {
+    async function executeAddNewProduct(manual = false) {
+      if (menuAISaving) return;
+      menuAISaving = true;
+      try {
+      if (manual === true) cancelMenuAIWork('add');
+      else if (!await ensureMenuAI('add')) return;
       const name = document.getElementById('add-menu-name').value.trim();
       const price = parseInt(document.getElementById('add-menu-price').value, 10);
       const category = document.getElementById('add-menu-category').value;
@@ -10199,6 +10345,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       closeAddMenuModal();
       playSuccessChime();
       showSmsToast("➕ ĐÃ THÊM MÓN MỚI!", `Món "${name}" đã được lưu bền vững vào thực đơn & Render Cloud.`);
+      } finally { menuAISaving = false; }
     }
 
     function openQuickRestockModal(itemId) {
