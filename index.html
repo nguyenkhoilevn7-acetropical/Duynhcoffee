@@ -67,7 +67,7 @@
     .header-inner {
       max-width: 1200px;
       margin: 0 auto;
-      padding: 12px 20px;
+      padding: 6px 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -85,7 +85,7 @@
     .mom-logo-frame {
       display: block;
       position: relative;
-      width: 144px;
+      width: 120px;
       aspect-ratio: 1020 / 570;
       overflow: hidden;
       flex-shrink: 0;
@@ -102,7 +102,6 @@
     }
     .brand-logo-area { flex-direction: column; gap: 2px; flex-shrink: 0; }
     .brand-logo-area .brand-title { display: none; }
-    .brand-logo-area .brand-sub { font-size: 8px; letter-spacing: 0.6px; color: #4a341f; }
 
     .brand-title {
       font-size: 1.25rem;
@@ -121,6 +120,8 @@
     }
 
     .header-controls {
+      align-self: flex-end;
+      margin-bottom: 6px;
       display: flex;
       align-items: center;
       gap: 10px;
@@ -2057,10 +2058,10 @@ input, select, textarea {
 @media (max-width: 640px) {
   /* 1. Header tinh gọn, không bao giờ tràn hàng */
   .header-inner {
-    padding: 8px 12px !important;
+    padding: 5px 12px !important;
     gap: 8px !important;
   }
-  .mom-logo-frame { width: 112px; border-radius: 8px; }
+  .mom-logo-frame { width: 94px; border-radius: 8px; }
   .brand-logo-area .brand-sub { display: none; }
   .brand-title {
     font-size: 0.98rem !important;
@@ -2071,6 +2072,7 @@ input, select, textarea {
     letter-spacing: 0.5px !important;
   }
   .header-controls {
+    margin-bottom: 2px;
     gap: 5px !important;
     flex: 1;
     min-width: 0;
@@ -3308,10 +3310,6 @@ body {
     <div class="header-inner">
       <div class="brand-logo-area" onclick="switchView('customer')">
         <span class="mom-logo-frame"><img src="/public/mom-logo.png" alt="Mom’s Tea &amp; Coffee" class="header-logo-img" width="1536" height="1147" fetchpriority="high"></span>
-        <div>
-          <div class="brand-title">Mom’s Tea & Coffee</div>
-          <div class="brand-sub">NGON ĐẾN GIỌT CUỐI CÙNG</div>
-        </div>
       </div>
 
       <div class="header-controls">
@@ -3332,7 +3330,7 @@ body {
 
 
         <button type="button" class="cart-pill-btn" onclick="openCartDrawer()" title="Xem giỏ hàng">
-          <span>🛍️ Giỏ</span>
+          <span>🥤 Giỏ</span>
           <span class="cart-count-badge" id="cart-counter">0</span>
         </button>
       </div>
@@ -3378,7 +3376,7 @@ body {
       <div id="floating-cart-bar" class="floating-cart-bar" onclick="openCartDrawer()" style="display: none;">
         <div style="display: flex; align-items: center; gap: 10px;">
           <div class="floating-cart-icon-wrapper">
-            <span>🛍️</span>
+            <span>🥤</span>
             <span class="floating-cart-badge" id="floating-cart-count">0</span>
           </div>
           <div style="font-size: 0.92rem; font-weight: 800;" id="floating-cart-total">0 đ</div>
@@ -3881,7 +3879,7 @@ body {
   <div id="cart-drawer" class="cart-drawer">
     <div class="cart-drawer-header">
       <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="font-size: 1.4rem;">🛍️</span>
+        <span style="font-size: 1.4rem;">🥤</span>
         <h3 style="font-size: 1.15rem; color: #FFF; font-weight: 800;">Giỏ Hàng Của Bạn</h3>
       </div>
       <button type="button" class="cart-drawer-close" onclick="closeCartDrawer()">✕</button>
@@ -7663,7 +7661,7 @@ function openProductCustomModal(itemId) {
       showFloatingCartTemporarily(3000);
       closeProductCustomModal();
       playAudioChime(650, 0.08);
-      showSmsToast("🛍️ ĐÃ THÊM VÀO GIỎ!", `+${addedQty} ${addedItemName} (Đã cập nhật giỏ hàng)`);
+      showSmsToast("🥤 ĐÃ THÊM VÀO GIỎ!", `+${addedQty} ${addedItemName} (Đã cập nhật giỏ hàng)`);
     }
     window.confirmAddToCartFromCustomModal = confirmAddToCartFromCustomModal;
 
@@ -8240,7 +8238,7 @@ function openProductCustomModal(itemId) {
       if (!cart || cart.length === 0) {
         container.innerHTML = `
           <div style="text-align: center; padding: 20px; color: #8E8E93; font-size: 0.86rem;">
-            <div style="font-size: 2rem; margin-bottom: 6px;">🛍️</div>
+            <div style="font-size: 2rem; margin-bottom: 6px;">🥤</div>
             <b style="color: #1C1C1E;">Giỏ hàng của bạn đang trống!</b>
             <div style="margin-top: 4px;">Vui lòng chọn món để tiếp tục đặt hàng.</div>
             <button type="button" class="btn-checkout-now" style="margin-top: 12px; height: 38px; font-size: 0.82rem; padding: 0 16px;" onclick="closePaymentCheckoutModal()">
@@ -10673,7 +10671,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       if (cart.length === 0) {
         container.innerHTML = `
           <div class="cart-empty-state">
-            <div class="cart-empty-icon">🛍️</div>
+            <div class="cart-empty-icon">🥤</div>
             <div style="font-weight: 700; font-size: 1rem;">Giỏ hàng của bạn đang trống</div>
             <div style="font-size: 0.82rem; margin-top: 6px;">Hãy chọn những món trà trái cây & cà phê tươi ngon của Mom nhé!</div>
           </div>
