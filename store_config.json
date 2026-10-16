@@ -1,10 +1,10 @@
 {
-  "storeName": "ĐUỶNH TEA & COFFEE",
-  "storeSlogan": "Đuỷnh — Ngon đến giọt cuối cùng",
+  "storeName": "Mom TEA & COFFEE",
+  "storeSlogan": "Mom — Ngon đến giọt cuối cùng",
   "storeAddress": "Tòa Babylon 2, Chung Cư Thủ Thiêm, Phường An Khánh, TP. Thủ Đức, TP. Hồ Chí Minh",
   "storePhone": "0988 776 655",
   "vatRate": 8,
-  "footerGreeting": "Đuỷnh Tea House — Ngon đến giọt cuối cùng!",
+  "footerGreeting": "Mom’s Tea & Coffee — Ngon đến giọt cuối cùng!",
   "bankConfig": {
     "bankId": "Vietcombank",
     "bankName": "Ngân Hàng TMCP Ngoại Thương Việt Nam (Vietcombank)",
@@ -35,7 +35,7 @@
     }
   },
   "banner": {
-    "tagline": "✨ ĐUỶNH TEA & COFFEE ✨",
+    "tagline": "✨ Mom TEA & COFFEE ✨",
     "slogan": "NGON ĐẾN GIỌT CUỐI CÙNG",
     "description": "Trà trái cây tươi ủ lạnh & Cà phê pha máy nguyên chất mỗi ngày.",
     "promoCode": "DUYNH20",

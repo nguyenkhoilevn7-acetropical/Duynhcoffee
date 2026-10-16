@@ -5,7 +5,7 @@ self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
 self.addEventListener('push',event=>{
   let data={};try{data=event.data.json();}catch{}
   const en=data.language==='en';
-  event.waitUntil(self.registration.showNotification(String(data.title||'Đuỷnh Tea & Coffee').slice(0,100),{
+  event.waitUntil(self.registration.showNotification(String(data.title||'Mom’s Tea & Coffee').slice(0,100),{
     body:String(data.body||(en?'Open Admin to view the order.':'Mở quản trị để xem đơn hàng.')).slice(0,200),
     tag:String(data.tag||'duynh-new-order').slice(0,100),renotify:true,
     silent:false,vibrate:[300,100,300,100,600],requireInteraction:true,

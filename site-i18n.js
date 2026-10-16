@@ -1004,13 +1004,18 @@
     "Chuyển khoản": "Bank transfer"
   });
   Object.assign(catalog, {"Tên người nhận trên biên lai không khớp tên đã cấu hình.": "The receipt recipient does not match the configured name.", "Chưa đọc rõ tên trong vùng người nhận trên biên lai.": "The recipient name on the receipt is unreadable.", "Chưa đọc rõ số tiền giao dịch trên biên lai. Hãy tải ảnh gốc rõ nét hơn.": "The transaction amount is unreadable. Please upload a clearer original image.", "Giỏ hàng không hợp lệ": "Invalid cart", "Món hoặc số lượng không hợp lệ": "Invalid item or quantity", "Mã giảm giá không hợp lệ hoặc đã tắt": "The promo code is invalid or disabled", "Giỏ hàng hoặc người nhận đã thay đổi. Vui lòng quét lại biên lai": "The cart or recipient changed. Please scan the receipt again", "Không đọc được biên lai. Vui lòng thử lại.": "Unable to read the receipt. Please try again.", "Máy chủ đang đọc nhiều biên lai. Vui lòng thử lại sau.": "The server is reading several receipts. Please try again shortly.", "Backup không đúng định dạng": "Invalid backup format", "Menu trong backup không hợp lệ": "The menu in the backup is invalid", "Backup chứa trường bí mật không được phép": "The backup contains prohibited secret fields", "Google API trả mã ": "Google API returned status ", "Google không trả access token": "Google did not return an access token", "Backup quá lớn": "The backup is too large", "Không đọc được phiên bản backup hợp lệ; không khởi tạo đè dữ liệu": "Unable to read a valid backup; existing data will not be overwritten", "Backup vượt giới hạn 25 MB": "The backup exceeds 25 MB", "Địa chỉ upload không hợp lệ": "Invalid upload address", "Chưa nhận đủ quyền offline drive.file": "Offline drive.file access has not been granted", "Thiếu cấu hình OAuth trên Render": "OAuth configuration is missing on Render", "Quá nhiều phiên OAuth": "Too many OAuth sessions", "Chưa có backup": "No backup available", "Không lưu được cài đặt": "Unable to save settings", "Không lưu được menu": "Unable to save menu", "Tác vụ quét đã hết hạn hoặc máy chủ vừa khởi động lại. Vui lòng thử lại.": "The scan expired or the server restarted. Please try again."});
+  // Keep legacy translations for historical orders; add the current brand copy.
+  const momCopy = text => text.replace(/Đuỷnh/gi, 'Mom').replace(/Mom Tea (?:House|& Coffee)/gi, 'Mom’s Tea & Coffee');
+  for (const [vi,en] of Object.entries(catalog)) {
+    if (/Đuỷnh/i.test(vi)) catalog[momCopy(vi)] = momCopy(en);
+  }
   const normalize = value => String(value).replace(/\s+/g, ' ').trim();
   const lower = value => normalize(value).toLocaleLowerCase('vi');
   const escapeRegex = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const forward = new Map(), reverse = new Map();
   let forwardPattern, reversePattern, protectedPattern = null, protectedSignature = '';
   let protectedSet = new Set(), privateSet = new Set();
-  const brands = ['Đuỷnh Tea & Coffee','ĐUỶNH TEA & COFFEE','Đuỷnh Tea House','ĐUỶNH TEA HOUSE','DuynhCoffee Backup','Vietcombank','MoMo','ZaloPay','Ahamove','Lalamove','Google Drive','Google Maps','VietQR','Render','Đuỷnh'];
+  const brands = ['Mom’s Tea & Coffee','Mom','Đuỷnh Tea & Coffee','ĐUỶNH TEA & COFFEE','Đuỷnh Tea House','ĐUỶNH TEA HOUSE','DuynhCoffee Backup','Vietcombank','MoMo','ZaloPay','Ahamove','Lalamove','Google Drive','Google Maps','VietQR','Render','Đuỷnh'];
   let language = 'vi', documentRef = null, observer = null, frame = null;
   let queue = [], cursor = 0;
   const records = new WeakMap(), attributes = new WeakMap();

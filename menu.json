@@ -1,7 +1,7 @@
 [
   {
     "id": 1,
-    "name": "Trà Mãng Cầu Đuỷnh (Signature)",
+    "name": "Trà Mãng Cầu Mom (Signature)",
     "category": "tea",
     "price": 45000,
     "description": "Mãng cầu xiêm tươi dầm nhuyễn, vị chua ngọt thanh mát hòa quyện cùng trà lài ủ lạnh.",
@@ -12,7 +12,7 @@
   },
   {
     "id": 2,
-    "name": "Trà Dâu Tằm Macchiato Đuỷnh",
+    "name": "Trà Dâu Tằm Macchiato Mom",
     "category": "tea",
     "price": 49000,
     "description": "Dâu tằm Đà Lạt ngâm đường phèn tự nhiên, lớp kem macchiato béo mịn mặn nhẹ phía trên.",
@@ -45,7 +45,7 @@
   },
   {
     "id": 5,
-    "name": "Cà Phê Muối Biển Đuỷnh",
+    "name": "Cà Phê Muối Biển Mom",
     "category": "coffee",
     "price": 39000,
     "description": "Cà phê Robusta Đắk Lắk pha phin nguyên chất, lớp kem muối biển béo ngậy mặn mòi đặc trưng.",
@@ -100,7 +100,7 @@
   },
   {
     "id": 10,
-    "name": "Bánh Tiramisu Hộp Thiếc Đuỷnh",
+    "name": "Bánh Tiramisu Hộp Thiếc Mom",
     "category": "bakery",
     "price": 45000,
     "description": "Cốt bánh mềm ẩm ngấm đẫm cà phê espresso, lớp kem phô mai Mascarpone béo mịn rắc bột cacao.",

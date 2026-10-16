@@ -89,7 +89,7 @@ function createAdminPush({dir,readConfig,backup,env=process.env,sendImpl,now=Dat
   function message(entry,id,test=false){
     const en=entry.language==='en';
     // No customer names, addresses, amounts or receipts on the lock screen.
-    return {title:test?(en?'Đuỷnh • Test notification':'Đuỷnh • Thông báo thử'):(en?'Đuỷnh • New order':'Đuỷnh • Có đơn hàng mới'),
+    return {title:test?(en?'Mom • Test notification':'Mom • Thông báo thử'):(en?'Mom • New order':'Mom • Có đơn hàng mới'),
       body:en?'Open Admin to view the order.':'Mở quản trị để xem đơn hàng.',
       tag:test?'duynh-push-test':'duynh-order-'+crypto.createHash('sha256').update(String(id)).digest('hex').slice(0,24),language:entry.language};
   }
