@@ -2072,7 +2072,13 @@ input, select, textarea {
   }
   .header-controls {
     gap: 5px !important;
+    flex: 1;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
+  .header-controls > button { min-height: 44px; }
+  .header-controls .lang-toggle-btn { padding: 6px 7px !important; }
   .btn-track-header {
     padding: 6px 10px !important;
     font-size: 0.74rem !important;
