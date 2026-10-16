@@ -7060,7 +7060,7 @@ function toggleKitchenSoundAlert() {
         const items = order ? order.items.map(i => ({ id: i.id, qty: i.qty, toppings: i.toppings || [] })) : cart.map(c => ({ id: c.item.id, qty: c.qty, toppings: c.toppings || [] }));
         const upload = {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: base64Str, items, discountCode: order ? order.discount?.code : activeDiscount?.code })
+          body: JSON.stringify({ image: base64Str, items, payableAmount: expAmt, discountCode: order ? order.discount?.code : activeDiscount?.code })
         };
         async function startJob() {
           for (let attempt = 0; ; attempt++) {

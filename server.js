@@ -998,6 +998,7 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/receipt-scans' && req.method === 'POST') {
     try {
       const body = await parseRequestBody(req);
+      if (!Number.isSafeInteger(body.payableAmount) || body.payableAmount <= 0) throw new Error('Phiên thanh toán đã cũ. Vui lòng tải lại trang để xác minh đúng tổng tiền gồm topping');
       sendJson(res, 202, receiptJobs.start(body, receiptVerifier.requestKey(body)));
     } catch (error) { sendJson(res, 422, { error: error.message }); }
     return;

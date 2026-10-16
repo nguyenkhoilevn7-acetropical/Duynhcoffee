@@ -198,6 +198,7 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
     if (typeof image !== 'string' || !/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(image) || image.length > 6 * 1024 * 1024) throw new Error('Hãy tải ảnh PNG, JPEG hoặc WebP dưới 4 MB');
     const state = readState();
     const amount = calculateAmount(body.items, state.menu, state.discounts, body.discountCode);
+    if (body.payableAmount !== undefined && body.payableAmount !== amount) throw new Error('Tổng tiền giỏ hàng chưa khớp giá món và topping trên máy chủ. Vui lòng tải lại trang và quét lại biên lai');
     const holder = state.config.bankConfig && state.config.bankConfig.accountHolder;
     if (!normalize(holder)) throw new Error('Chưa cấu hình tên người nhận');
     if (busy) throw new Error('Máy chủ đang đọc một biên lai khác. Vui lòng thử lại sau');
@@ -242,6 +243,7 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
     if (typeof image !== 'string' || !/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(image) || image.length > 6 * 1024 * 1024) throw new Error('Hãy tải ảnh PNG, JPEG hoặc WebP dưới 4 MB');
     const state = readState();
     const amount = calculateAmount(body.items, state.menu, state.discounts, body.discountCode);
+    if (body.payableAmount !== undefined && body.payableAmount !== amount) throw new Error('Tổng tiền giỏ hàng chưa khớp giá món và topping trên máy chủ. Vui lòng tải lại trang và quét lại biên lai');
     const holder = normalize(state.config.bankConfig && state.config.bankConfig.accountHolder);
     if (!holder) throw new Error('Chưa cấu hình tên người nhận');
     return hash(image + ':' + amount + ':' + holder);

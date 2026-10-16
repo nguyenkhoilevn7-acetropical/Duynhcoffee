@@ -17,7 +17,9 @@ test('HTTP scan starts quickly, retries share work, and completed proof is serve
  const post=(route,body)=>fetch(base+route,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
  assert.equal((await post('/api/menu',[{id:1,name:'Tea',price:45000}])).status,200);
  assert.equal((await post('/api/config',{bankConfig:{accountHolder:'DAO KHOI NGUYEN'}})).status,200);
- const body={image:'data:image/png;base64,YWJj',items:[{id:1,qty:1}],expectedAmount:1,expectedHolder:'WRONG'};
+ const body={image:'data:image/png;base64,YWJj',items:[{id:1,qty:1}],payableAmount:45000,expectedAmount:1,expectedHolder:'WRONG'};
+ assert.equal((await post('/api/receipt-scans',{...body,payableAmount:undefined})).status,422);
+ assert.equal((await post('/api/receipt-scans',{...body,payableAmount:53000})).status,422);
  let response=await post('/api/receipt-scans',body);assert.equal(response.status,202);
  const pending=await response.json();assert.equal(pending.status,'pending');assert.ok(!pending.result);assert.ok(!pending.image);
  const retry=await(await post('/api/receipt-scans',body)).json();assert.equal(retry.jobId,pending.jobId);
