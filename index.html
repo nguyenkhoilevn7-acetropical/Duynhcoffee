@@ -10120,7 +10120,11 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       const state = menuAIStates[context];
       if (state) { state.closed = true; clearTimeout(state.timer); }
     }
-    window.retryMenuAI = context => generateMenuAI(context);
+    window.retryMenuAI = context => {
+      const state = menuAIStates[context];
+      if (state) state.ok = false;
+      return generateMenuAI(context);
+    };
     document.addEventListener('DOMContentLoaded', () => {
       for (const context of ['add','edit']) for (const field of ['name','desc','category']) {
         menuAIEl(context,field)?.addEventListener('input', () => scheduleMenuAI(context,field));
@@ -10214,7 +10218,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       const item = { ...original };
 
       item.name = document.getElementById('edit-menu-name').value.trim() || item.name;
-      item.category = document.getElementById('edit-menu-category').value;
+      item.category = document.getElementById('edit-menu-category').value || original.category;
       item.price = parseInt(document.getElementById('edit-menu-price').value, 10) || item.price;
       item.stock = parseInt(document.getElementById('edit-menu-stock').value, 10) || 0;
       item.isAvailable = (document.getElementById('edit-menu-status').value === '1');

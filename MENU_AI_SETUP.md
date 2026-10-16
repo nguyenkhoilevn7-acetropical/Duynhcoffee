@@ -8,7 +8,7 @@
 4. Save, rebuild/redeploy dịch vụ hiện tại. Giữ nguyên build/start command, GitHub connection và các biến môi trường khác.
 5. Đăng nhập quản trị; sửa hoặc thêm món với tên và ảnh. Chờ trạng thái tạo xong mô tả Việt–Anh, kiểm tra nội dung rồi bấm Lưu.
 
-Mặc định dùng Gemini 3.8 Flash, có Free tier theo bảng giá Google tại ngày triển khai. Không dùng dịch vụ tìm kiếm hay tạo ảnh có phí, không tự chuyển sang model/nhà cung cấp trả phí, không có mã kích hoạt billing. **Việc API có được miễn phí phụ thuộc dự án gắn với khóa**: nếu dùng khóa của dự án đã bật billing, Google có thể tính tiền. Luôn chọn dự án chưa bật billing.
+Mặc định dùng Gemini Flash (`gemini-flash-latest`, tên model trong hướng dẫn hiện tại của AI Studio), có Free tier theo bảng giá Google tại ngày triển khai. Không dùng dịch vụ tìm kiếm hay tạo ảnh có phí, không tự chuyển sang model/nhà cung cấp trả phí, không có mã kích hoạt billing. **Việc API có được miễn phí phụ thuộc dự án gắn với khóa**: nếu dùng khóa của dự án đã bật billing, Google có thể tính tiền. Luôn chọn dự án chưa bật billing.
 
 Hạn mức xem tại AI Studio. Backend giới hạn 5 lượt/phút, gộp yêu cầu trùng, lưu tối đa 100 kết quả tạm; bản dịch đã Lưu theo cùng menu vào cơ chế đồng bộ/Drive hiện có. Khách xem menu không gọi Gemini. Hết hạn mức báo lỗi, không tự nâng cấp.
 

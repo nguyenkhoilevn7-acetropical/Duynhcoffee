@@ -3,7 +3,7 @@ const crypto = require('node:crypto');
 const fail = (message, status=503) => Object.assign(new Error(message), {status});
 function createMenuAI({env=process.env, fetchImpl=global.fetch, now=Date.now}={}) {
   // Credentials stay on Render; this module never enables billing or changes tiers.
-  const model = 'gemini-3.8-flash';
+  const model = 'gemini-flash-latest';
   const cache=new Map(), pending=new Map();
   let calls=[];
   const status=()=>({configured:!!env.GEMINI_API_KEY,model});
@@ -35,6 +35,14 @@ function createMenuAI({env=process.env, fetchImpl=global.fetch, now=Date.now}={}
         body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt},...(inlineData?[{inlineData}]:[])]}],generationConfig:{responseMimeType:'application/json',responseSchema:{type:'OBJECT',properties:Object.fromEntries(fields.map(k=>[k,{type:'STRING'}])),required:fields},maxOutputTokens:2048}}),signal:AbortSignal.timeout(45000)
       });}catch{throw fail('Chưa kết nối được Gemini. Nội dung cũ vẫn được giữ; vui lòng thử lại.');}
       if(!response.ok){
+        let reason = '';
+        try {
+          const problem = await response.json();
+          const raw = problem.error?.details?.find(d => typeof d.reason === 'string')?.reason || problem.error?.status || '';
+          reason = /^[A-Z_]{1,80}$/.test(raw) ? raw : 'UNKNOWN';
+        } catch { reason = 'UNKNOWN'; }
+        console.warn('[Menu AI] Google HTTP', response.status, reason);
+
         if(response.status===429)throw fail('Đã chạm hạn mức Gemini miễn phí. Vui lòng thử lại sau; hệ thống không tự chuyển sang trả phí.',429);
         if([401,403].includes(response.status))throw fail('Khóa Gemini chưa hợp lệ hoặc chưa được cấp quyền. Vui lòng kiểm tra cấu hình Render.');
         throw fail('Gemini chưa xử lý được món này. Vui lòng thử lại sau.');

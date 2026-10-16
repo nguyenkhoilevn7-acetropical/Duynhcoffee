@@ -74,3 +74,9 @@ test('save closes add/edit modals after server acknowledgement even if Gemini is
   acknowledge(serverOK);await saving;assert.equal(closeCount,serverOK?1:0);assert.equal(s.menuAISaving,false);
  }
 });
+
+test('retry AI regenerates an unchanged existing item instead of returning an old translation',async()=>{
+ const {s,e,pending}=client();s.resetMenuAI('edit');
+ const job=s.window.retryMenuAI('edit');await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(pending.length,1);pending[0](output);assert.equal(await job,true);assert.equal(e['edit-menu-name-en'].value,output.name_en);
+});
