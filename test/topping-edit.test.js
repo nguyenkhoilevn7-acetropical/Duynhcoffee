@@ -1,0 +1,24 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const {JSDOM}=require('jsdom');
+test('checkout edit restores translated topping controls, removes/replaces selections, saves original quantity and base price, and cancels without changing cart',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8'),dom=new JSDOM(html),document=dom.window.document;
+ const base={id:1,name:'Drink',price:45000,category:'tea',image:'photo',description:'Description'};
+ const cart=[{item:{...base,price:57000},qty:2,toppings:[{id:'Kem Macchiato',name:'Kem Macchiato',price:12000}],ice:'70% Đá',sugar:'50% Ngọt',note:'Original note'}];
+ let financialUpdates=0;
+ const s={window:{},document,menu:[base],cart,activeCustomItem:null,activeToppings:[],activeCustomQty:1,activeIce:'',activeSugar:'',formatMoney:v=>v+' đ',getCategoryFallbackSvg:()=>'',playAudioChime(){},playSuccessChime(){},saveLocalData(){},updateCartBadge(){},renderCartDrawerItems(){},renderCheckoutItemsPreview(){},updateCheckoutFinancials(){financialUpdates++;},showSmsToast(){}};
+ vm.createContext(s);vm.runInContext(html.slice(html.indexOf('    let editingCartIndex = null;'),html.indexOf('    function submitProductCustomToCart()')),s);
+ const mac=document.querySelector('[data-name="Kem Macchiato"]'),pearl=document.querySelector('[data-name="Trân Châu Trắng"]');
+ mac.querySelector('span').textContent='Macchiato Cream';
+ for(const button of document.querySelectorAll('.ios-segment-btn'))button.textContent='Translated option';
+ s.openEditCartItemModal(0);
+ assert.equal(mac.classList.contains('selected'),true);assert.equal(mac.getAttribute('aria-checked'),'true');
+ assert.equal(document.querySelector('#ios-group-sugar [data-option="50% Ngọt"]').classList.contains('active'),true);
+ assert.equal(document.getElementById('ios-custom-normal-actions').style.display,'none');assert.equal(document.getElementById('ios-custom-edit-actions').style.display,'block');
+ s.toggleToppingSelection(mac,'Kem Macchiato',12000);assert.equal(mac.getAttribute('aria-checked'),'false');
+ s.confirmAddToCartFromCustomModal();assert.equal(cart.length,1);assert.equal(cart[0].item.price,45000);assert.equal(cart[0].toppings.length,0);assert.equal(cart[0].qty,2);assert.equal(cart[0].note,'Original note');assert.equal(base.price,45000);assert.equal(financialUpdates,1);
+ s.openEditCartItemModal(0);s.toggleToppingSelection(pearl,'Trân Châu Trắng',8000);s.closeProductCustomModal();assert.equal(cart[0].toppings.length,0);
+ s.openEditCartItemModal(0);assert.equal(pearl.getAttribute('aria-checked'),'false');s.toggleToppingSelection(pearl,'Trân Châu Trắng',8000);s.confirmAddToCartFromCustomModal();assert.equal(cart[0].item.price,53000);
+ s.openEditCartItemModal(0);assert.equal(pearl.getAttribute('aria-checked'),'true');s.toggleToppingSelection(pearl,'Trân Châu Trắng',8000);s.toggleToppingSelection(mac,'Kem Macchiato',12000);s.confirmAddToCartFromCustomModal();assert.equal(cart[0].item.price,57000);assert.equal(cart[0].toppings.length,1);assert.equal(cart[0].toppings[0].name,'Kem Macchiato');assert.equal(cart[0].qty,2);
+ dom.window.close();
+});

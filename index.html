@@ -90,7 +90,7 @@
       overflow: hidden;
       flex-shrink: 0;
       border-radius: 12px;
-      background: #faf7ed;
+      background: #ffffff;
     }
     .header-logo-img {
       position: absolute;
@@ -671,6 +671,9 @@
       border-color: var(--accent);
       background: #FFF7ED;
     }
+    .ios-topping-info::before { content: ''; display: grid; place-items: center; width: 20px; height: 20px; border: 1.5px solid #94a3b8; border-radius: 6px; }
+    .ios-topping-item.selected .ios-topping-info::before { content: '✓'; background: var(--primary); border-color: var(--primary); color: #fff; }
+    .ios-topping-item:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
     .ios-topping-item.selected {
       border-color: var(--primary);
       background: #F0FDF4;
@@ -2827,6 +2830,9 @@ body {
     #product-custom-modal {
       z-index: 9999 !important;
     }
+    #product-custom-modal.is-editing-cart .ios-drink-img { width: 64px !important; height: 64px !important; }
+    #product-custom-modal.is-editing-cart .ios-drink-desc { display: none; }
+    #product-custom-modal .ios-modal-body { min-height: 0; }
     #product-custom-modal .ios-modal-card {
       z-index: 10000 !important;
     }
@@ -3309,7 +3315,7 @@ body {
   <header>
     <div class="header-inner">
       <div class="brand-logo-area" onclick="switchView('customer')">
-        <span class="mom-logo-frame"><img src="/public/mom-logo.png" alt="Mom’s Tea &amp; Coffee" class="header-logo-img" width="1536" height="1147" fetchpriority="high"></span>
+        <span class="mom-logo-frame"><img src="/public/mom-logo-white.png" alt="Mom’s Tea &amp; Coffee" class="header-logo-img" width="1536" height="1147" fetchpriority="high"></span>
       </div>
 
       <div class="header-controls">
@@ -3918,10 +3924,10 @@ body {
         <div id="ios-group-ice" class="ios-option-group">
           <div class="ios-option-title">🧊 Mức Đá</div>
           <div class="ios-segmented-control">
-            <button type="button" class="ios-segment-btn active" onclick="selectIceOption('100% Đá', this)">100% Đá</button>
-            <button type="button" class="ios-segment-btn" onclick="selectIceOption('70% Đá', this)">70% Đá</button>
-            <button type="button" class="ios-segment-btn" onclick="selectIceOption('50% Đá', this)">50% Đá</button>
-            <button type="button" class="ios-segment-btn" onclick="selectIceOption('Không Đá', this)">Không Đá</button>
+            <button type="button" class="ios-segment-btn active" data-option="100% Đá" onclick="selectIceOption('100% Đá', this)">100% Đá</button>
+            <button type="button" class="ios-segment-btn" data-option="70% Đá" onclick="selectIceOption('70% Đá', this)">70% Đá</button>
+            <button type="button" class="ios-segment-btn" data-option="50% Đá" onclick="selectIceOption('50% Đá', this)">50% Đá</button>
+            <button type="button" class="ios-segment-btn" data-option="Không Đá" onclick="selectIceOption('Không Đá', this)">Không Đá</button>
           </div>
         </div>
 
@@ -3929,10 +3935,10 @@ body {
         <div id="ios-group-sugar" class="ios-option-group">
           <div class="ios-option-title">🍯 Mức Ngọt (Đường)</div>
           <div class="ios-segmented-control">
-            <button type="button" class="ios-segment-btn active" onclick="selectSugarOption('100% Ngọt', this)">100% Đường</button>
-            <button type="button" class="ios-segment-btn" onclick="selectSugarOption('70% Ngọt', this)">70% Đường</button>
-            <button type="button" class="ios-segment-btn" onclick="selectSugarOption('50% Ngọt', this)">50% Đường</button>
-            <button type="button" class="ios-segment-btn" onclick="selectSugarOption('Không Đường', this)">Không Đường</button>
+            <button type="button" class="ios-segment-btn active" data-option="100% Ngọt" onclick="selectSugarOption('100% Ngọt', this)">100% Đường</button>
+            <button type="button" class="ios-segment-btn" data-option="70% Ngọt" onclick="selectSugarOption('70% Ngọt', this)">70% Đường</button>
+            <button type="button" class="ios-segment-btn" data-option="50% Ngọt" onclick="selectSugarOption('50% Ngọt', this)">50% Đường</button>
+            <button type="button" class="ios-segment-btn" data-option="Không Đường" onclick="selectSugarOption('Không Đường', this)">Không Đường</button>
           </div>
         </div>
 
@@ -3940,19 +3946,19 @@ body {
         <div id="ios-group-toppings" class="ios-option-group">
           <div class="ios-option-title">✨ Topping Thêm</div>
           <div class="ios-topping-list">
-            <div class="ios-topping-item" onclick="toggleToppingSelection(this, 'Trân Châu Trắng', 8000)">
+            <div class="ios-topping-item" data-name="Trân Châu Trắng" role="checkbox" aria-checked="false" tabindex="0" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();this.click();}" onclick="toggleToppingSelection(this, 'Trân Châu Trắng', 8000)">
               <div class="ios-topping-info"><span>Trân Châu Trắng</span></div>
               <div class="ios-topping-price">+8.000 đ</div>
             </div>
-            <div class="ios-topping-item" onclick="toggleToppingSelection(this, 'Kem Macchiato', 12000)">
+            <div class="ios-topping-item" data-name="Kem Macchiato" role="checkbox" aria-checked="false" tabindex="0" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();this.click();}" onclick="toggleToppingSelection(this, 'Kem Macchiato', 12000)">
               <div class="ios-topping-info"><span>Kem Macchiato</span></div>
               <div class="ios-topping-price">+12.000 đ</div>
             </div>
-            <div class="ios-topping-item" onclick="toggleToppingSelection(this, 'Thạch Củ Năng', 8000)">
+            <div class="ios-topping-item" data-name="Thạch Củ Năng" role="checkbox" aria-checked="false" tabindex="0" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();this.click();}" onclick="toggleToppingSelection(this, 'Thạch Củ Năng', 8000)">
               <div class="ios-topping-info"><span>Thạch Củ Năng</span></div>
               <div class="ios-topping-price">+8.000 đ</div>
             </div>
-            <div class="ios-topping-item" onclick="toggleToppingSelection(this, 'Đào Miếng Giòn', 10000)">
+            <div class="ios-topping-item" data-name="Đào Miếng Giòn" role="checkbox" aria-checked="false" tabindex="0" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();this.click();}" onclick="toggleToppingSelection(this, 'Đào Miếng Giòn', 10000)">
               <div class="ios-topping-info"><span>Đào Miếng Giòn</span></div>
               <div class="ios-topping-price">+10.000 đ</div>
             </div>
@@ -3976,13 +3982,16 @@ body {
         </div>
 
         <!-- HÀNH ĐỘNG -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <div id="ios-custom-normal-actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <button type="button" class="ios-add-cart-btn" onclick="submitProductCustomToCart()">
             🛒 Thêm Vào Giỏ
           </button>
           <button type="button" class="ios-instant-checkout-btn" onclick="submitProductCustomAndBuyNow()">
             ⚡ Mua Ngay (<span id="ios-custom-total-btn-price">0 đ</span>)
           </button>
+        </div>
+        <div id="ios-custom-edit-actions" style="display: none; margin-top: 10px;">
+          <button type="button" class="ios-add-cart-btn" style="width: 100%;" onclick="confirmAddToCartFromCustomModal()">Lưu thay đổi · <span id="ios-custom-total-btn-price-edit">0 đ</span></button>
         </div>
       </div>
     </div>
@@ -7417,15 +7426,13 @@ function toggleKitchenSoundAlert() {
         if (iceGroup) {
           iceGroup.style.display = 'block';
           iceGroup.querySelectorAll('.ios-segment-btn').forEach(btn => {
-            const txt = btn.textContent.trim();
-            btn.classList.toggle('active', txt === activeIce);
+            btn.classList.toggle('active', btn.getAttribute('data-option') === activeIce);
           });
         }
         if (sugarGroup) {
           sugarGroup.style.display = 'block';
           sugarGroup.querySelectorAll('.ios-segment-btn').forEach(btn => {
-            const txt = btn.textContent.trim();
-            btn.classList.toggle('active', txt === activeSugar);
+            btn.classList.toggle('active', btn.getAttribute('data-option') === activeSugar);
           });
         }
         if (topGroup) {
@@ -7433,12 +7440,7 @@ function toggleKitchenSoundAlert() {
         }
       }
 
-      // Topping
-      document.querySelectorAll('.ios-topping-item').forEach(el => {
-        const topName = el.getAttribute('data-name') || el.querySelector('.ios-topping-name')?.textContent?.trim();
-        const isSel = activeToppings.some(t => t.name === topName || (topName && topName.includes(t.name)));
-        el.classList.toggle('selected', isSel);
-      });
+      syncToppingSelections();
 
       // Ghi chú & số lượng
       const noteEl = document.getElementById('ios-item-custom-note');
@@ -7454,7 +7456,11 @@ function toggleKitchenSoundAlert() {
       const elEditAct = document.getElementById('ios-custom-edit-actions');
       if (elEditAct) elEditAct.style.display = 'block';
       const modal = document.getElementById('product-custom-modal');
-      if (modal) modal.style.display = 'flex';
+      if (modal) {
+        modal.classList.add('is-editing-cart');
+        modal.style.display = 'flex';
+        for (const el of modal.querySelectorAll('.ios-modal-card,.ios-modal-body')) el.scrollTop=0;
+      }
       playAudioChime(700, 0.08);
     }
     window.openEditCartItemModal = openEditCartItemModal;
@@ -7506,7 +7512,7 @@ function openProductCustomModal(itemId) {
         });
       }
 
-      document.querySelectorAll('.ios-topping-item').forEach(el => el.classList.remove('selected'));
+      syncToppingSelections();
 
       const noteEl = document.getElementById('ios-item-custom-note');
       if (noteEl) noteEl.value = '';
@@ -7521,6 +7527,7 @@ function openProductCustomModal(itemId) {
       if (elNormalAct) elNormalAct.style.display = 'grid';
       const elEditAct = document.getElementById('ios-custom-edit-actions');
       if (elEditAct) elEditAct.style.display = 'none';
+      document.getElementById('product-custom-modal').classList.remove('is-editing-cart');
       document.getElementById('product-custom-modal').style.display = 'flex';
       playAudioChime(700, 0.08);
     }
@@ -7552,6 +7559,14 @@ function openProductCustomModal(itemId) {
       playAudioChime(620, 0.04);
     }
 
+    function syncToppingSelections() {
+      document.querySelectorAll('.ios-topping-item').forEach(el => {
+        const name=el.getAttribute('data-name');
+        const selected=activeToppings.some(t=>(t.id || t.name)===name || t.name===name);
+        el.classList.toggle('selected',selected);
+        el.setAttribute('aria-checked',String(selected));
+      });
+    }
     function toggleToppingSelection(elem, name, price) {
       const p = Number(price) || 0;
       const existingIdx = activeToppings.findIndex(t => t.name === name);
@@ -7562,6 +7577,7 @@ function openProductCustomModal(itemId) {
         activeToppings.push({ id: name, name: name, price: p });
         if (elem) elem.classList.add('selected');
       }
+      syncToppingSelections();
       updateCustomModalPrice();
       playAudioChime(680, 0.05);
     }

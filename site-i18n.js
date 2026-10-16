@@ -6,6 +6,7 @@
 })(function () {
   'use strict';
   const catalog = {
+  "Lưu thay đổi ·": "Save changes ·",
   "Đọc được trên biên lai:": "Read from receipt:",
   "Đang lưu món...": "Saving item...",
   "Lưu món": "Save item",
