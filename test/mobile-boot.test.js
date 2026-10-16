@@ -95,3 +95,11 @@ test('checkout never leaks scroll locks on empty cart, duplicate opens or missin
   s.lockScreenScroll();s.closePaymentCheckoutModal();assert.equal(rootNames.has('modal-open'),true);
   s.unlockScreenScroll();modal=null;await s.openPaymentCheckoutModal();assert.equal(rootNames.has('modal-open'),false);
 });
+
+test('closing login as a guest returns to the menu rather than leaving an empty page',()=>{
+ const element={style:{display:'flex'}};let customerViews=0;
+ const s={document:{getElementById:()=>element},isUserAdmin:()=>false,switchView:mode=>{assert.equal(mode,'customer');customerViews++;}};
+ vm.createContext(s);vm.runInContext(html.slice(html.indexOf('    function closeAdminLoginModal'),html.indexOf('    async function executeAdminLogin')),s);
+ s.closeAdminLoginModal();assert.equal(element.style.display,'none');assert.equal(customerViews,1);
+ s.isUserAdmin=()=>true;s.closeAdminLoginModal();assert.equal(customerViews,1);
+});

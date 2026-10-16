@@ -8722,6 +8722,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
     function closeAdminLoginModal() {
       document.getElementById('admin-login-modal').style.display = 'none';
+      if (!isUserAdmin()) switchView('customer');
     }
 
     async function executeAdminLogin() {
