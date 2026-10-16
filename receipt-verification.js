@@ -1,5 +1,6 @@
 'use strict';
 const crypto = require('node:crypto');
+const {getOptions}=require('./menu-options');
 function normalize(value) {
   return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'D').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
 }
@@ -104,16 +105,17 @@ function shouldRetryOcr(comparison, confidence) {
   const readable = (comparison.matchedRecipient || comparison.recipientReadable) && (comparison.matchedAmount || comparison.amountReadable);
   return !readable || !Number.isFinite(confidence) || confidence < 70;
 }
-const toppingPrices = new Map([['TRAN CHAU TRANG',8000],['KEM MACCHIATO',12000],['THACH CU NANG',8000],['DAO MIENG GION',10000]]);
 function unitPrice(entry,item) {
-  // Prices come from our catalog, never from client-supplied topping prices.
+  const options=getOptions(item);
+  const available=new Map(options.toppings.map(t=>[t.id,t]));
   const toppings=entry.toppings===undefined?[]:entry.toppings;
-  if (!Array.isArray(toppings) || toppings.length>toppingPrices.size) throw new Error('Topping không hợp lệ');
+  if(!Array.isArray(toppings)||toppings.length>available.size)throw new Error('Topping không hợp lệ');
   let extras=0;const seen=new Set();
-  for (const topping of toppings) {
-    const key=normalize(topping && typeof topping==='object' ? topping.id || topping.name : '');
-    if (!toppingPrices.has(key) || seen.has(key) || item.category==='bakery') throw new Error('Topping không hợp lệ');
-    seen.add(key);extras+=toppingPrices.get(key);
+  for(const topping of toppings){
+    const id=topping&&typeof topping==='object'?(topping.id||topping.name):'';
+    const option=available.get(id);
+    if(!option||seen.has(id))throw new Error('Topping không hợp lệ hoặc không còn bán cho món này');
+    seen.add(id);extras+=option.price;
   }
   return Number(item.price)+extras;
 }

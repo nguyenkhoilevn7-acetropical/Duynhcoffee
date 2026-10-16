@@ -19,6 +19,7 @@ const { createAdminPush } = require('./admin-push');
 const { createDelivery, protectOrderWrite, transition } = require('./delivery');
 const { createMenuAI } = require('./menu-ai');
 const menuAI = createMenuAI();
+const {validateOptions}=require('./menu-options');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const ROOT_DIR = __dirname;
@@ -953,6 +954,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const body = await parseRequestBody(req);
         if (Array.isArray(body)) {
+          for (const item of body) if (item.options !== undefined) validateOptions(item.options);
           menuCache = body;
           menuVersion = Date.now();
           if (!writeJsonFile(MENU_FILE, menuCache)) throw new Error('Không lưu được menu');

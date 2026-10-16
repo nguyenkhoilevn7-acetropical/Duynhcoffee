@@ -3306,6 +3306,7 @@ body {
     .tracked-item-custom { color:#64748B; font-size:0.78rem; }
     .tracked-item-price { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; margin-top:4px; }
   </style>
+<script src="menu-options.js" defer></script>
 <script src="site-i18n.js" defer></script>
 <script src="admin-notifications.js" defer></script>
 </head>
@@ -4640,6 +4641,7 @@ body {
             <img id="edit-menu-image-preview" src="" style="max-height: 100px; max-width: 160px; border-radius: 10px; border: 2px solid var(--border); display: block; object-fit: cover;">
           </div>
         </div>
+        <details style="margin:16px 0;border:1px solid #d1d5db;border-radius:12px;padding:12px;"><summary style="cursor:pointer;font-weight:700;">Tùy chọn món: Đá, độ ngọt và topping</summary><p>Để trống nhóm nếu món không cho khách chọn. Giá topping được cộng theo từng ly.</p><div id="edit-menu-options"></div></details>
         <button type="button" id="edit-menu-save" class="btn-checkout-now" onclick="saveProductChanges()">
           💾 Lưu Cập Nhật Món
         </button>
@@ -4734,10 +4736,18 @@ body {
             <button type="button" onclick="clearAddMenuImage()" title="Xóa ảnh" style="position: absolute; top: -6px; right: -6px; background: #DC2626; color: #fff; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">✕</button>
           </div>
         </div>
+        <details style="margin:16px 0;border:1px solid #d1d5db;border-radius:12px;padding:12px;"><summary style="cursor:pointer;font-weight:700;">Tùy chọn món: Đá, độ ngọt và topping</summary><p>Để trống nhóm nếu món không cho khách chọn. Giá topping được cộng theo từng ly.</p><div id="add-menu-options"></div></details>
         <button type="button" id="add-menu-save" class="btn-checkout-now" onclick="executeAddNewProduct()">
           ➕ Thêm Món Vào Hệ Thống
         </button>
       </div>
+    </div>
+  </div>
+
+  <div id="delete-menu-modal" class="modal-overlay" style="display:none;z-index:11000;">
+    <div class="modal-card" style="max-width:420px;">
+      <div class="modal-header"><h3>Xóa món khỏi thực đơn</h3><button type="button" class="modal-close" onclick="closeDeleteMenuModal()">✕</button></div>
+      <div class="modal-body"><p>Bạn muốn xóa món này?</p><p id="delete-menu-name" style="font-weight:700;"></p><div style="display:flex;gap:10px;margin-top:16px;"><button type="button" class="nav-btn" onclick="closeDeleteMenuModal()">Hủy</button><button type="button" id="delete-menu-confirm" class="btn-isolated-cancel" onclick="confirmDeleteMenuItem()">Xác nhận xóa món</button></div></div>
     </div>
   </div>
 
@@ -5225,6 +5235,7 @@ body {
       for (const item of menu) {
         if (item.name_en) pairs[item.name_vi || item.name] = item.name_en;
         if (item.description_en) pairs[item.description_vi || item.description] = item.description_en;
+        if(item.options && window.MenuOptions) for(const group of Object.values(menuOptionsFor(item))) for(const option of group) if(option.name_en)pairs[option.name]=option.name_en;
       }
       for (const category of getCategoriesList()) if (category.name_en) pairs[category.name_vi || category.name] = category.name_en;
       const banner = storeConfig?.banner || {};
@@ -5467,7 +5478,7 @@ body {
         const match = onClickAttr.match(/openProductCustomModal\((\d+)\)/);
         if (match) {
           const itemId = parseInt(match[1], 10);
-          const item = menu.find(m => m.id === itemId);
+          const item = menu.find(m => String(m.id) === String(itemId));
           if (item) {
             const isOutOfStock = (item.isAvailable === false || (item.stock !== undefined && item.stock <= 0));
             const stockLeft = (item.stock !== undefined) ? item.stock : 50;
@@ -7383,11 +7394,70 @@ function toggleKitchenSoundAlert() {
     // =========================================================================
     let editingCartIndex = null;
 
+    function menuOptionsFor(item) { return window.MenuOptions.getOptions(item); }
+    function optionLabel(option) { return currentLang==='en' ? (option.name_en || translateFnbText(option.name)) : option.name; }
+    function renderCustomOptions(item) {
+      const options=menuOptionsFor(item);
+      activeIce=options.ice.some(o=>o.name===activeIce)?activeIce:(options.ice[0]?.name || '');
+      activeSugar=options.sugar.some(o=>o.name===activeSugar)?activeSugar:(options.sugar[0]?.name || '');
+      activeToppings=options.toppings.filter(o=>activeToppings.some(t=>(t.id||t.name)===o.id)).map(o=>({...o}));
+      for(const [group,value,method] of [['ice',activeIce,'selectIceOption'],['sugar',activeSugar,'selectSugarOption']]) {
+        const box=document.getElementById('ios-group-'+group);box.style.display=options[group].length?'block':'none';
+        const list=box.querySelector('.ios-segmented-control');list.replaceChildren();
+        for(const option of options[group]) {
+          const button=document.createElement('button');button.type='button';button.className='ios-segment-btn';button.dataset.option=option.name;
+          button.textContent=optionLabel(option);button.classList.toggle('active',value===option.name);
+          button.onclick=()=>window[method](option.name,button);list.appendChild(button);
+        }
+      }
+      const box=document.getElementById('ios-group-toppings');box.style.display=options.toppings.length?'block':'none';
+      const list=box.querySelector('.ios-topping-list');list.replaceChildren();
+      for(const option of options.toppings) {
+        const row=document.createElement('div');row.className='ios-topping-item';row.dataset.name=option.id;row.setAttribute('role','checkbox');row.tabIndex=0;
+        const info=document.createElement('div');info.className='ios-topping-info';info.textContent=optionLabel(option);
+        const price=document.createElement('div');price.className='ios-topping-price';price.textContent='+'+formatMoney(option.price);
+        row.append(info,price);row.onclick=()=>toggleToppingSelection(row,option.id,option.price);
+        row.onkeydown=e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();row.click();}};list.appendChild(row);
+      }
+      syncToppingSelections();
+    }
+    function renderMenuOptionsEditor(context,item) {
+      const root=document.getElementById(context+'-menu-options');if(!root)return;
+      root.replaceChildren();
+      const options=menuOptionsFor(item || {category:document.getElementById(context+'-menu-category')?.value || 'tea'});
+      for(const [group,label] of [['ice','Mức đá'],['sugar','Độ ngọt'],['toppings','Topping']]) {
+        const section=document.createElement('section');section.dataset.optionGroup=group;section.style.marginBottom='16px';
+        const title=document.createElement('h4');title.textContent=label;section.appendChild(title);
+        const rows=document.createElement('div');rows.className='menu-option-rows';section.appendChild(rows);root.appendChild(section);
+        for(const option of options[group])addMenuOptionRow(context,group,option);
+        const button=document.createElement('button');button.type='button';button.className='nav-btn';button.textContent='+ Thêm lựa chọn';button.onclick=()=>addMenuOptionRow(context,group);section.appendChild(button);
+      }
+    }
+    function addMenuOptionRow(context,group,option) {
+      const list=document.querySelector('#'+context+'-menu-options [data-option-group="'+group+'"] .menu-option-rows');
+      if(list.children.length>=20){alert('Mỗi nhóm tối đa 20 lựa chọn.');return;}
+      const row=document.createElement('div');row.className='menu-option-row';row.dataset.optionId=option?.id || 'option_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+      row.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px 0;border-bottom:1px solid #e2e8f0';
+      for(const [field,label,type] of [['name','Tên tiếng Việt','text'],['name_en','Tên tiếng Anh','text'],...(group==='toppings'?[['price','Giá cộng thêm (đ)','number']]:[])]) {
+        const wrap=document.createElement('label');wrap.textContent=label;wrap.style.fontSize='0.78rem';
+        const input=document.createElement('input');input.className='form-control';input.type=type;input.dataset.field=field;input.value=option?.[field] ?? (field==='price'?0:'');
+        if(type==='number'){input.min='0';input.max='1000000';input.step='1000';}else input.maxLength=field==='name'?100:160;
+        wrap.appendChild(input);row.appendChild(wrap);
+      }
+      const remove=document.createElement('button');remove.type='button';remove.className='nav-btn';remove.textContent='Xóa lựa chọn';remove.onclick=()=>row.remove();row.appendChild(remove);list.appendChild(row);
+    }
+    function readMenuOptionsEditor(context) {
+      const root=document.getElementById(context+'-menu-options');if(!root)return undefined;
+      const options={};
+      for(const group of ['ice','sugar','toppings']) options[group]=Array.from(root.querySelectorAll('[data-option-group="'+group+'"] .menu-option-row')).map(row=>({id:row.dataset.optionId,name:row.querySelector('[data-field="name"]').value.trim(),name_en:row.querySelector('[data-field="name_en"]').value.trim(),price:group==='toppings'?Number(row.querySelector('[data-field="price"]').value):0}));
+      return window.MenuOptions.validateOptions(options);
+    }
+
     function openEditCartItemModal(cartIdx) {
       if (typeof cartIdx !== 'number' || !cart[cartIdx]) return;
       const c = cart[cartIdx];
       const itemId = (c.item && c.item.id) ? c.item.id : c.id;
-      const item = menu.find(m => m.id === itemId) || c.item;
+      const item = menu.find(m => String(m.id) === String(itemId)) || c.item;
       if (!item) return;
 
       editingCartIndex = cartIdx;
@@ -7440,7 +7510,7 @@ function toggleKitchenSoundAlert() {
         }
       }
 
-      syncToppingSelections();
+      renderCustomOptions(item);
 
       // Ghi chú & số lượng
       const noteEl = document.getElementById('ios-item-custom-note');
@@ -7466,7 +7536,7 @@ function toggleKitchenSoundAlert() {
     window.openEditCartItemModal = openEditCartItemModal;
 
 function openProductCustomModal(itemId) {
-      const item = menu.find(m => m.id === itemId);
+      const item = menu.find(m => String(m.id) === String(itemId));
       if (!item) return;
 
       const isOutOfStock = (item.isAvailable === false || (item.stock !== undefined && item.stock <= 0));
@@ -7512,7 +7582,7 @@ function openProductCustomModal(itemId) {
         });
       }
 
-      syncToppingSelections();
+      renderCustomOptions(item);
 
       const noteEl = document.getElementById('ios-item-custom-note');
       if (noteEl) noteEl.value = '';
@@ -7569,12 +7639,14 @@ function openProductCustomModal(itemId) {
     }
     function toggleToppingSelection(elem, name, price) {
       const p = Number(price) || 0;
-      const existingIdx = activeToppings.findIndex(t => t.name === name);
+      const existingIdx = activeToppings.findIndex(t => (t.id || t.name) === name);
       if (existingIdx !== -1) {
         activeToppings.splice(existingIdx, 1);
         if (elem) elem.classList.remove('selected');
       } else {
-        activeToppings.push({ id: name, name: name, price: p });
+        const option=menuOptionsFor(activeCustomItem).toppings.find(t=>t.id===name);
+        if(!option)return;
+        activeToppings.push({...option});
         if (elem) elem.classList.add('selected');
       }
       syncToppingSelections();
@@ -7627,10 +7699,8 @@ function openProductCustomModal(itemId) {
       const noteVal = (document.getElementById('ios-item-custom-note')?.value || '').trim();
 
       let customParts = [];
-      if (activeCustomItem.category !== 'bakery') {
-        customParts.push(activeIce || '100% Đá');
-        customParts.push(activeSugar || '100% Ngọt');
-      }
+      if(activeIce)customParts.push(activeIce);
+      if(activeSugar)customParts.push(activeSugar);
       if (activeToppings && activeToppings.length > 0) {
         customParts.push('Topping: ' + activeToppings.map(t => t.name).join(', '));
       }
@@ -7642,8 +7712,8 @@ function openProductCustomModal(itemId) {
       // NẾU ĐANG Ở CHẾ ĐỘ SỬA MÓN ĐÃ CÓ TRONG GIỎ HÀNG: CẬP NHẬT TRỰC TIẾP
       if (editingCartIndex !== null && typeof editingCartIndex === 'number' && cart[editingCartIndex]) {
         cart[editingCartIndex].qty = addedQty;
-        cart[editingCartIndex].ice = (activeCustomItem.category !== 'bakery') ? (activeIce || '100% Đá') : null;
-        cart[editingCartIndex].sugar = (activeCustomItem.category !== 'bakery') ? (activeSugar || '100% Ngọt') : null;
+        cart[editingCartIndex].ice = activeIce || null;
+        cart[editingCartIndex].sugar = activeSugar || null;
         cart[editingCartIndex].toppings = [...activeToppings];
         cart[editingCartIndex].note = noteVal;
         cart[editingCartIndex].item.price = unitPrice;
@@ -7671,8 +7741,8 @@ function openProductCustomModal(itemId) {
         cart.push({
           item: { ...activeCustomItem, price: unitPrice },
           qty: addedQty,
-          ice: (activeCustomItem.category !== 'bakery') ? (activeIce || '100% Đá') : null,
-          sugar: (activeCustomItem.category !== 'bakery') ? (activeSugar || '100% Ngọt') : null,
+          ice: activeIce || null,
+          sugar: activeSugar || null,
           toppings: [...activeToppings],
           note: noteVal,
           custom: customStr
@@ -7919,7 +7989,7 @@ function openProductCustomModal(itemId) {
 
     // MUA NGAY TRỰC TIẾP TRÊN THẺ MÓN (BỎ QUA CHỌN MÓN NẾU MUỐN NHANH)
     function quickBuyProductNow(itemId) {
-      const item = menu.find(m => m.id === itemId);
+      const item = menu.find(m => String(m.id) === String(itemId));
       if (!item) {
         alert("Không tìm thấy thông tin món ăn!");
         return;
@@ -10001,7 +10071,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
             <td><b style="color:var(--primary); font-size:0.95rem;">${formatMoney(m.price)}</b></td>
             <td>${stockBadge}</td>
             <td>
-              <button type="button" class="nav-btn" style="padding:4px 8px; font-size:0.75rem; ${m.isBestSeller ? 'background:#FEF2F2; color:#DC2626; border-color:#FCA5A5;' : 'background:#F8FAFC; color:#64748B;'}" onclick="toggleBestSeller(${m.id})">
+              <button type="button" class="nav-btn" style="padding:4px 8px; font-size:0.75rem; ${m.isBestSeller ? 'background:#FEF2F2; color:#DC2626; border-color:#FCA5A5;' : 'background:#F8FAFC; color:#64748B;'}" onclick="toggleBestSeller(${orderText(JSON.stringify(String(m.id)))})">
                 ${m.isBestSeller ? '❤️‍🔥 Đang Bật' : '⚪ Tắt'}
               </button>
             </td>
@@ -10012,15 +10082,15 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
             </td>
             <td>
               <div style="display:flex; gap:6px;">
-                <button type="button" class="nav-btn" ${menuIndex === 0 ? 'disabled' : ''} onclick="moveMenuItem(${m.id}, -1)" aria-label="Đưa món ${menuIndex + 1} lên trước">↑ Trước</button>
-                <button type="button" class="nav-btn" ${menuIndex === menu.length - 1 ? 'disabled' : ''} onclick="moveMenuItem(${m.id}, 1)" aria-label="Đưa món ${menuIndex + 1} xuống sau">↓ Sau</button>
-                <button type="button" class="nav-btn" style="padding:4px 8px; font-size:0.75rem;" onclick="openEditMenuModal(${m.id})">
+                <button type="button" class="nav-btn" ${menuIndex === 0 ? 'disabled' : ''} onclick="moveMenuItem(${orderText(JSON.stringify(String(m.id)))}, -1)" aria-label="Đưa món ${menuIndex + 1} lên trước">↑ Trước</button>
+                <button type="button" class="nav-btn" ${menuIndex === menu.length - 1 ? 'disabled' : ''} onclick="moveMenuItem(${orderText(JSON.stringify(String(m.id)))}, 1)" aria-label="Đưa món ${menuIndex + 1} xuống sau">↓ Sau</button>
+                <button type="button" class="nav-btn" style="padding:4px 8px; font-size:0.75rem;" onclick="openEditMenuModal(${orderText(JSON.stringify(String(m.id)))})">
                   ✏️ Sửa
                 </button>
-                <button type="button" class="nav-btn" style="padding:4px 8px; font-size:0.75rem; background:#ECFDF5; color:#065F46; border-color:#A7F3D0;" onclick="openQuickRestockModal(${m.id})">
+                <button type="button" class="nav-btn" style="padding:4px 8px; font-size:0.75rem; background:#ECFDF5; color:#065F46; border-color:#A7F3D0;" onclick="openQuickRestockModal(${orderText(JSON.stringify(String(m.id)))})">
                   📦 Nhập Kho
                 </button>
-                <button type="button" class="btn-isolated-cancel" style="padding:4px 8px; font-size:0.75rem;" onclick="deleteMenuItem(${m.id})">
+                <button type="button" class="btn-isolated-cancel" style="padding:4px 8px; font-size:0.75rem;" onclick="deleteMenuItem(${orderText(JSON.stringify(String(m.id)))})">
                   🗑️ Xóa
                 </button>
               </div>
@@ -10031,26 +10101,11 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     }
 
     // BẬT / TẮT TRẠNG THÁI BEST SELLER CHO MÓN
-    function toggleBestSeller(itemId) {
-      const item = menu.find(m => m.id === itemId);
-      if (!item) return;
-
-      item.isBestSeller = !item.isBestSeller;
-      localStorage.setItem('duynh_menu_customized', 'true');
-      localStorage.setItem('duynh_custom_menu_backup', JSON.stringify(menu));
-      saveLocalData();
-      broadcastMeshEvent('MENU_UPDATE', { menu });
-
-      fetch('/api/menu', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(menu)
-      }).catch(() => {});
-
-      renderAdminMenuTable();
-      renderCustomerProducts();
-      playAudioChime(750, 0.1);
-      showSmsToast("❤️‍🔥 CẬP NHẬT BEST SELLER!", `Món "${item.name}" đã ${item.isBestSeller ? 'BẬT' : 'TẮT'} huy hiệu Best Seller.`);
+    async function toggleBestSeller(itemId) {
+      if(menuOrderSaving)return;
+      const item=menu.find(m=>String(m.id)===String(itemId));if(!item)return;
+      const updated={...item,isBestSeller:!item.isBestSeller};
+      if(await saveOrderedMenu(menu.map(m=>String(m.id)===String(itemId)?updated:m)))playAudioChime(750,0.1);
     }
 
     // AI drafts stay inside the modal until an acknowledged menu save.
@@ -10175,7 +10230,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     });
 
     function openEditMenuModal(itemId) {
-      const item = menu.find(m => m.id === itemId);
+      const item = menu.find(m => String(m.id) === String(itemId));
       if (!item) return;
 
       document.getElementById('edit-menu-id').value = item.id;
@@ -10196,6 +10251,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       document.getElementById('edit-menu-modal-title').textContent = `Chỉnh Sửa Món #${item.id} - ${item.name}`;
       populateMenuPositions('edit', item.id);
       resetMenuAI('edit');
+      renderMenuOptionsEditor('edit', item);
       document.getElementById('edit-menu-modal').style.display = 'flex';
     }
 
@@ -10259,6 +10315,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       const original = menu.find(m => String(m.id) === String(idStr));
       if (!original) return;
       const item = { ...original };
+      if(typeof readMenuOptionsEditor==='function')item.options=readMenuOptionsEditor('edit');
 
       item.name = document.getElementById('edit-menu-name').value.trim() || item.name;
       item.category = document.getElementById('edit-menu-category').value || original.category;
@@ -10281,7 +10338,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       closeEditMenuModal();
       playSuccessChime();
       showSmsToast("💾 ĐÃ CẬP NHẬT MÓN!", `Món "${item.name}" đã được lưu vào thực đơn & kho hàng.${!aiReady && manual !== true ? ' AI chưa sẵn sàng; đã lưu nội dung hiện có.' : ''}`);
-      } finally { menuAISaving = false; menuSaveBusy('edit', false); }
+      } catch(error) { showSmsToast('Chưa lưu được món',error.message); } finally { menuAISaving = false; menuSaveBusy('edit', false); }
     }
 
     function openAddMenuModal() {
@@ -10296,6 +10353,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       toggleInlineCategoryCreator('add', false);
       clearAddMenuImage();
       resetMenuAI('add');
+      renderMenuOptionsEditor('add');
       document.getElementById('add-menu-modal').style.display = 'flex';
     }
 
@@ -10394,6 +10452,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       const autoDescEn = document.getElementById('add-menu-desc-en')?.value.trim() || (desc ? translateFnbText(desc) : 'Freshly prepared daily with premium ingredients.');
 
       const newItem = {
+        options: typeof readMenuOptionsEditor==='function' ? readMenuOptionsEditor('add') : undefined,
         id: newId,
         name: name,
         name_en: autoNameEn,
@@ -10413,11 +10472,11 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       closeAddMenuModal();
       playSuccessChime();
       showSmsToast("➕ ĐÃ THÊM MÓN MỚI!", `Món "${name}" đã được lưu bền vững vào thực đơn & Render Cloud.${!aiReady && manual !== true ? ' AI chưa sẵn sàng; đã lưu nội dung hiện có.' : ''}`);
-      } finally { menuAISaving = false; menuSaveBusy('add', false); }
+      } catch(error) { showSmsToast('Chưa lưu được món',error.message); } finally { menuAISaving = false; menuSaveBusy('add', false); }
     }
 
     function openQuickRestockModal(itemId) {
-      const item = menu.find(m => m.id === itemId);
+      const item = menu.find(m => String(m.id) === String(itemId));
       if (!item) return;
 
       document.getElementById('quick-restock-id').value = item.id;
@@ -10430,58 +10489,39 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       document.getElementById('quick-restock-modal').style.display = 'none';
     }
 
-    function executeQuickRestock() {
-      const id = parseInt(document.getElementById('quick-restock-id').value, 10);
-      const qty = parseInt(document.getElementById('quick-restock-qty').value, 10);
-      const item = menu.find(m => m.id === id);
-      if (!item || isNaN(qty) || qty <= 0) return;
-
-      item.stock = (item.stock || 0) + qty;
-      item.isAvailable = true;
-      saveLocalData();
-      broadcastMeshEvent('MENU_UPDATE', { menu });
-
-      fetch('/api/menu', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(menu)
-      }).catch(() => {});
-
-      closeQuickRestockModal();
-      renderAdminMenuTable();
-      renderCustomerProducts();
-      playSuccessChime();
-      showSmsToast("📦 NHẬP KHO THÀNH CÔNG!", `Đã thêm +${qty} ly cho món "${item.name}". Tổng tồn: ${item.stock} ly.`);
+    async function executeQuickRestock() {
+      if(menuOrderSaving)return;
+      const id=document.getElementById('quick-restock-id').value;
+      const qty=Number(document.getElementById('quick-restock-qty').value);
+      const item=menu.find(m=>String(m.id)===String(id));
+      if(!item||!Number.isSafeInteger(qty)||qty<=0){showSmsToast('Chưa nhập kho','Số lượng nhập phải là số nguyên lớn hơn 0.');return;}
+      const next={...item,stock:(Number(item.stock)||0)+qty,isAvailable:true};
+      if(!Number.isSafeInteger(next.stock)){showSmsToast('Chưa nhập kho','Số lượng tồn không hợp lệ.');return;}
+      if(!await saveOrderedMenu(menu.map(m=>String(m.id)===String(id)?next:m)))return;
+      closeQuickRestockModal();playSuccessChime();showSmsToast('Nhập kho thành công',next.name+' · '+next.stock);
     }
-
+    let pendingDeleteMenuId=null;
     function deleteMenuItem(itemId) {
-      const item = menu.find(m => String(m.id) === String(itemId));
-      if (!item) return;
-      if (!confirm(`Bạn có chắc chắn muốn xóa món "${item.name}" khỏi thực đơn không?`)) return;
-
-      localPendingItems.delete(itemId);
-      localPendingItems.delete(String(itemId));
-      localPendingItems.delete(Number(itemId));
-
-      menu = menu.filter(m => String(m.id) !== String(itemId));
-      lastMenuVersion = Date.now();
-      localStorage.setItem('duynh_menu_customized', 'true');
-      localStorage.setItem('duynh_custom_menu_backup', JSON.stringify(menu));
-      saveLocalData();
-      try { localStorage.setItem('duynh_menu_version', String(lastMenuVersion)); } catch(e) {}
-
-      broadcastMeshEvent('MENU_UPDATE', { menu, menuVersion: lastMenuVersion });
+      if(menuOrderSaving)return;
+      const item=menu.find(m=>String(m.id)===String(itemId));if(!item)return;
+      pendingDeleteMenuId=String(item.id);
+      document.getElementById('delete-menu-name').textContent=item.name;
+      document.getElementById('delete-menu-modal').style.display='flex';
+    }
+    function closeDeleteMenuModal() {
+      if(menuOrderSaving)return;
+      pendingDeleteMenuId=null;document.getElementById('delete-menu-modal').style.display='none';
+    }
+    async function confirmDeleteMenuItem() {
+      if(menuOrderSaving||pendingDeleteMenuId===null)return;
+      const id=pendingDeleteMenuId;
+      if(!menu.some(m=>String(m.id)===id)){closeDeleteMenuModal();return;}
+      const button=document.getElementById('delete-menu-confirm');button.disabled=true;
       try {
-        fetch(getCloudApiUrl('/api/menu'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(menu)
-        }).catch(() => {});
-      } catch(e) {}
-
-      renderAdminMenuTable();
-      renderCustomerProducts();
-      showSmsToast("🗑️ ĐÃ XÓA MÓN", `Món "${item.name}" đã được xóa khỏi hệ thống.`);
+        if(!await saveOrderedMenu(menu.filter(m=>String(m.id)!==id)))return;
+        for(const key of Array.from(localPendingItems.keys()))if(String(key)===id)localPendingItems.delete(key);
+        closeDeleteMenuModal();showSmsToast('Đã xóa món','Thực đơn đã được lưu và đồng bộ.');
+      } finally {button.disabled=false;}
     }
 
     async function saveStoreSettings() {

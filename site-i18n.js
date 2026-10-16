@@ -6,6 +6,26 @@
 })(function () {
   'use strict';
   const catalog = {
+  "Hủy": "Cancel",
+  "Tùy chọn món: Đá, độ ngọt và topping": "Item options: ice, sweetness and toppings",
+  "Để trống nhóm nếu món không cho khách chọn. Giá topping được cộng theo từng ly.": "Leave a group empty to disable it. Topping prices are added per drink.",
+  "Mức đá": "Ice level",
+  "Độ ngọt": "Sweetness",
+  "Topping": "Toppings",
+  "+ Thêm lựa chọn": "+ Add option",
+  "Tên tiếng Việt": "Vietnamese name",
+  "Tên tiếng Anh": "English name",
+  "Giá cộng thêm (đ)": "Extra price (VND)",
+  "Xóa lựa chọn": "Remove option",
+  "Mỗi nhóm tối đa 20 lựa chọn.": "Each group allows up to 20 options.",
+  "Xóa món khỏi thực đơn": "Remove item from menu",
+  "Bạn muốn xóa món này?": "Remove this item?",
+  "Xác nhận xóa món": "Confirm item removal",
+  "Chưa nhập kho": "Restock not saved",
+  "Nhập kho thành công": "Restock saved",
+  "Đã xóa món": "Item removed",
+  "Thực đơn đã được lưu và đồng bộ.": "The menu has been saved and synchronized.",
+
   "Lưu thay đổi ·": "Save changes ·",
   "Đọc được trên biên lai:": "Read from receipt:",
   "Đang lưu món...": "Saving item...",
