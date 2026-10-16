@@ -25,6 +25,12 @@ test('request limiter bounds retries and unsuccessful requests are not cached',a
  for(let i=0;i<5;i++)await assert.rejects(ai.generate({name:'Tea'}));
  await assert.rejects(ai.generate({name:'Tea'}),/một phút/);assert.equal(count,5);
 });
+test('Google overload falls back once to free Flash-Lite with the same deadline',async()=>{
+ const calls=[];const ai=createMenuAI({env:{GEMINI_API_KEY:'test'},fetchImpl:async(u,o)=>{calls.push({u,o});return calls.length===1?{ok:false,status:503}:success();}});
+ assert.deepEqual(await ai.generate({name:'Trà xoài'}),output);
+ assert.equal(calls.length,2);assert.match(calls[1].u,/gemini-2\.5-flash-lite:generateContent$/);
+ assert.equal(calls[0].o.signal,calls[1].o.signal);
+});
 function client(){
  const elements={};for(const field of ['name','name-en','desc','desc-en','image-url','ai-status','ai-manual'])elements['edit-menu-'+field]={value:'',textContent:'',style:{}};
  elements['edit-menu-name'].value='Trà xoài';elements['edit-menu-name-en'].value='Old Tea';
