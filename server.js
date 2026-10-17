@@ -20,8 +20,9 @@ const { createDelivery, protectOrderWrite, transition } = require('./delivery');
 const { createMenuAI } = require('./menu-ai');
 const menuAI = createMenuAI();
 const {validateOptions}=require('./menu-options');
-const {validateRecipe,createRecipeScanner}=require('./drink-recipes');
+const {validateRecipe,createRecipeScanner,createRecipeTranslator,recipeSourceHash}=require('./drink-recipes');
 const recipeScanner=createRecipeScanner();
+const recipeTranslator=createRecipeTranslator();
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const ROOT_DIR = __dirname;
@@ -972,6 +973,22 @@ const server = http.createServer(async (req, res) => {
       }
       return;
     }
+  }
+
+  if (pathname === '/api/drink-recipes/translate' && req.method === 'POST') {
+    res.setHeader('Cache-Control','no-store');
+    if (!adminPush.verify((req.headers.authorization || '').replace(/^Bearer /, ''))) {sendJson(res,401,{error:'Vui lòng đăng nhập quản trị để dịch công thức.'});return;}
+    try {
+      const body=await parseRequestBody(req),result=await recipeTranslator.translate(body);
+      // Persist a translation only while the exact saved source is still current.
+      const id=String(body.itemId || ''),recipes=readJsonFile(RECIPES_FILE,{});
+      const current=Object.hasOwn(recipes,id)?recipes[id]:null;
+      if(current && current.version===body.version && recipeSourceHash(current)===result.english.sourceHash){
+        writeJsonFile(RECIPES_FILE,{...recipes,[id]:{...current,english:result.english}});
+      }
+      sendJson(res,200,result);
+    } catch(error){sendJson(res,error.status || 503,{error:error.message});}
+    return;
   }
 
   if (pathname === '/api/drink-recipes/scan' && req.method === 'POST') {

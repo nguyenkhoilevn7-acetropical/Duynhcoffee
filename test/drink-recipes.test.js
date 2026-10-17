@@ -70,3 +70,23 @@ test('structured OCR separates actions, notes and quantities; numeric comma and 
  assert.equal(result.notes,'Dùng ngay sau khi pha\nKhông đun sôi');assert.doesNotMatch(result.notes,/cần kiểm tra/);
  assert.match(result.warnings[0],/dòng 3/);assert.equal(body.generationConfig.responseSchema.properties.steps.type,'ARRAY');
 });
+const {createRecipeTranslator,recipeSourceHash}=require('../drink-recipes');
+const enValue={ingredients:[{name:'Jasmine tea',unit:'ml'},{name:'Sugar',unit:'g'}],steps:'1. Brew tea\n2. Shake with ice',notes:'Sugar to customer preference',custom:'50% ice • 50% sugar'};
+test('English translation preserves quantities, uses cache, saves with matching source and invalidates edited Vietnamese',async()=>{
+ let count=0;
+ const translator=createRecipeTranslator({env:{GEMINI_API_KEY:'private'},fetchImpl:async()=>{count++;return candidate(enValue);}});
+ const input={recipe,custom:'50% đá • 50% đường'};
+ const [a,b]=await Promise.all([translator.translate(input),translator.translate(input)]);assert.deepEqual(a,b);assert.equal(count,1);
+ await translator.translate(input);assert.equal(count,1);
+ assert.equal(a.english.sourceHash,recipeSourceHash(recipe));
+ const saved=validateRecipe({...recipe,english:a.english});assert.equal(saved.english.ingredients[0].name,'Jasmine tea');assert.equal(saved.ingredients[0].amount,120);
+ assert.equal(validateRecipe({...saved,notes:'Đã đổi lưu ý'}).english,undefined);
+ const changed={...recipe,ingredients:recipe.ingredients.map((r,i)=>({...r,amount:i?13:120}))};assert.equal(validateRecipe({...changed,english:a.english}).english,undefined);
+});
+test('translation refuses modified times, incomplete ingredient rows and changed customer percentages',async()=>{
+ for(const value of [{...enValue,steps:'1. Brew tea for 10 minutes\n2. Shake with ice'},{...enValue,ingredients:[]},{...enValue,custom:'100% ice • 50% sugar'}]){
+  const translator=createRecipeTranslator({env:{GEMINI_API_KEY:'private'},fetchImpl:async()=>candidate(value)});
+  await assert.rejects(translator.translate({recipe,custom:'50% đá • 50% đường'}),/khác số liệu/);
+ }
+ await assert.rejects(createRecipeTranslator({env:{}}).translate({recipe}),/Chưa cấu hình/);
+});

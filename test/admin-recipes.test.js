@@ -8,7 +8,7 @@ function client(saved=recipe){
  const dom=new JSDOM('<button id="open">Mở món</button>',{url:'https://example.test',runScripts:'outside-only'}),w=dom.window;
  w.isUserAdmin=()=>true;w.menu=[{id:1,name:'Cafe Trứng Mom'}];w.getCloudApiUrl=p=>p;w.confirm=()=>true;w.AbortSignal.timeout=()=>undefined;
  const writes=[];
- w.fetch=async(url,opts)=>{if(opts.method==='POST'){writes.push(JSON.parse(opts.body));return {ok:true,json:async()=>({recipe:{...JSON.parse(opts.body).recipe,version:'v2'},backup:{connected:false}})};}return {ok:true,json:async()=>({recipe:saved})};};
+ w.fetch=async(url,opts)=>{if(opts.method==='POST'){writes.push(JSON.parse(opts.body));return {ok:true,json:async()=>({recipe:{...JSON.parse(opts.body).recipe,version:'v2'},backup:{connected:false}})};}return {ok:true,json:async()=>({recipe:JSON.parse(JSON.stringify(saved))})};};
  w.eval(code);return {dom,w,writes,el:id=>w.document.getElementById(id)};
 }
 test('recipe steps retain decimals and words, remove old numbering and support inline step markers',()=>{
@@ -81,5 +81,38 @@ test('upload stays disabled if recipe load fails, avoiding overwriting an unseen
  const c=client();try{
   c.w.fetch=async()=>({ok:false,json:async()=>({error:'Không kết nối được'})});
   await c.w.openDrinkRecipe(1);assert.equal(c.el('recipe-upload-open').disabled,true);assert.equal(c.el('recipe-file'),null);
+ }finally{c.dom.window.close();}
+});
+const englishRecipe={sourceHash:'test',ingredients:[{name:'Coffee',unit:'ml'}],steps:'Prepare 2.5 g of powder.\nPour the coffee\nAdd milk',notes:'Serve immediately\nDo not boil'};
+const settle=async predicate=>{for(let i=0;i<30;i++){if(predicate())return;await new Promise(r=>setImmediate(r));}throw Error('UI did not settle');};
+test('VI/EN translates ingredients, steps, notes and customer requests, while upload and quantities remain available',async()=>{
+ const c=client();try{
+  await c.w.openDrinkRecipe(1,2,'50% (ít đá) • 50% (ít ngọt)');let calls=0;
+  c.w.fetch=async(url,opts)=>{assert.match(url,/\/translate$/);calls++;return {ok:true,json:async()=>({english:englishRecipe,custom_en:'50% (less ice) • 50% (less sweet)'})};};
+  c.el('recipe-lang-en').click();await settle(()=>c.el('recipe-lang-en').getAttribute('aria-pressed')==='true');
+  assert.match(c.el('recipe-content').textContent,/Coffee/);assert.match(c.el('recipe-content').textContent,/60 ml/);
+  assert.equal(c.el('recipe-content').querySelectorAll('.recipe-steps li').length,3);assert.match(c.el('recipe-notices').textContent,/less ice/);assert.match(c.el('recipe-notices').textContent,/Do not boil/);
+  assert.match(c.el('recipe-upload-open').textContent,/Upload recipe photo/);
+  c.el('recipe-lang-vi').click();assert.match(c.el('recipe-notices').textContent,/ít đá/);
+  c.el('recipe-lang-en').click();assert.equal(calls,1);
+  c.el('recipe-upload-open').click();assert.ok(c.el('recipe-file'));assert.equal(c.el('recipe-steps').value,'1. Chuẩn bị 2.5 g bột.\n2. Rót cà phê\n3. Thêm sữa');
+ }finally{c.dom.window.close();}
+});
+test('failed or late English translations preserve the Vietnamese source and cannot overwrite a reopened recipe',async()=>{
+ const c=client();try{
+  await c.w.openDrinkRecipe(1);c.w.fetch=async()=>({ok:false,json:async()=>({error:'Quota'})});
+  c.el('recipe-lang-en').click();await settle(()=>c.el('recipe-message').textContent==='Quota');assert.match(c.el('recipe-content').textContent,/Cà phê/);
+  let finish;c.w.fetch=()=>new Promise(r=>{finish=r;});c.el('recipe-lang-en').click();
+  c.el('recipe-close').click();c.w.fetch=async()=>({ok:true,json:async()=>({recipe})});await c.w.openDrinkRecipe(1);
+  finish({ok:true,json:async()=>({english:englishRecipe,custom_en:''})});await new Promise(r=>setImmediate(r));
+  assert.match(c.el('recipe-content').textContent,/Cà phê/);assert.equal(c.el('recipe-lang-vi').getAttribute('aria-pressed'),'true');
+ }finally{c.dom.window.close();}
+});
+test('saved English opens without a new AI request and follows the site language selector',async()=>{
+ const c=client({...recipe,english:englishRecipe});try{
+  c.w.document.documentElement.lang='en';await c.w.openDrinkRecipe(1);
+  assert.match(c.el('recipe-content').textContent,/Coffee/);assert.equal(c.el('recipe-lang-en').getAttribute('aria-pressed'),'true');
+  c.w.document.documentElement.lang='vi';await settle(()=>c.el('recipe-lang-vi').getAttribute('aria-pressed')==='true');
+  assert.match(c.el('recipe-content').textContent,/Cà phê/);
  }finally{c.dom.window.close();}
 });
