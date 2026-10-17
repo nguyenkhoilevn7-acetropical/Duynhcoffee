@@ -56,3 +56,8 @@ test('client sends selected toppings and compares the same 53000 payable amount'
  f.s.cart[0].toppings=[{id:'Trân Châu Trắng',price:8000}];assert.equal((await f.run(53000)).isValid,true);
  const legacy=setup(()=>response(complete('base-price-only')));const result=await legacy.run(53000);assert.equal(result.isValid,false);assert.equal(result.verificationToken,undefined);
 });
+
+test('client timing keeps server OCR and queue timing distinct from request duration',async()=>{
+ const f=setup(({advance})=>{advance(1400);const job=complete('timed');job.queueMs=300;job.result.processingMs=900;return response(job);});
+ const r=await f.run();assert.equal(r.scanTiming.serverMs,900);assert.equal(r.scanTiming.queueMs,300);assert.equal(r.scanTiming.requestMs,1400);assert.equal(r.scanTiming.reusedJob,true);assert.equal(r.isValid,true);
+});

@@ -23,7 +23,7 @@ function createReceiptJobs({ verify, now = Date.now }) {
   function snapshot(job) {
     if (!job) return null;
     const result = { status: job.status, jobId: job.id };
-    if (job.status === 'complete') result.result = job.result;
+    if (job.status === 'complete') { result.result = job.result; result.queueMs = Math.max(0, job.startedAt - job.createdAt); }
     if (job.status === 'error') result.error = job.error;
     return result;
   }
@@ -31,6 +31,7 @@ function createReceiptJobs({ verify, now = Date.now }) {
     try {
       while (queue.length) {
         const job = queue.shift();
+        job.startedAt = now();
         try {
           job.result = await verify(job.body);
           job.status = 'complete';
@@ -58,7 +59,7 @@ function createReceiptJobs({ verify, now = Date.now }) {
     if ([...jobs.values()].filter(job => job.status === 'pending').length >= 3) {
       throw new Error('Máy chủ đang đọc nhiều biên lai. Vui lòng thử lại sau.');
     }
-    const job = { id: crypto.randomBytes(24).toString('hex'), key, body, status: 'pending' };
+    const job = { id: crypto.randomBytes(24).toString('hex'), key, body, status: 'pending', createdAt:now() };
     jobs.set(job.id, job);
     keys.set(key, job.id);
     queue.push(job);

@@ -21,7 +21,8 @@ test('serializes OCR, deduplicates retries, and exposes no uploaded input', asyn
   releases.shift()({ isValid: true });
   await tick();
   assert.deepEqual(calls, ['private-one', 'private-two']);
-  assert.deepEqual(jobs.get(first.jobId), { jobId: first.jobId, status: 'complete', result: { isValid: true } });
+  const finished=jobs.get(first.jobId);assert.ok(Number.isFinite(finished.queueMs) && finished.queueMs>=0);
+  assert.deepEqual({...finished,queueMs:undefined}, { jobId: first.jobId, status: 'complete', result: { isValid: true },queueMs:undefined });
   assert.equal(jobs.start({}, 'key-one').jobId, first.jobId);
   releases.shift()({ isValid: false });
   await tick();
@@ -85,4 +86,10 @@ test('failed OCR is readable and does not stop the queue', async () => {
   assert.equal(jobs.get(retried.jobId).status, 'complete');
   assert.equal(jobs.get(failed.jobId).status, 'error');
   assert.throws(() => jobs.start({}, ''), /Validated receipt key/);
+});
+
+test('queue timing measures waiting independently of recognition time',async()=>{
+ let clock=0;const releases=[];const jobs=createReceiptJobs({now:()=>clock,verify:()=>new Promise(resolve=>releases.push(resolve))});
+ const first=jobs.start({},'first');await tick();clock=10;const second=jobs.start({},'second');clock=110;releases.shift()({processingMs:110});await tick();clock=120;releases.shift()({processingMs:10});await tick();
+ assert.equal(jobs.get(first.jobId).queueMs,0);assert.equal(jobs.get(second.jobId).queueMs,100);assert.equal(jobs.get(second.jobId).result.processingMs,10);
 });

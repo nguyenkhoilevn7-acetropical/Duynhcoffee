@@ -6,6 +6,7 @@
 })(function () {
   'use strict';
   const catalog = {
+  "Đang nhận dạng chữ và đối chiếu thông tin biên lai...": "Reading text and checking receipt details...",
   "ĐÃ ĐỐI CHIẾU: KHỚP TÊN VÀ SỐ TIỀN TRÊN BIÊN LAI": "CHECKED: RECIPIENT AND AMOUNT MATCH THE RECEIPT",
   "ĐÃ KHỚP TÊN VÀ SỐ TIỀN TRÊN BIÊN LAI": "RECIPIENT AND AMOUNT MATCH THE RECEIPT",
   "Thử lại thông tin thanh toán": "Retry payment details",
