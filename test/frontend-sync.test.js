@@ -49,7 +49,7 @@ test('banner retains its slide and timer on identical sync, changes when banner 
   const box={classList:{add(){},remove(){}}};
   const s={window:{},document:{getElementById:id=>id==='frontend-hero-banner'?box:id==='hero-banner-image-container'?container:null},
     bannerSlideTimer:null,bannerActiveSlideIndex:0,config:{images:['a','b'],autoplaySpeed:3.5},
-    getBannerConfig(){return s.config;},bannerMediaHtml:()=>'',activateBannerMedia(){s.bannerSlideTimer=++starts;},setInterval(){starts++;return starts;},clearTimeout(){stops++;},clearInterval(){stops++;},nextFrontendBannerSlide(){}};
+    orderText:String,getBannerConfig(){return s.config;},setInterval(){starts++;return starts;},clearTimeout(){stops++;},clearInterval(){stops++;},nextFrontendBannerSlide(){}};
   vm.createContext(s);
   vm.runInContext(html.slice(html.indexOf('    function renderFrontendBanner()'),html.indexOf('    function goToFrontendBannerSlide')),s);
   s.renderFrontendBanner();s.bannerActiveSlideIndex=1;s.renderFrontendBanner();

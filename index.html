@@ -3736,7 +3736,7 @@ body {
             <!-- UPLOAD NHIỀU HÌNH ẢNH QUẢNG CÁO (TỐI ĐA 20 TẤM) -->
             <div class="form-group" style="margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 14px;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <label style="margin: 0; font-weight: 700;">Ảnh & video quảng cáo Banner:</label>
+                <label style="margin: 0; font-weight: 700;">Hình ảnh quảng cáo Banner:</label>
                 <span id="banner-images-count-badge" style="font-size: 0.78rem; font-weight: 700; color: #166534; background: #DCFCE7; padding: 2px 8px; border-radius: 999px;">0/20 tấm</span>
               </div>
               
@@ -3762,16 +3762,15 @@ body {
                 </div>
               </div>
 <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap;">
-                <input type="file" id="banner-setting-image-file" accept="image/*,video/mp4,video/webm" multiple style="display: none;" onchange="handleBannerMultiImageUpload(event)">
+                <input type="file" id="banner-setting-image-file" accept="image/*" multiple style="display: none;" onchange="handleBannerMultiImageUpload(event)">
                 <button type="button" class="btn-card-buy" style="padding: 9px 15px; font-size: 0.84rem; display: inline-flex; align-items: center; gap: 6px;" onclick="document.getElementById('banner-setting-image-file').click()">
-                  <span>📸</span> <span>Tải ảnh / video từ máy (Tối đa 20)</span>
+                  <span>📸</span> <span>Tải nhiều ảnh từ máy / ĐT (Tối đa 20)</span>
                 </button>
                 <button type="button" class="nav-btn" style="padding: 8px 12px; font-size: 0.78rem; background: #FEE2E2; color: #DC2626; border-color: #FECACA;" onclick="clearAllBannerImages()" title="Xóa toàn bộ ảnh banner">
                   🗑️ Xóa tất cả ảnh
                 </button>
               </div>
 
-              <p style="font-size:0.8rem;color:var(--text-muted)">Video MP4/WebM khoảng 10 giây (tối đa 15 giây, 4 MB/clip; tổng video 6 MB). Tự phát không tiếng, có nút bật tiếng. Bấm Lưu để đồng bộ.</p>
               <!-- DÁN LINK ẢNH THÊM VÀO -->
               <div style="display: flex; gap: 6px; margin-bottom: 10px;">
                 <input type="text" id="banner-setting-image-url-input" class="form-control" placeholder="Hoặc dán URL ảnh món nước (https://...) rồi bấm Thêm" style="flex: 1; height: 38px; font-size: 0.84rem;">
@@ -10798,9 +10797,12 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     let previewActiveSlideIndex = 0;
     let previewSlideTimer = null;
 
+    function bannerImagesOnly(banner) {
+      return { ...banner, images: Array.isArray(banner?.images) ? banner.images.filter(source => typeof source === 'string' && !/^data:video\/|^blob:|\.(?:mp4|webm|mov)(?:[?#]|$)/i.test(source)) : [] };
+    }
     function getBannerConfig() {
       // Cấu hình vừa nhận từ server là nguồn chính, kể cả danh sách ảnh rỗng.
-      if (storeConfig && storeConfig.banner && Array.isArray(storeConfig.banner.images)) return storeConfig.banner;
+      if (storeConfig && storeConfig.banner && Array.isArray(storeConfig.banner.images)) return bannerImagesOnly(storeConfig.banner);
       // Bản cục bộ chỉ là dự phòng trước khi nhận cấu hình máy chủ.
       let customBanner = null;
       try {
@@ -10810,12 +10812,12 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       if (customBanner && Array.isArray(customBanner.images) && customBanner.images.length > 0) {
         if (!storeConfig) storeConfig = {};
         storeConfig.banner = customBanner;
-        return customBanner;
+        return bannerImagesOnly(customBanner);
       }
 
       // Ưu tiên 2: Đọc từ storeConfig.banner nếu hợp lệ
       if (storeConfig && storeConfig.banner && Array.isArray(storeConfig.banner.images) && storeConfig.banner.images.length > 0) {
-        return storeConfig.banner;
+        return bannerImagesOnly(storeConfig.banner);
       }
 
       // Mặc định ban đầu nếu chưa từng thiết lập:
@@ -10832,7 +10834,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         autoplaySpeed: "3.5",
         images: [...DEFAULT_BANNER_PRESETS]
       };
-      return storeConfig.banner;
+      return bannerImagesOnly(storeConfig.banner);
     }
 
     // Nạp banner quảng cáo mẫu 1 chạm cho chủ quán
@@ -10916,8 +10918,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         const sliderKey = JSON.stringify([images, b.transitionEffect || 'fade', Number(b.autoplaySpeed) || 3.5]);
         if (imgContainer._sliderKey === sliderKey) return;
         imgContainer._sliderKey = sliderKey;
-        if (bannerSlideTimer) { clearTimeout(bannerSlideTimer); bannerSlideTimer = null; }
-        imgContainer.querySelectorAll?.('video').forEach(video => video.pause());
+        if (bannerSlideTimer) { clearInterval(bannerSlideTimer); bannerSlideTimer = null; }
         if (images.length > 0) {
           bannerBox.classList.add('has-ad-image');
           imgContainer.style.display = 'block';
@@ -10930,7 +10931,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
               <div class="hero-slider-track" id="frontend-slider-track">
                 ${images.map((img, idx) => `
                   <div class="hero-slider-slide ${idx === 0 ? 'active' : ''}" data-index="${idx}">
-                    ${bannerMediaHtml(img, idx, idx === 0)}
+                    <img ${idx === 0 ? `src="${orderText(img)}"` : ''} decoding="async" alt="Quảng cáo ${idx + 1}">
                   </div>
                 `).join('')}
               </div>
@@ -10946,7 +10947,13 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
             </div>
           `;
 
-          activateBannerMedia();
+          // Bật tự động chuyển ảnh nếu có từ 2 tấm trở lên
+          if (images.length > 1) {
+            const speedMs = (Number(b.autoplaySpeed) || 3.5) * 1000;
+            bannerSlideTimer = setInterval(() => {
+              nextFrontendBannerSlide();
+            }, speedMs);
+          }
         } else {
           bannerBox.classList.remove('has-ad-image');
           imgContainer.style.display = 'none';
@@ -10987,8 +10994,21 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       const dots = document.querySelectorAll('#frontend-banner-slider .hero-slider-dot');
       const track = document.getElementById('frontend-slider-track');
 
-      slides.forEach((slide, idx) => slide.classList.toggle('active', idx === bannerActiveSlideIndex));
-      activateBannerMedia();
+      const images = getBannerConfig().images || [];
+      slides.forEach((s, idx) => {
+        const img = s.querySelector('img');
+        if (idx === bannerActiveSlideIndex && img && img.getAttribute('src') !== images[idx]) img.src = images[idx];
+        s.classList.toggle('active', idx === bannerActiveSlideIndex);
+      });
+      // Release hidden image resources after the transition, rather than decoding every banner at once.
+      if (track) {
+        clearTimeout(track._releaseTimer);
+        track._releaseTimer = setTimeout(() => {
+          slides.forEach((s, idx) => {
+            if (idx !== bannerActiveSlideIndex) s.querySelector('img')?.removeAttribute('src');
+          });
+        }, 800);
+      }
       dots.forEach((d, idx) => {
         d.classList.toggle('active', idx === bannerActiveSlideIndex);
       });
@@ -11046,82 +11066,28 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     }
     window.loadBannerSettingsToAdmin = loadBannerSettingsToAdmin;
 
-    function isBannerVideo(src) { return /^data:video\/(mp4|webm);base64,/i.test(String(src)); }
-    function bannerMediaHtml(src, index, active = true, preview = false) {
-      const safe = orderText(src);
-      if (isBannerVideo(src)) return `<video ${active ? `src="${safe}"` : ''} data-banner-video="1" muted playsinline controls preload="none" aria-label="Video quảng cáo ${index + 1}" style="width:100%;height:100%;object-fit:cover"></video>`;
-      return `<img ${active ? `src="${safe}"` : ''} decoding="async" alt="Quảng cáo ${index + 1}">`;
-    }
-    function activateBannerMedia(preview = false) {
-      const root = document.getElementById(preview ? 'preview-slider-track' : 'frontend-slider-track');
-      if (!root) return;
-      const images = preview ? bannerUploadedImages : getBannerConfig().images || [];
-      const index = preview ? previewActiveSlideIndex : bannerActiveSlideIndex;
-      const advance = preview ? nextPreviewSlide : nextFrontendBannerSlide;
-      if (preview) clearTimeout(previewSlideTimer); else clearTimeout(bannerSlideTimer);
-      const setTimer = ms => { const timer = setTimeout(advance, ms); if (preview) previewSlideTimer = timer; else bannerSlideTimer = timer; };
-      root.querySelectorAll('.hero-slider-slide').forEach((slide, i) => {
-        const media = slide.querySelector('img,video');
-        if (!media) return;
-        if (i !== index) {
-          if (media.tagName === 'VIDEO') { media.pause(); media.onended = media.onerror = null; }
-          media.removeAttribute('src');
-        } else {
-          if (media.getAttribute('src') !== images[i]) media.setAttribute('src', images[i]);
-          if (media.tagName === 'VIDEO') {
-            media.muted = true; media.loop = images.length === 1; media.currentTime = 0;
-            media.onended = () => { if (images.length > 1) advance(); };
-            media.onerror = () => { if (images.length > 1) setTimer(2000); };
-            media.play()?.catch(() => {}); // Native controls remain usable if autoplay is unavailable.
-          }
-        }
-      });
-      if (images.length > 1 && !isBannerVideo(images[index])) {
-        const speed = preview ? Number(document.getElementById('banner-setting-speed')?.value) : Number(getBannerConfig().autoplaySpeed);
-        setTimer((speed || 3.5) * 1000);
-      }
-    }
-    async function readBannerVideo(file) {
-      if (!['video/mp4','video/webm'].includes(file.type)) throw new Error('Video cần định dạng MP4 hoặc WebM.');
-      if (file.size > 4 * 1024 * 1024) throw new Error('Video vượt 4 MB. Anh xuất clip 720p khoảng 10 giây rồi tải lại nhé.');
-      const url = URL.createObjectURL(file), video = document.createElement('video');
-      try {
-        video.preload = 'metadata';
-        await new Promise((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error('Không đọc được thời lượng video.')), 12000);
-          video.onloadedmetadata = () => { clearTimeout(timer); resolve(); };
-          video.onerror = () => { clearTimeout(timer); reject(new Error('Không đọc được video. Hãy thử MP4 H.264.')); };
-          video.src = url;
-        });
-        if (!Number.isFinite(video.duration) || video.duration <= 0 || video.duration > 15.1) throw new Error('Video banner cần dài tối đa 15 giây.');
-        return await new Promise((resolve,reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error('Không tải được video.')); reader.readAsDataURL(file); });
-      } finally { video.onloadedmetadata = video.onerror = null; video.removeAttribute('src'); URL.revokeObjectURL(url); }
-    }
-    // UPLOAD NHIỀU ẢNH / VIDEO (TỐI ĐA 20)
-
+    // UPLOAD NHIỀU ẢNH (TỐI ĐA 20 TẤM)
     let bannerUploadBusy = false;
     async function handleBannerMultiImageUpload(e) {
       if (bannerUploadBusy) return;
       const files = Array.from(e.target.files || []); e.target.value = '';
       if (!files.length) return;
+      if (files.some(file => !file.type.startsWith('image/') || /\.(mp4|webm|mov)$/i.test(file.name || ''))) {
+        showSmsToast('⚠️ CHỈ NHẬN ẢNH', 'Banner hiện chỉ hỗ trợ hình ảnh để giữ trang tải nhanh.'); return;
+      }
+      if (bannerUploadedImages.length >= 20) { showSmsToast('⚠️ ĐÃ ĐỦ ẢNH', 'Banner tối đa 20 hình ảnh.'); return; }
       bannerUploadBusy = true;
-      showSmsToast('⏳ ĐANG TẢI', 'Đang xử lý ảnh / video banner...');
+      showSmsToast('⏳ ĐANG TẢI & NÉN ẢNH', 'Đang tối ưu ảnh banner...');
       try {
-        for (const file of files) {
-          if (bannerUploadedImages.length >= 20) throw new Error('Banner đã đủ 20 ảnh / video. Hãy xóa bớt trước khi tải thêm.');
-          let source;
-          if (file.type.startsWith('video/')) {
-            source = await readBannerVideo(file);
-            const videoBytes = bannerUploadedImages.filter(isBannerVideo).reduce((n,src) => n + src.length * 0.75, 0);
-            if (videoBytes + file.size > 6 * 1024 * 1024) throw new Error('Tổng video tối đa 6 MB để giữ website tải nhanh.');
-          } else {
-            if (!file.type.startsWith('image/')) throw new Error('Chỉ nhận ảnh, video MP4 hoặc WebM.');
-            source = await new Promise(resolve => compressImageFile(file, 750, 0.72, resolve));
-            if (!source) throw new Error('Không đọc được ảnh.');
-          }
+        // Decode one image at a time to bound peak memory on phones.
+        for (const file of files.slice(0, 20 - bannerUploadedImages.length)) {
+          const source = await new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('Không đọc được ảnh. Hãy thử ảnh JPG hoặc PNG khác.')), 15000);
+            compressImageFile(file, 750, 0.72, result => { clearTimeout(timer); result ? resolve(result) : reject(new Error('Không đọc được ảnh.')); });
+          });
           bannerUploadedImages.push(source);
         }
-        showSmsToast('✅ ĐÃ TẢI', 'Bấm Lưu banner để cập nhật lên website.');
+        showSmsToast('📸 ĐÃ TẢI ẢNH', 'Bấm Lưu banner để đồng bộ lên website.');
       } catch (error) { showSmsToast('⚠️ CHƯA TẢI XONG', error.message); }
       finally { bannerUploadBusy = false; renderBannerThumbnailsGrid(); updateBannerLivePreview(); }
     }
@@ -11131,6 +11097,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       const urlInp = document.getElementById('banner-setting-image-url-input');
       if (!urlInp) return;
       const url = urlInp.value.trim();
+      if (bannerImagesOnly({images:[url]}).images.length === 0) { showSmsToast('⚠️ CHỈ NHẬN ẢNH', 'Banner hiện chỉ hỗ trợ hình ảnh để giữ trang tải nhanh.'); return; }
       if (!url) {
         alert("Vui lòng dán đường link ảnh hợp lệ!");
         return;
@@ -11188,7 +11155,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
       container.innerHTML = bannerUploadedImages.map((img, idx) => `
         <div style="position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; border: 1.5px solid #CBD5E1; box-shadow: 0 1px 4px rgba(0,0,0,0.06); background: #FFF;">
-          ${isBannerVideo(img) ? `<span style="display:grid;place-items:center;height:100%;background:#18351d;color:white">▶ Video</span>` : `<img src="${orderText(img)}" alt="Ảnh ${idx + 1}" style="width:100%;height:100%;object-fit:cover">`}
+          <img src="${orderText(img)}" alt="Ảnh ${idx + 1}" style="width: 100%; height: 100%; object-fit: cover;">
           <span style="position: absolute; bottom: 2px; left: 3px; background: rgba(0,0,0,0.65); color: #FFF; font-size: 0.6rem; font-weight: 700; padding: 1px 4px; border-radius: 4px;">#${idx + 1}</span>
           <button type="button" onclick="removeBannerImageAt(${idx})" style="position: absolute; top: 2px; right: 2px; background: #DC2626; color: #FFF; border: none; width: 18px; height: 18px; border-radius: 50%; font-size: 0.65rem; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Xóa ảnh này">✕</button>
         </div>
@@ -11217,7 +11184,6 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       if (previewSlideTimer) clearInterval(previewSlideTimer);
       previewActiveSlideIndex = 0;
 
-      previewBox.querySelectorAll('video').forEach(video => video.pause());
       previewBox.innerHTML = `
         <div class="duynh-hero-banner ${hasImg ? 'has-ad-image' : ''}" style="margin: 0; box-shadow: 0 4px 14px rgba(0,0,0,0.1);">
           <div class="duynh-hero-content" style="${hasImg ? 'align-items: flex-start; text-align: left;' : 'align-items: center; text-align: center;'}">
@@ -11249,7 +11215,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
                 <div class="hero-slider-track" id="preview-slider-track">
                   ${images.map((img, idx) => `
                     <div class="hero-slider-slide ${idx === 0 ? 'active' : ''}" data-index="${idx}">
-                      ${bannerMediaHtml(img, idx, idx === 0, true)}
+                      <img src="${orderText(img)}" alt="Preview ${idx + 1}">
                     </div>
                   `).join('')}
                 </div>
@@ -11268,7 +11234,9 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         </div>
       `;
 
-      activateBannerMedia(true);
+      if (images.length > 1) {
+        previewSlideTimer = setInterval(nextPreviewSlide, speed * 1000);
+      }
     }
     window.updateBannerLivePreview = updateBannerLivePreview;
 
@@ -11283,7 +11251,6 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       const track = document.getElementById('preview-slider-track');
 
       slides.forEach((s, i) => s.classList.toggle('active', i === previewActiveSlideIndex));
-      activateBannerMedia(true);
       dots.forEach((d, i) => d.classList.toggle('active', i === previewActiveSlideIndex));
       if (effect === 'slide' && track) {
         track.style.transform = `translateX(-${previewActiveSlideIndex * 100}%)`;
@@ -11309,14 +11276,14 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
     function closeBannerReviewModal() {
       const modal = document.getElementById('banner-review-modal');
-      if (modal) { modal.querySelectorAll('video').forEach(video => video.pause()); modal.style.display = 'none'; }
+      if (modal) modal.style.display = 'none';
     }
     window.closeBannerReviewModal = closeBannerReviewModal;
 
     let bannerSaveBusy = false;
     async function saveBannerSettings() {
       if (bannerSaveBusy) return;
-      if (bannerUploadBusy) { showSmsToast('⏳ ĐANG TẢI', 'Chờ ảnh / video tải xong trước khi lưu.'); return; }
+      if (bannerUploadBusy) { showSmsToast('⏳ ĐANG TẢI', 'Chờ ảnh tải xong trước khi lưu.'); return; }
       const tagline = (document.getElementById('banner-setting-tagline')?.value || '').trim();
       const slogan = (document.getElementById('banner-setting-slogan')?.value || '').trim();
       const desc = (document.getElementById('banner-setting-desc')?.value || '').trim();
@@ -11366,7 +11333,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       broadcastMeshEvent('CONFIG_UPDATE', { config: { banner: updatedBanner }, configVersion: lastConfigVersion });
       playSuccessChime();
 
-      showSmsToast("💾 ĐÃ LƯU BANNER!", `Đã cập nhật Banner với ${bannerUploadedImages.length} ảnh / video quảng cáo & đồng bộ đa thiết bị.`);
+      showSmsToast("💾 ĐÃ LƯU BANNER!", `Đã cập nhật Banner với ${bannerUploadedImages.length} ảnh quảng cáo & đồng bộ đa thiết bị.`);
     }
     window.saveBannerSettings = saveBannerSettings;
 

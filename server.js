@@ -94,6 +94,14 @@ backupService = createBackup({
     if (localAdmin) configCache.adminAccount = localAdmin;
     discountsCache = data.discounts;
     rebrandMenuAndConfig();
+// Retire embedded clips from older saved settings before any public snapshot.
+function bannerImagesOnlyConfig(config) {
+  if (!Array.isArray(config?.banner?.images)) return config;
+  const images = config.banner.images.filter(src => typeof src === 'string' && !/^data:video\/|^blob:|\.(?:mp4|webm|mov)(?:[?#]|$)/i.test(src));
+  return images.length === config.banner.images.length ? config : {...config, banner:{...config.banner, images}};
+}
+const imageOnlyConfig = bannerImagesOnlyConfig(configCache);
+if (imageOnlyConfig !== configCache) { configCache = imageOnlyConfig; writeJsonFile(CONFIG_FILE, configCache); }
     menuVersion = configVersion = discountsVersion = Date.now();
     broadcastRealtime('FULL_SYNC', { menu: menuCache, config: configCache, discounts: discountsCache, orders: ordersCache });
   }
@@ -146,6 +154,14 @@ function rebrandMenuAndConfig() {
   if (configChanged) writeJsonFile(CONFIG_FILE,configCache);
 }
 rebrandMenuAndConfig();
+// Retire embedded clips from older saved settings before any public snapshot.
+function bannerImagesOnlyConfig(config) {
+  if (!Array.isArray(config?.banner?.images)) return config;
+  const images = config.banner.images.filter(src => typeof src === 'string' && !/^data:video\/|^blob:|\.(?:mp4|webm|mov)(?:[?#]|$)/i.test(src));
+  return images.length === config.banner.images.length ? config : {...config, banner:{...config.banner, images}};
+}
+const imageOnlyConfig = bannerImagesOnlyConfig(configCache);
+if (imageOnlyConfig !== configCache) { configCache = imageOnlyConfig; writeJsonFile(CONFIG_FILE, configCache); }
 
 const receiptVerifier = createReceiptVerifier({ readState: () => ({ menu: menuCache, config: configCache, discounts: discountsCache }) });
 const receiptJobs = createReceiptJobs({ verify: body => receiptVerifier.verify(body) });
@@ -158,17 +174,8 @@ setInterval(() => delivery.poll().catch(() => {}), 60000).unref();
 function mergeConfig(current, patch) {
   if (patch.banner !== undefined) {
     const images = patch.banner && patch.banner.images;
-    if (!Array.isArray(images) || images.length > 20 || images.some(src => typeof src !== 'string')) throw new Error('Banner cần tối đa 20 ảnh / video');
-    let videoBytes = 0;
-    for (const src of images) {
-      if (/^data:video\//i.test(src)) {
-        if (!/^data:video\/(mp4|webm);base64,[A-Za-z0-9+/=]+$/i.test(src)) throw new Error('Video cần định dạng MP4 hoặc WebM');
-        const bytes = Buffer.byteLength(src.split(',')[1], 'base64');
-        if (bytes > 4 * 1024 * 1024) throw new Error('Mỗi video tối đa 4 MB');
-        videoBytes += bytes;
-      }
-    }
-    if (videoBytes > 6 * 1024 * 1024 || Buffer.byteLength(JSON.stringify(patch.banner)) > 12 * 1024 * 1024) throw new Error('Banner quá lớn. Tổng video tối đa 6 MB');
+    if (!Array.isArray(images) || images.length > 20 || images.some(src => typeof src !== 'string')) throw Object.assign(new Error('Banner cần tối đa 20 hình ảnh'), {status:422});
+    if (images.some(src => /^data:video\/|^blob:|\.(?:mp4|webm|mov)(?:[?#]|$)/i.test(src))) throw Object.assign(new Error('Banner hiện chỉ hỗ trợ hình ảnh để giữ trang tải nhanh'), {status:422});
   }
   return { ...current, ...patch,
     bankConfig: { ...(current.bankConfig || {}), ...(patch.bankConfig || {}) },
@@ -459,7 +466,7 @@ function setupFileWatchers() {
       file: CONFIG_FILE,
       type: 'CONFIG_UPDATE',
       name: 'Cấu hình quán (store_config.json)',
-      reload: () => { configCache = readJsonFile(CONFIG_FILE, configCache); return configCache; }
+      reload: () => { configCache = bannerImagesOnlyConfig(readJsonFile(CONFIG_FILE, configCache)); return configCache; }
     },
     {
       file: DISCOUNTS_FILE,
@@ -939,7 +946,7 @@ const server = http.createServer(async (req, res) => {
   // 5. GET & POST /api/config
   if (pathname === '/api/config') {
     if (req.method === 'GET') {
-      configCache = readJsonFile(CONFIG_FILE, configCache);
+      configCache = bannerImagesOnlyConfig(readJsonFile(CONFIG_FILE, configCache));
       sendJson(res, 200, configCache);
       return;
     }
@@ -951,7 +958,7 @@ const server = http.createServer(async (req, res) => {
         broadcastRealtime('CONFIG_UPDATE', configCache);
         sendJson(res, 200, { success: true, config: configCache, configVersion, backup: backupService.status() });
       } catch (err) {
-        sendJson(res, 500, { error: err.message });
+        sendJson(res, err.status || 500, { error: err.message });
       }
       return;
     }
