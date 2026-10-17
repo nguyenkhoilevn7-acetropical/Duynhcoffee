@@ -3245,6 +3245,18 @@ body {
     .tracked-item-custom { color:#64748B; font-size:0.78rem; }
     .tracked-item-price { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; margin-top:4px; }
   </style>
+<style id="responsive-order-text-fix">
+/* Let real text and browser font scaling determine card height. */
+.product-info .product-name,.product-info .product-desc{display:block!important;-webkit-line-clamp:unset!important;line-clamp:unset!important;height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;white-space:normal!important;overflow-wrap:anywhere;line-height:1.5!important}
+.product-info .product-name{font-size:1rem!important}.product-info .product-desc{font-size:.875rem!important;margin-bottom:12px!important}
+.product-card{height:auto;min-width:0}.products-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
+.backend-orders-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr))}.backend-order-card{min-width:0;overflow-wrap:anywhere;height:auto!important}
+.backend-order-card button{height:auto!important;min-height:44px;max-height:none!important;white-space:normal!important;line-height:1.4!important;padding:10px 12px!important;overflow:visible!important}
+.backend-order-card>div:last-child{flex-wrap:wrap}.backend-order-card>div:last-child>button{min-width:140px}
+.backend-order-card [style*="justify-content: space-between"]{flex-wrap:wrap;row-gap:8px}.backend-order-card [style*="white-space: nowrap"]{white-space:normal!important}
+.backend-order-card [style*="display: flex"]>div{min-width:0}.category-scroll-nav{flex-wrap:wrap!important;overflow:visible!important;white-space:normal!important;height:auto!important}
+@media(max-width:600px){.products-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.product-info .product-name{font-size:.92rem!important}.backend-orders-grid{grid-template-columns:minmax(0,1fr)!important}}
+</style>
 <link rel="stylesheet" href="admin-recipes.css">
 <script src="admin-recipes.js" defer></script>
 <script src="menu-options.js" defer></script>
@@ -5671,12 +5683,9 @@ body {
     let fullSyncInFlight = false;
     async function pullFullSyncFromServer() {
       if (fullSyncInFlight) return;
-      // Nếu WebSocket đang kết nối trực tiếp, không cần gọi HTTP polling dồn dập
-      if (wsClient && wsClient.readyState === 1 && isInitialLoadDone) {
-        return;
-      }
+      // Version-only polling also repairs an apparently open but stalled WebSocket.
 
-      let syncUrl = getCloudApiUrl('/api/sync');
+      let syncUrl = getCloudApiUrl('/api/sync?delta=1');
       if (!syncUrl) return;
 
       // Gửi kèm version hiện tại để server trả về 50 bytes nếu không có thay đổi
@@ -5703,7 +5712,7 @@ body {
             return;
           }
 
-          if (data && (Array.isArray(data.orders) || Array.isArray(data.menu))) {
+          if (data && (Array.isArray(data.orders) || Array.isArray(data.menu) || data.config || Array.isArray(data.discounts))) {
             handleIncomingMeshPayload({
               type: 'FULL_SYNC',
               orders: data.orders,
@@ -5916,7 +5925,15 @@ body {
           if (Array.isArray(pData.orders)) {
             if (!lastOrdersVersion || (pData.ordersVersion && pData.ordersVersion !== lastOrdersVersion) || !isInitialLoadDone) {
               ordersChanged = JSON.stringify(orders) !== JSON.stringify(pData.orders);
-              if (ordersChanged) orders = pData.orders;
+              if (ordersChanged) {
+                const knownIds=new Set(orders.map(order=>String(order.id)));
+                const recovered=pData.orders.filter(order=>!knownIds.has(String(order.id)) && order.status==='new');
+                orders = pData.orders;
+                if(isInitialLoadDone && isAdminDevice && recovered.length){
+                  playNewOrderAlertSound();
+                  showSmsToast('🔔 ĐƠN MỚI',recovered.length+' đơn mới vừa được đồng bộ.');
+                }
+              }
               lastOrdersVersion = pData.ordersVersion || lastOrdersVersion;
             }
           }
@@ -6038,7 +6055,7 @@ body {
             body: JSON.stringify(data.order)
           }).catch(() => {});
         } else if (type === 'ORDER_STATUS' && data.orderId) {
-          fetch(`/api/orders/${data.orderId}/status`, {
+          fetch(getCloudApiUrl(`/api/orders/${data.orderId}/status`), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: data.status, reason: data.cancelReason })
@@ -6150,7 +6167,11 @@ body {
       saveLocalData();
     }
 
-    let currentPendingOrderId = 'ORD-1003';
+    let currentPendingOrderId = '';
+    function createCustomerOrderId() {
+      const suffix=globalThis.crypto?.randomUUID?.() || Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,12);
+      return 'ORD-'+suffix.toUpperCase();
+    }
     let pendingCancelOrderId = null;
     let viewingReceiptOrderId = null;
 
@@ -8515,7 +8536,7 @@ async function openPaymentCheckoutModal() {
       closeCartDrawer();
 
       const beverageTotal = cart.reduce((s, c) => s + (c.item.price * c.qty), 0);
-      currentPendingOrderId = `ORD-${1000 + orders.length + 1}`;
+      currentPendingOrderId = currentPendingOrderId || createCustomerOrderId();
 
       const elOrderId = document.getElementById('checkout-order-id-display');
       if (elOrderId) elOrderId.textContent = currentPendingOrderId;
@@ -8595,6 +8616,7 @@ async function openPaymentCheckoutModal() {
 
     // GỬI ĐƠN HÀNG (BẮT BUỘC HÓA ĐƠN & PHẢI QUA NHẬN DIỆN THÔNG MINH)
     async function submitCustomerOrderWithBill() {
+      if(window.__orderSubmitInFlight)return;
       if (!cart || cart.length === 0) {
         alert("⚠️ Giỏ hàng của bạn đang trống! Vui lòng chọn món trước khi đặt hàng.");
         closePaymentCheckoutModal();
@@ -8648,7 +8670,8 @@ async function openPaymentCheckoutModal() {
 
       const now = new Date();
       const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-      const orderId = currentPendingOrderId || `ORD-${1000 + orders.length + 1}`;
+      const orderId = currentPendingOrderId || createCustomerOrderId();
+      currentPendingOrderId=orderId;
       const partnerName = (selectedDeliveryPartner === 'ahamove') ? 'Ahamove Siêu Tốc' : 'Lalamove Giao Nhanh';
 
       const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
@@ -8683,7 +8706,7 @@ async function openPaymentCheckoutModal() {
           id: c.item.id,
           name: c.item.name,
           name_en: c.item.name_en || '',
-          image: c.item.image || '',
+          image: /^data:/i.test(c.item.image || '') ? '' : (c.item.image || ''),
           qty: c.qty,
           price: c.item.price,
           total: c.item.price * c.qty,
@@ -8692,15 +8715,29 @@ async function openPaymentCheckoutModal() {
         }))
       };
 
+      const submitButton=document.getElementById('btn-submit-customer-order');
+      const originalLabel=submitButton?.textContent;
+      window.__orderSubmitInFlight=true;
+      if(submitButton){submitButton.disabled=true;submitButton.textContent='Đang gửi đơn…';submitButton.setAttribute?.('aria-busy','true');}
+      let submitted=false;
       try {
-        const response = await fetch(getCloudApiUrl('/api/orders'), {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newOrder)
-        });
-        const saved = await response.json();
-        if (!response.ok || !saved.success) throw new Error(saved.error || 'Máy chủ chưa nhận đơn');
+        // A lost response is retried once with the SAME order ID and payload.
+        for(let attempt=0;attempt<2;attempt++){
+          const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
+          try {
+            const response=await fetch(getCloudApiUrl('/api/orders'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(newOrder),signal:controller.signal});
+            const saved=await response.json();
+            if(!response.ok || !saved.success){const error=new Error(saved.error || 'Máy chủ chưa nhận đơn');error.noRetry=response.status<500;throw error;}
+            submitted=true;break;
+          } catch(error){if(error.noRetry || attempt===1)throw error;}
+          finally{clearTimeout(timer);}
+        }
       } catch (error) {
-        alert('Chưa gửi được đơn: ' + error.message);
+        alert('Chưa nhận được xác nhận đơn '+orderId+': '+(error.name==='AbortError'?'Kết nối chậm, anh/chị có thể thử lại với cùng mã đơn.':error.message));
         return;
+      } finally {
+        window.__orderSubmitInFlight=false;
+        if(submitButton){submitButton.disabled=submitted;submitButton.textContent=originalLabel || 'Gửi đơn hàng';submitButton.removeAttribute?.('aria-busy');}
       }
       delete newOrder.verificationToken;
       // Giảm tồn kho
@@ -8711,7 +8748,8 @@ async function openPaymentCheckoutModal() {
         }
       });
 
-      orders.unshift(newOrder);
+      if(!orders.some(order=>String(order.id)===String(newOrder.id)))orders.unshift(newOrder);
+      currentPendingOrderId='';
       localStorage.setItem('duynh_latest_order_id', newOrder.id);
       saveLocalData();
 
@@ -8892,7 +8930,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         });
       } catch(e) {}
 
-      fetch(`/api/orders/${canonicalId}/status`, {
+      fetch(getCloudApiUrl(`/api/orders/${canonicalId}/status`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'cancelled', reason })
@@ -9247,7 +9285,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       saveLocalData();
       broadcastMeshEvent('ORDER_STATUS', { orderId, status: 'prep' });
 
-      fetch(`/api/orders/${orderId}/status`, {
+      fetch(getCloudApiUrl(`/api/orders/${orderId}/status`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'prep' })
@@ -9277,7 +9315,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
       broadcastMeshEvent('ORDER_STATUS', { orderId, status: 'new' });
 
-      fetch(`/api/orders/${orderId}/status`, {
+      fetch(getCloudApiUrl(`/api/orders/${orderId}/status`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'new' })
@@ -9420,7 +9458,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
           });
         } catch(e) {}
 
-        fetch(`/api/orders/${orderId}/status`, {
+        fetch(getCloudApiUrl(`/api/orders/${orderId}/status`), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status: 'cancelled', reason })
@@ -11460,7 +11498,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     }
 
     function syncAdminOrdersFromServer() {
-      fetch('/api/orders')
+      fetch(getCloudApiUrl('/api/orders'),{cache:'no-store'})
         .then(r => r.json())
         .then(data => {
           if (Array.isArray(data) && data.length > 0) {
@@ -11732,9 +11770,9 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         }
       }
     });
-    window.addEventListener('focus', () => {
-      pullFullSyncFromServer();
-    });
+    window.addEventListener('focus', () => {pullFullSyncFromServer();initWebSocketSync();});
+    window.addEventListener('online', () => {pullFullSyncFromServer();initWebSocketSync();});
+    window.addEventListener('pageshow', () => {pullFullSyncFromServer();initWebSocketSync();});
 
     // ==================== CÔNG CỤ QUẢN TRỊ MÁY CHỦ CLOUD (RENDER / RAILWAY) ====================
     async function testAndConnectCloudServer(url) {

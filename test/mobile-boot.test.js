@@ -82,7 +82,7 @@ test('checkout never leaks scroll locks on empty cart, duplicate opens or missin
   const s={window:{},document:{documentElement:{classList:cl(rootNames)},body:{classList:cl(bodyNames),style:{}},
     getElementById:id=>id==='checkout-modal'?modal:null},
     fetch:async()=>({ok:true,json:async()=>({})}),getCloudApiUrl:()=>'/config',applyServerConfig(){},alert(){},
-    cart:[],orders:[],storeConfig:{bankConfig:{}},currentDistanceKm:0,currentDeliveryAddress:'',
+    cart:[],orders:[],currentPendingOrderId:'',createCustomerOrderId:()=> 'ORD-UNIQUE',storeConfig:{bankConfig:{}},currentDistanceKm:0,currentDeliveryAddress:'',
     hideFloatingCartNow(){},closeCartDrawer(){},calculateShippingFees:()=>({feeAhamove:1,feeLalamove:1}),
     formatMoney:String,updateShipFeeDisplay(){},updateGoogleMapsPreview(){},updateCheckoutFinancials(){}};
   vm.createContext(s);
@@ -103,3 +103,4 @@ test('closing login as a guest returns to the menu rather than leaving an empty 
  s.closeAdminLoginModal();assert.equal(element.style.display,'none');assert.equal(customerViews,1);
  s.isUserAdmin=()=>true;s.closeAdminLoginModal();assert.equal(customerViews,1);
 });
+

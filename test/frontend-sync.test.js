@@ -97,3 +97,11 @@ test('undecodable receipt completes with failure and releases object URL so uplo
   await ctx.s.compressReceiptImage({},data=>{called=true;assert.equal(data,null);assert.equal(ctx.revoked,1);});
   assert.equal(called,true);assert.equal(ctx.canvases.length,0);
 });
+
+test('admin receives an alert exactly once when fallback polling recovers a missed new order',()=>{
+ const {s,calls}=setup();let alerts=0;s.isUserAdmin=()=>true;s.playNewOrderAlertSound=()=>alerts++;s.showSmsToast=()=>{};
+ s.isInitialLoadDone=true;s.lastOrdersVersion=1;
+ const update={type:'FULL_SYNC',orders:[{id:'ORD-RECOVERED',status:'new'}],ordersVersion:2};
+ s.handleIncomingMeshPayload(update,'render_http');assert.equal(alerts,1);assert.equal(calls.backend,1);
+ s.handleIncomingMeshPayload(update,'render_http');assert.equal(alerts,1);assert.equal(calls.backend,1);
+});

@@ -335,7 +335,7 @@ function broadcastRealtime(eventType, data, senderClient = null, senderId = null
     adminPush.notifyOrder(data).catch(() => console.error('[Push] Không gửi được thông báo đơn mới'));
   }
   const now = Date.now();
-  if (eventType === 'ORDERS_UPDATE' || eventType === 'NEW_ORDER' || eventType === 'ORDER_STATUS' || eventType === 'ORDER_DISPATCH') ordersVersion = now;
+  if (eventType === 'ORDERS_UPDATE' || eventType === 'NEW_ORDER' || eventType === 'ORDER_STATUS' || eventType === 'ORDER_DISPATCH') ordersVersion = Math.max(now, ordersVersion + 1);
   if (eventType === 'MENU_UPDATE') menuVersion = now;
   if (eventType === 'CONFIG_UPDATE') configVersion = now;
   if (eventType === 'DISCOUNTS_UPDATE') discountsVersion = now;
@@ -753,10 +753,12 @@ const server = http.createServer(async (req, res) => {
 
       // Trả về trực tiếp từ RAM cache (không đọc lại ổ đĩa nhiều lần)
       sendJson(res, 200, {
-        orders: ordersCache,
-        menu: menuCache,
-        discounts: discountsCache,
-        config: configCache,
+        ...(q.delta==='1' ? {
+          ...(clientOv!==ordersVersion ? {orders:ordersCache}:{}),
+          ...(clientMv!==menuVersion ? {menu:menuCache}:{}),
+          ...(clientDv!==discountsVersion ? {discounts:discountsCache}:{}),
+          ...(clientCv!==configVersion ? {config:configCache}:{})
+        } : {orders:ordersCache,menu:menuCache,discounts:discountsCache,config:configCache}),
         codeVersion,
         menuVersion,
         configVersion,
@@ -831,12 +833,13 @@ const server = http.createServer(async (req, res) => {
       ordersCache = readJsonFile(ORDERS_FILE, ordersCache);
       const existingIdx = ordersCache.findIndex(o => o.id === body.id);
       if (existingIdx >= 0) {
-        ordersCache[existingIdx] = {
-          ...ordersCache[existingIdx],
-          ...body,
-          receiptImage: body.receiptImage || ordersCache[existingIdx].receiptImage || null,
-          updatedAtIso: new Date().toISOString()
-        };
+        const fingerprint=order=>crypto.createHash('sha256').update(JSON.stringify({
+          receipt:order.receiptImage,items:(order.items || []).map(item=>({id:String(item.id),qty:item.qty,toppings:item.toppings || [],custom:item.custom || ''})),
+          total:Number(order.total),shipping:Number(order.shippingFee || 0),phone:order.phone || '',address:order.deliveryAddress || '',
+          customer:order.customerName || '',note:order.note || '',discount:order.discount?.code || ''
+        })).digest('hex');
+        if(fingerprint(body)!==fingerprint(ordersCache[existingIdx])){sendJson(res,409,{error:'Mã đơn đã tồn tại với nội dung khác. Vui lòng mở lại thanh toán để lấy mã mới.'});return;}
+        sendJson(res,200,{success:true,duplicate:true,orderId:body.id,count:ordersCache.length});return;
       } else {
         const newOrder = {
           ...body,
@@ -850,8 +853,9 @@ const server = http.createServer(async (req, res) => {
       writeJsonFile(ORDERS_FILE, ordersCache);
       console.log(`[API] Lưu đơn hàng thành công: ${body.id}`);
       const savedOrder = existingIdx >= 0 ? ordersCache[existingIdx] : ordersCache[ordersCache.length - 1];
-      broadcastRealtime('NEW_ORDER', savedOrder);
+      ordersVersion=Math.max(Date.now(),ordersVersion+1);
       sendJson(res, 200, { success: true, orderId: body.id, count: ordersCache.length });
+      setImmediate(()=>broadcastRealtime('NEW_ORDER', savedOrder));
     } catch (err) {
       console.error('[API] Lỗi xử lý POST /api/orders:', err);
       sendJson(res, 500, { error: err.message });

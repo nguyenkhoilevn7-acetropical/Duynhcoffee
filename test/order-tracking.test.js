@@ -30,7 +30,7 @@ test('tracking shows every ordered item, snapshot price/image, old-menu fallback
 });
 test('customer checkout persists item snapshots and uses success confirmation without admin order alarm',async()=>{
  const sent=[],calls={alarm:0,success:0,track:0};
- const s={window:{},document:{getElementById:()=>null},cart:[{item:{id:1,name:'Trà',name_en:'Tea',price:45000,image:'/tea.jpg'},qty:2,custom:'Ít đá'}],
+ const s={window:{},AbortController,setTimeout,clearTimeout,document:{getElementById:()=>null},cart:[{item:{id:1,name:'Trà',name_en:'Tea',price:45000,image:'/tea.jpg'},qty:2,custom:'Ít đá'}],
   currentDeliveryAddress:'Test address',currentCustomerReceiptBase64:'receipt',isReceiptValid:true,receiptVerificationToken:'proof',receiptVerificationContext:'current',paymentContext:()=> 'current',
   activeDiscount:null,getSelectedShippingFee:()=>0,currentPendingOrderId:'ORD-NEW',orders:[],selectedDeliveryPartner:'ahamove',currentDistanceKm:1,
   getCloudApiUrl:p=>p,fetch:async(url,opts)=>{sent.push(JSON.parse(opts.body));return{ok:true,json:async()=>({success:true})};},
@@ -71,3 +71,4 @@ test('customer page removes a previous push registration without requesting noti
  try{await w.DuynhAdminNotifications.refresh();assert.ok(removed>=1);assert.equal(permissions,0);assert.equal(w.localStorage.getItem('duynh_admin_push_token'),null);}
  finally{w.close();}
 });
+

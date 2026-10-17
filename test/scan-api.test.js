@@ -35,7 +35,14 @@ test('HTTP scan starts quickly, retries share work, and completed proof is serve
  const order={id:'NOTIFY-ONCE',items:[{id:1,qty:1}],total:45000,receiptImage:body.image,verificationToken:completed.result.verificationToken};
  assert.equal((await post('/api/orders',{...order,id:'INVALID-NOTIFY',verificationToken:'wrong'})).status,422);
  assert.equal(fs.existsSync(path.join(dir,'.push-test-log')),false);
- assert.equal((await post('/api/orders',order)).status,200);assert.equal((await post('/api/orders',order)).status,200);
+ assert.equal((await post('/api/orders',order)).status,200);
+ const originalFile=fs.readFileSync(path.join(dir,'orders.json'),'utf8');
+ const replay=await post('/api/orders',order);assert.equal(replay.status,200);assert.equal((await replay.json()).duplicate,true);
+ assert.equal(fs.readFileSync(path.join(dir,'orders.json'),'utf8'),originalFile);
+ assert.equal((await post('/api/orders',{...order,customerName:'Different customer'})).status,409);
+ const snapshot=await(await fetch(base+'/api/sync')).json();
+ const delta=await(await fetch(base+'/api/sync?delta=1&mv='+snapshot.menuVersion+'&cv='+snapshot.configVersion+'&dv='+snapshot.discountsVersion+'&ov=0')).json();
+ assert.ok(Array.isArray(delta.orders));assert.equal(delta.menu,undefined);assert.equal(delta.config,undefined);assert.equal(delta.discounts,undefined);
  const status=(value,auth=false)=>fetch(base+'/api/orders/NOTIFY-ONCE/status',{method:'POST',headers:{'Content-Type':'application/json',...(auth?{Authorization:'Bearer '+session.token}:{})},body:JSON.stringify({status:value})});
  assert.equal((await status('done')).status,409);
  assert.equal((await status('shipping')).status,401);
