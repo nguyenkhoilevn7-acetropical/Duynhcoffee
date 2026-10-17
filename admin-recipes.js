@@ -41,8 +41,13 @@
     if (el('drink-recipe-modal')) return;
     const root = document.createElement('div'); root.id='drink-recipe-modal'; root.className='modal-overlay';
     root.setAttribute('role','dialog'); root.setAttribute('aria-modal','true'); root.setAttribute('aria-labelledby','recipe-title');
-    root.innerHTML='<div class="modal-card recipe-card"><div class="modal-header"><h2 id="recipe-title">Công thức pha chế</h2><button type="button" class="modal-close" aria-label="Đóng công thức" id="recipe-close">✕</button></div><div class="modal-body"><div id="recipe-photo"></div><p id="recipe-order"></p><div id="recipe-notices"></div><p id="recipe-message" role="status" aria-live="polite"></p><div id="recipe-content"></div></div></div>';
+    root.innerHTML='<div class="modal-card recipe-card"><div class="modal-header"><h2 id="recipe-title">Công thức pha chế</h2><button type="button" class="modal-close" aria-label="Đóng công thức" id="recipe-close">✕</button></div><div class="modal-body"><section class="recipe-upload-toolbar"><button type="button" class="nav-btn recipe-primary" id="recipe-upload-open" disabled>📷 Tải ảnh công thức – AI tự điền</button><p>Chọn ảnh → AI đọc nguyên liệu, định lượng và cách pha theo từng bước → Kiểm tra rồi lưu.</p></section><div id="recipe-photo"></div><p id="recipe-order"></p><div id="recipe-notices"></div><p id="recipe-message" role="status" aria-live="polite"></p><div id="recipe-content"></div></div></div>';
     document.body.append(root); el('recipe-close').onclick=close;
+    el('recipe-upload-open').onclick=()=>{
+      if(!state?.loaded || state.saving || state.scanning)return;
+      if(!state.editing)renderEditor();
+      el('recipe-file').click();
+    };
     root.addEventListener('keydown', e => {
       if(e.key==='Escape') {e.preventDefault();close();}
       if(e.key==='Tab') {
@@ -62,8 +67,9 @@
     if (!isUserAdmin() || state?.saving || state?.scanning) return;
     createModal(); opener=document.activeElement;
     const item=menu.find(m=>String(m.id)===String(id));
-    state={id:String(id), qty:Math.max(1, Number(qty)||1), custom:String(custom||''), recipe:null, editing:false,dirty:false};
+    state={id:String(id), qty:Math.max(1, Number(qty)||1), custom:String(custom||''), recipe:null, loaded:false, editing:false,dirty:false};
     const serial=++requestId;
+    el('recipe-upload-open').disabled=true;
     el('recipe-title').textContent=item?.name || 'Công thức món';
     el('recipe-photo').replaceChildren();
     if(item?.image) {
@@ -76,7 +82,7 @@
     el('drink-recipe-modal').style.display='flex';el('recipe-close').focus();
     try {
       const result=await api('GET'); if(serial!==requestId)return;
-      state.recipe=result.recipe;state.sourceImage=result.recipe?.sourceImage || '';el('recipe-message').textContent='';
+      state.recipe=result.recipe;state.sourceImage=result.recipe?.sourceImage || '';state.loaded=true;el('recipe-upload-open').disabled=false;el('recipe-message').textContent='';
       if(edit) renderEditor();else renderView();
     } catch(error) {
       if(serial!==requestId)return;
@@ -143,7 +149,7 @@
     const nonempty=state.dirty || [...el('recipe-rows').querySelectorAll('input')].some(n=>n.value.trim()) || el('recipe-steps').value.trim() || el('recipe-notes').value.trim();
     if(nonempty && !confirm('Dùng nội dung đọc từ ảnh thay cho bản công thức đang hiển thị? Bản đã lưu chỉ đổi khi anh nhấn Lưu công thức.')){event.target.value='';return;}
     state.scanning=true;
-    const controls=[...el('recipe-form').querySelectorAll('button,input,textarea')];controls.forEach(n=>n.disabled=true);el('recipe-close').disabled=true;
+    const controls=[...el('recipe-form').querySelectorAll('button,input,textarea')];controls.forEach(n=>n.disabled=true);el('recipe-close').disabled=true;el('recipe-upload-open').disabled=true;
     el('recipe-scan-warnings').replaceChildren();
     const message=el('recipe-scan-message');message.textContent='Đang chuẩn bị ảnh…';message.classList.add('recipe-reading');
     try {
@@ -158,7 +164,7 @@
       state.sourceImage=image;state.dirty=true;showSourcePreview();
       message.textContent='Đã điền nguyên liệu, định lượng, cách pha và lưu ý vào từng ô. Anh kiểm tra các ô được đánh dấu trước khi lưu.';
     } catch(error){message.textContent=error.message;}
-    finally{state.scanning=false;message.classList.remove('recipe-reading');controls.forEach(n=>n.disabled=false);el('recipe-close').disabled=false;event.target.value='';}
+    finally{state.scanning=false;message.classList.remove('recipe-reading');controls.forEach(n=>n.disabled=false);el('recipe-close').disabled=false;el('recipe-upload-open').disabled=false;event.target.value='';}
   }
   async function save(event) {
     event.preventDefault();if(state.saving || state.scanning)return;
@@ -170,13 +176,13 @@
       ingredients.push({...value,amount:Number(value.amount)});
     }
     state.saving=true;el('recipe-save-message').textContent='Đang lưu công thức…';
-    const controls=[...el('recipe-form').querySelectorAll('button,input,textarea')];controls.forEach(n=>n.disabled=true);el('recipe-close').disabled=true;
+    const controls=[...el('recipe-form').querySelectorAll('button,input,textarea')];controls.forEach(n=>n.disabled=true);el('recipe-close').disabled=true;el('recipe-upload-open').disabled=true;
     try {
       const result=await api('POST',{itemId:state.id,version:state.recipe?.version || '',recipe:{ingredients,steps:preparationSteps(el('recipe-steps').value).join('\n'),notes:el('recipe-notes').value,sourceImage:state.sourceImage || ''}});
       state.recipe=result.recipe;renderView();
       el('recipe-message').textContent='Đã lưu công thức.'+(result.backup?.connected?' Đã lên lịch sao lưu Google Drive.':'');
     } catch(error) {el('recipe-save-message').textContent=error.message;}
-    finally{state.saving=false;controls.forEach(n=>n.disabled=false);el('recipe-close').disabled=false;}
+    finally{state.saving=false;controls.forEach(n=>n.disabled=false);el('recipe-close').disabled=false;el('recipe-upload-open').disabled=false;}
   }
   function activate(event) {
     const target=event.target.closest('[data-drink-recipe]');if(!target)return;

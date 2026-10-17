@@ -62,3 +62,24 @@ test('photo draft populates the correct fields, highlights unknown quantity and 
  await c.el('recipe-form').onsubmit({preventDefault(){}});assert.match(c.el('recipe-save-message').textContent,/định lượng lớn hơn 0/);
  }finally{c.dom.window.close();}
 });
+test('upload button is visible at the top for new and saved recipes, opens file picker without an edit step',async()=>{
+ for(const saved of [null,recipe]){
+  const c=client(saved);try{
+   await c.w.openDrinkRecipe(1);
+   const button=c.el('recipe-upload-open');assert.ok(button);assert.equal(button.disabled,false);
+   assert.match(button.textContent,/Tải ảnh công thức/);
+   assert.equal(button.closest('.recipe-upload-toolbar').nextElementSibling.id,'recipe-photo');
+   assert.equal(c.el('recipe-file'),null);
+   let clicks=0;c.w.HTMLInputElement.prototype.click=function(){assert.equal(this.id,'recipe-file');clicks++;};
+   button.click();assert.equal(clicks,1);assert.ok(c.el('recipe-form'));assert.ok(c.el('recipe-file'));
+   if(saved)assert.match(c.el('recipe-steps').value,/Rót cà phê/);
+   button.click();assert.equal(clicks,2);
+  }finally{c.dom.window.close();}
+ }
+});
+test('upload stays disabled if recipe load fails, avoiding overwriting an unseen saved version',async()=>{
+ const c=client();try{
+  c.w.fetch=async()=>({ok:false,json:async()=>({error:'Không kết nối được'})});
+  await c.w.openDrinkRecipe(1);assert.equal(c.el('recipe-upload-open').disabled,true);assert.equal(c.el('recipe-file'),null);
+ }finally{c.dom.window.close();}
+});
