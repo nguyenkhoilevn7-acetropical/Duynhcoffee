@@ -197,7 +197,6 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
       const peek=await activeWorker.recognize(screeningBuffer,{},textOnly);
       const screeningKind=classifyReceiptText(peek.data.text);
       if(screeningKind==='unrelated') return {text:peek.data.text,passes:1,nonReceipt:true};
-      if(screeningKind==='unclear') return {text:peek.data.text,passes:1,unreadable:true};
     }
     const { prepareReceipt } = require('./receipt-image');
     const prepared = prepareReceipt(Buffer.from(image.split(',')[1], 'base64'), image.match(/^data:image\/(\w+)/)[1]);

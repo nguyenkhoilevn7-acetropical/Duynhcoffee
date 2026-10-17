@@ -7011,9 +7011,9 @@ function toggleKitchenSoundAlert() {
         canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));
         const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0,canvas.width,canvas.height);
         const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data;
-        let colored=0,count=0;
-        for(let i=0;i<pixels.length;i+=64){count++;if(Math.max(pixels[i],pixels[i+1],pixels[i+2])-Math.min(pixels[i],pixels[i+1],pixels[i+2])>45)colored++;}
-        return colored/count>=0.12 ? canvas.toDataURL('image/png') : undefined;
+        let colored=0,dark=0,count=0;
+        for(let i=0;i<pixels.length;i+=64){count++;if(Math.max(pixels[i],pixels[i+1],pixels[i+2])-Math.min(pixels[i],pixels[i+1],pixels[i+2])>45)colored++;if((pixels[i]+pixels[i+1]+pixels[i+2])/3<100)dark++;}
+        return colored/count>=0.12 || dark/count>=0.15 ? canvas.toDataURL('image/png') : undefined;
       } catch (_) {return undefined;}
       finally {image.onload=image.onerror=null;image.src='';}
     }
