@@ -63,6 +63,18 @@ test('HTTP scan starts quickly, retries share work, and completed proof is serve
  const ignored=await(await post('/api/delivery/webhooks/lalamove',{data:{order:{orderId:'FAKE',status:'COMPLETED'}}})).json();assert.equal(ignored.ignored,true);
  assert.equal((await post('/api/orders/NOTIFY-ONCE/dispatch',{partner:'lalamove',carrierOrderId:'123456'})).status,401);
  const messages=fs.readFileSync(path.join(dir,'.push-test-log'),'utf8').trim().split('\n');assert.equal(messages.length,1);assert.match(messages[0],/Có đơn hàng mới/);
+ const firstShort=await(await post('/api/orders',{...order,id:'ORD-54321',submissionKey:'client-a-unique-123',customerName:'A'})).json();
+ assert.equal(firstShort.orderId,'ORD-54321');
+ const secondInput={...order,id:'ORD-54321',submissionKey:'client-b-unique-456',customerName:'B'};
+ const secondShort=await(await post('/api/orders',secondInput)).json();
+ assert.match(secondShort.orderId,/^ORD-\d{5}$/);assert.notEqual(secondShort.orderId,firstShort.orderId);
+ const shortReplay=await(await post('/api/orders',secondInput)).json();assert.equal(shortReplay.orderId,secondShort.orderId);assert.equal(shortReplay.duplicate,true);
+ assert.equal((await fetch(base+'/api/orders/'+secondShort.orderId+'/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'prep'})})).status,200);
+ assert.equal((await post('/api/orders',secondInput)).status,200);
+ const shortOrders=await(await fetch(base+'/api/orders')).json();
+ assert.equal(shortOrders.filter(o=>o.submissionKey==='client-b-unique-456').length,1);
+ assert.equal(shortOrders.find(o=>o.id===secondShort.orderId).status,'prep');assert.equal(shortOrders.find(o=>o.id===firstShort.orderId).customerName,'A');
+ assert.ok(shortOrders.some(o=>o.id==='NOTIFY-ONCE'));
  await post('/api/config',{bankConfig:{accountHolder:'DAO KHUE NGUYEN'}});
  const changed=await(await post('/api/receipt-scans',body)).json();assert.notEqual(changed.jobId,pending.jobId);
  const waited=await(await fetch(base+'/api/receipt-scans/'+changed.jobId+'?waitMs=4000')).json();assert.equal(waited.status,'complete');assert.equal(waited.result.isValid,false);assert.ok(!waited.result.verificationToken);

@@ -6187,8 +6187,13 @@ body {
 
     let currentPendingOrderId = '';
     function createCustomerOrderId() {
-      const suffix=globalThis.crypto?.randomUUID?.() || Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,12);
-      return 'ORD-'+suffix.toUpperCase();
+      const used=new Set((orders || []).map(order=>String(order.id)));
+      const start=10000+Math.floor(Math.random()*90000);
+      for(let offset=0;offset<90000;offset++){
+        const id='ORD-'+(10000+(start-10000+offset)%90000);
+        if(!used.has(id))return id;
+      }
+      throw new Error('Đã hết mã đơn 5 số khả dụng. Vui lòng liên hệ quán.');
     }
     let pendingCancelOrderId = null;
     let viewingReceiptOrderId = null;
@@ -8696,6 +8701,7 @@ async function openPaymentCheckoutModal() {
 
       const newOrder = {
         id: orderId,
+        submissionKey:window.__pendingOrderSubmissionKey || (window.__pendingOrderSubmissionKey=globalThis.crypto?.randomUUID?.() || Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,12)+'-'+Math.random().toString(36).slice(2,12)),
         time: timeStr,
         createdAtIso: new Date().toISOString(),
         orderType: 'delivery',
@@ -8746,6 +8752,7 @@ async function openPaymentCheckoutModal() {
             const response=await fetch(getCloudApiUrl('/api/orders'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(newOrder),signal:controller.signal});
             const saved=await response.json();
             if(!response.ok || !saved.success){const error=new Error(saved.error || 'Máy chủ chưa nhận đơn');error.noRetry=response.status<500;throw error;}
+            if(saved.orderId)newOrder.id=saved.orderId;
             submitted=true;break;
           } catch(error){if(error.noRetry || attempt===1)throw error;}
           finally{clearTimeout(timer);}
@@ -8767,7 +8774,7 @@ async function openPaymentCheckoutModal() {
       });
 
       if(!orders.some(order=>String(order.id)===String(newOrder.id)))orders.unshift(newOrder);
-      currentPendingOrderId='';
+      currentPendingOrderId='';window.__pendingOrderSubmissionKey='';
       localStorage.setItem('duynh_latest_order_id', newOrder.id);
       saveLocalData();
 

@@ -24,14 +24,45 @@ function validate(value) {
   if (JSON.stringify(clean) !== JSON.stringify(value)) throw new Error('Backup chứa trường bí mật không được phép');
   return clean;
 }
-function createBackup({ dir, snapshot, apply, fetchImpl = global.fetch, env = process.env, debounceMs = 1500 }) {
+function orderArchiveView(orders, updatedAt) {
+  const labels = {new:'🆕 CHƯA LÀM',prep:'☕ ĐANG PHA',shipping:'🛵 ĐANG GIAO',done:'✅ ĐÃ HOÀN TẤT',cancelled:'❌ ĐÃ HỦY'};
+  const money = n => Number(n || 0).toLocaleString('vi-VN') + ' đ';
+  const lines = ['MOM’S TEA & COFFEE — ĐƠN HÀNG DỰ PHÒNG', 'Cập nhật: ' + updatedAt,
+    'Đây là trạng thái tại lần đồng bộ cuối. Khi web ngừng hoạt động, hãy ghi riêng những đơn đã xử lý để tránh làm trùng.', ''];
+  for (const status of [...Object.keys(labels), 'unknown']) {
+    const group = orders.filter(o => (labels[o.status] ? o.status : 'unknown') === status);
+    if (!group.length) continue;
+    lines.push((labels[status] || '⚠️ CẦN KIỂM TRA TRẠNG THÁI') + ' (' + group.length + ')', '');
+    for (const o of group.sort((a,b) => String(a.createdAtIso || '').localeCompare(String(b.createdAtIso || '')))) {
+      lines.push(o.id + ' · ' + (o.createdAtIso || ''), 'Khách: ' + (o.customerName || '') + ' · ĐT: ' + (o.phone || ''),
+        'Địa chỉ: ' + (o.deliveryAddress || o.address || ''));
+      for (const i of o.items || []) lines.push('  • ' + i.qty + ' × ' + (i.name || i.item?.name || i.id) +
+        (i.custom ? '\n    ⚠️ Lưu ý: ' + i.custom : '') +
+        (i.toppings?.length ? '\n    Thêm: ' + i.toppings.map(t => typeof t === 'string' ? t : t.name || t.id).join(', ') : ''));
+      if (o.note) lines.push('⚠️ Ghi chú khách: ' + o.note);
+      lines.push('Tiền nước: ' + money(o.total) + ' · Phí giao: ' + money(o.shippingFee),
+        'Thanh toán: ' + (o.paymentStatus || 'Kiểm tra trước khi giao'),
+        'Giao hàng: ' + (o.deliveryPartnerName || '') + (o.trackingCode ? ' · ' + o.trackingCode : ''), '');
+    }
+  }
+  if (!orders.length) lines.push('Chưa có đơn hàng.');
+  return lines.join('\n');
+}
+function archiveOrder(order) {
+  // Keep operational details, without large pictures or payment verification credentials.
+  return JSON.parse(JSON.stringify(order, (key, value) =>
+    /image|password|secret|token|api.?key|credential|__proto__|constructor|prototype/i.test(key) ? undefined : value));
+}
+function createBackup({ dir, snapshot, apply, ordersSnapshot, fetchImpl = global.fetch, env = process.env, debounceMs = 1500 }) {
   let refreshToken = env.GOOGLE_DRIVE_REFRESH_TOKEN || '';
   let accessToken = '', expires = 0, timer, retryTimer, chain = Promise.resolve(), dirty = false;
   let lastSuccess = null, lastError = null, startupRestored = false, revision = 0;
   const states = new Map();
   const enabled = () => Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && refreshToken);
   const ready = () => Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.GOOGLE_REDIRECT_URI);
-  const status = () => ({ configured: ready(), connected: enabled(), pending: dirty, lastSuccess, lastError, startupRestored });
+  const orderState = {pending:false,lastSuccess:null,lastError:null,folderUrl:null,boardUrl:null,count:0};
+  let orderTimer, orderRetry, orderJob, orderRevision = 0, orderFolder, orderJson, orderBoard, archive;
+  const status = () => ({ configured: ready(), connected: enabled(), pending: dirty, lastSuccess, lastError, startupRestored, orders:{...orderState} });
   async function request(url, options = {}) {
     const response = await fetchImpl(url, { ...options, signal: AbortSignal.timeout(20000) });
     if (!response.ok) throw new Error('Google API trả mã ' + response.status);
@@ -197,7 +228,8 @@ function createBackup({ dir, snapshot, apply, fetchImpl = global.fetch, env = pr
         const params = new URLSearchParams({ client_id: env.GOOGLE_CLIENT_ID, redirect_uri: env.GOOGLE_REDIRECT_URI,
           response_type: 'code', scope: SCOPE, access_type: 'offline', prompt: 'consent', state });
         reply(res, 200, { url: 'https://accounts.google.com/o/oauth2/v2/auth?' + params });
-      } else if (p === '/api/backup/save' && req.method === 'POST') reply(res, 200, await flush());
+      } else if (p === '/api/backup/save' && req.method === 'POST') { await flush(); if (ordersSnapshot) await flushOrders(); reply(res, 200, status()); }
+      else if (p === '/api/backup/orders/save' && req.method === 'POST') { await flushOrders(); reply(res, 200, status()); }
       else if (p === '/api/backup/restore' && req.method === 'POST') {
         if (req.headers['x-backup-confirm'] !== 'RESTORE') { reply(res, 400, { error: 'Cần xác nhận khôi phục' }); return true; }
         const result = await enqueue(async () => {
@@ -211,7 +243,74 @@ function createBackup({ dir, snapshot, apply, fetchImpl = global.fetch, env = pr
     } catch (error) { reply(res, 503, { error: error.message }); }
     return true;
   }
-  function stop() { clearTimeout(timer); clearTimeout(retryTimer); }
+  function stop() { clearTimeout(timer); clearTimeout(retryTimer); clearTimeout(orderTimer); clearTimeout(orderRetry); }
+  async function findOrderFile(kind, name, mimeType, parent) {
+    const params = new URLSearchParams({q:"trashed = false and appProperties has { key='duynhOrders' and value='" + kind + "' }" +
+      (parent ? " and '" + parent.replace(/['\\]/g, '\\$&') + "' in parents" : ''),fields:'files(id)',pageSize:'1'});
+    const files = await (await request('https://www.googleapis.com/drive/v3/files?' + params,{headers:await auth()})).json();
+    if (files.files?.[0]?.id) return {id:files.files[0].id,existing:true};
+    const file = await (await request('https://www.googleapis.com/drive/v3/files?fields=id', {
+      method:'POST',headers:{...await auth(),'Content-Type':'application/json'},
+      body:JSON.stringify({name,mimeType,appProperties:{duynhOrders:kind},...(parent ? {parents:[parent]} : {})})})).json();
+    if (!file.id) throw new Error('Drive chưa tạo được file đơn hàng');
+    return {id:file.id,existing:false};
+  }
+  async function uploadOrders() {
+    if (!ordersSnapshot) throw new Error('Chưa cấu hình sao lưu đơn hàng');
+    const startRevision = orderRevision;
+    if (!orderFolder) orderFolder = (await findOrderFile('folder-v1','Mom - Đơn hàng dự phòng','application/vnd.google-apps.folder')).id;
+    orderState.folderUrl = 'https://drive.google.com/drive/folders/' + encodeURIComponent(orderFolder);
+    if (!orderJson) {
+      const file = await findOrderFile('data-v1','Don-hang-du-phong.json','application/json',orderFolder);
+      if (file.existing) {
+        const response = await request('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.id) + '?alt=media',{headers:await auth()});
+        let size=0; const chunks=[];
+        for await (const chunk of response.body) {size+=chunk.length;if(size>MAX_BYTES)throw new Error('Lịch sử đơn vượt giới hạn 25 MB');chunks.push(Buffer.from(chunk));}
+        const text = Buffer.concat(chunks).toString('utf8');
+        // A metadata-only file can remain if the process stops during first setup.
+        const previous = text === '' ? {schema:'mom-orders-v1',orders:[]} : JSON.parse(text);
+        if (previous.schema !== 'mom-orders-v1' || !Array.isArray(previous.orders) || previous.orders.some(o=>!o || typeof o.id !== 'string' || !Array.isArray(o.items)))
+          throw new Error('Lịch sử Drive không hợp lệ; dừng ghi để bảo vệ đơn cũ');
+        archive = previous.orders;
+      } else archive = [];
+      orderJson = file.id;
+    }
+    if (!orderBoard) orderBoard = (await findOrderFile('board-v1','MO-DAY-XEM-DON-HANG.txt','text/plain',orderFolder)).id;
+    const current = ordersSnapshot();
+    if (!Array.isArray(current) || current.some(o=>!o || typeof o.id !== 'string' || !Array.isArray(o.items))) throw new Error('Dữ liệu đơn hàng không hợp lệ');
+    const merged = new Map((archive || []).map(o=>[o.id,o]));
+    for (const order of current) merged.set(order.id,archiveOrder(order));
+    const data = {schema:'mom-orders-v1',updatedAt:new Date().toISOString(),orders:[...merged.values()]};
+    const json = JSON.stringify(data);
+    if (Buffer.byteLength(json)>MAX_BYTES) throw new Error('Lịch sử đơn vượt giới hạn 25 MB');
+    const put = async (id,mimeType,body) => request('https://www.googleapis.com/upload/drive/v3/files/' + encodeURIComponent(id) + '?uploadType=media',{
+      method:'PATCH',headers:{...await auth(),'Content-Type':mimeType + '; charset=utf-8'},body});
+    await put(orderJson,'application/json',json);
+    archive=data.orders;
+    await put(orderBoard,'text/plain',orderArchiveView(data.orders,data.updatedAt));
+    orderState.boardUrl='https://drive.google.com/file/d/' + encodeURIComponent(orderBoard) + '/view';
+    orderState.lastSuccess=data.updatedAt;orderState.lastError=null;orderState.count=data.orders.length;
+    orderState.pending=orderRevision!==startRevision;
+  }
+  function flushOrders() {
+    clearTimeout(orderTimer);orderTimer=null;clearTimeout(orderRetry);
+    if (orderJob) return orderJob;
+    orderState.pending=true;
+    orderJob=uploadOrders().catch(error=>{
+      orderState.lastError=error.message;orderState.pending=true;
+      if(enabled()){orderRetry=setTimeout(()=>flushOrders().catch(()=>{}),30000);orderRetry.unref();}
+      throw error;
+    }).finally(()=>{
+      orderJob=null;
+      if(orderState.pending && !orderState.lastError && enabled()) scheduleOrders();
+    });
+    return orderJob;
+  }
+  function scheduleOrders() {
+    if(orderTimer || !enabled())return;
+    orderTimer=setTimeout(()=>{orderTimer=null;flushOrders().catch(()=>{});},debounceMs);orderTimer.unref();
+  }
+  function ordersChanged() {orderRevision++;orderState.pending=true;scheduleOrders();}
   // A separate private Drive record: never included in public config or menu backups.
   let pushFileId = null;
   async function loadPushState() {
@@ -240,7 +339,7 @@ function createBackup({ dir, snapshot, apply, fetchImpl = global.fetch, env = pr
       return true;
     });
   }
-  return { initialize, changed, flush, handle, status, stop, loadPushState, savePushState };
+  return { initialize, changed, flush, handle, status, stop, loadPushState, savePushState, ordersChanged, flushOrders };
 }
-module.exports = { createBackup, sanitize, validate, TAG };
+module.exports = { createBackup, sanitize, validate, TAG, orderArchiveView, archiveOrder };
 

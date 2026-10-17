@@ -74,6 +74,7 @@ function writeJsonFile(filePath, data) {
     const temporary = filePath + '.tmp';
     fs.writeFileSync(temporary, JSON.stringify(data, null, 2), 'utf8');
     fs.renameSync(temporary, filePath);
+    if (backupService && filePath === ORDERS_FILE) backupService.ordersChanged();
     if (backupService && [CONFIG_FILE, MENU_FILE, DISCOUNTS_FILE, RECIPES_FILE].includes(filePath)) backupService.changed();
     return true;
   } catch (err) {
@@ -89,6 +90,7 @@ const DEFAULT_STORE_CONFIG = {"storeName": "Mom’s Tea & Coffee", "storeSlogan"
 async function startApplication() {
 backupService = createBackup({
   dir: ROOT_DIR,
+  ordersSnapshot: () => readJsonFile(ORDERS_FILE, []),
   snapshot: () => ({ menu: menuCache, config: configCache, discounts: discountsCache, recipes: readJsonFile(RECIPES_FILE, {}) }),
   apply: data => {
     menuCache = data.menu;
@@ -113,6 +115,7 @@ if (imageOnlyConfig !== configCache) { configCache = imageOnlyConfig; writeJsonF
 const restoredFromDrive = await backupService.initialize();
 // In-memory cache
 let ordersCache = readJsonFile(ORDERS_FILE, []);
+backupService.ordersChanged();
 let configCache = readJsonFile(CONFIG_FILE, {});
 let menuCache = readJsonFile(MENU_FILE, []);
 let discountsCache = readJsonFile(DISCOUNTS_FILE, []);
@@ -184,6 +187,15 @@ function mergeConfig(current, patch) {
   return { ...current, ...patch,
     bankConfig: { ...(current.bankConfig || {}), ...(patch.bankConfig || {}) },
     momoConfig: { ...(current.momoConfig || {}), ...(patch.momoConfig || {}) } };
+}
+function allocateShortOrderId(orders) {
+  const used=new Set(orders.map(order=>String(order.id)));
+  const start=crypto.randomInt(10000,100000);
+  for(let offset=0;offset<90000;offset++){
+    const id='ORD-'+(10000+(start-10000+offset)%90000);
+    if(!used.has(id))return id;
+  }
+  const error=new Error('Đã hết mã đơn 5 số khả dụng. Vui lòng liên hệ quán.');error.status=409;throw error;
 }
 function checkOrder(order) {
   receiptVerifier.assertVerified(order);
@@ -829,6 +841,13 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      ordersCache=readJsonFile(ORDERS_FILE,ordersCache);
+      if(body.submissionKey!==undefined){
+        if(typeof body.submissionKey!=='string' || !/^[a-zA-Z0-9-]{8,100}$/.test(body.submissionKey)){sendJson(res,400,{error:'Khóa gửi đơn không hợp lệ'});return;}
+        const previous=ordersCache.find(order=>order.submissionKey===body.submissionKey);
+        if(previous)body.id=previous.id;
+        else if(!/^ORD-\d{5}$/.test(String(body.id)) || ordersCache.some(order=>order.id===body.id))body.id=allocateShortOrderId(ordersCache);
+      }
       try { body = checkOrder(body); } catch (error) { sendJson(res, 422, { error: error.message }); return; }
       ordersCache = readJsonFile(ORDERS_FILE, ordersCache);
       const existingIdx = ordersCache.findIndex(o => o.id === body.id);

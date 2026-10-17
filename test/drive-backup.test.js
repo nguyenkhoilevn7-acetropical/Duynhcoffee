@@ -115,3 +115,58 @@ test('recipes round trip in Drive backup; restoring an older backup preserves lo
  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.dir,'drink-recipes.json'))),recipes);
  }finally{f.cleanup();}
 });
+
+test('order mirror retains historical orders, updates status, strips pictures and survives restart',async()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'mom-order-mirror-'));
+ const files=[];let failBoard=false,failHistory=false,patches=0;
+ const fetchImpl=async(url,opts={})=>{
+  const u=new URL(url);
+  if(u.hostname==='oauth2.googleapis.com')return Response.json({access_token:'a',expires_in:3600});
+  if(opts.method==='POST'){
+   const metadata=JSON.parse(opts.body);assert.equal(metadata.permissions,undefined);
+   const f={...metadata,id:'f'+(files.length+1),body:''};files.push(f);return Response.json({id:f.id});
+  }
+  if(opts.method==='PATCH'){
+   const f=files.find(f=>url.includes('/'+f.id+'?'));assert.ok(f);
+   if(f.mimeType==='text/plain'&&failBoard)return new Response('',{status:503});
+   f.body=opts.body;patches++;return Response.json({id:f.id});
+  }
+  if(u.searchParams.get('alt')==='media'){
+   if(failHistory)return new Response('',{status:503});
+   const f=files.find(f=>u.pathname.endsWith('/'+f.id));return new Response(f.body);
+  }
+  const q=u.searchParams.get('q');const kind=q.match(/value='([^']+)'/)[1];
+  return Response.json({files:files.filter(f=>f.appProperties.duynhOrders===kind).map(f=>({id:f.id}))});
+ };
+ let orders=[{id:'ORD-12345',status:'new',createdAtIso:'2026-10-17T01:00:00Z',customerName:'Anh A',phone:'0901234567',deliveryAddress:'Đường A',total:45000,
+  receiptImage:'secret-image',verificationToken:'secret-token',submissionKey:'retry-key',items:[{id:1,name:'Trà',qty:2,custom:'50% đá, ít ngọt',image:'big-image',toppings:[{name:'Macchiato'}]}]}];
+ const options={dir,env,fetchImpl,debounceMs:60000,snapshot:()=>({}),apply:()=>{},ordersSnapshot:()=>orders};
+ let backup=createBackup(options);
+ try{
+  backup.ordersChanged();await backup.flushOrders();
+  assert.equal(files.length,3);assert.equal(backup.status().orders.pending,false);
+  const data=files.find(f=>f.mimeType==='application/json'),board=files.find(f=>f.mimeType==='text/plain');
+  assert.ok(data.parents.includes(files[0].id));assert.ok(board.parents.includes(files[0].id));
+  assert.doesNotMatch(data.body,/secret-image|secret-token|big-image/);
+  assert.match(board.body,/CHƯA LÀM/);assert.match(board.body,/2 × Trà/);assert.match(board.body,/50% đá, ít ngọt/);assert.match(board.body,/Macchiato/);assert.match(board.body,/0901234567/);
+  orders[0].status='prep';backup.ordersChanged();failBoard=true;
+  await assert.rejects(backup.flushOrders(),/503/);assert.equal(backup.status().orders.pending,true);assert.match(backup.status().orders.lastError,/503/);
+  failBoard=false;await backup.flushOrders();assert.match(board.body,/ĐANG PHA/);assert.doesNotMatch(board.body,/CHƯA LÀM/);
+  backup.stop();orders=[];backup=createBackup(options);await backup.flushOrders();
+  assert.equal(files.length,3);assert.equal(backup.status().orders.count,1);assert.equal(JSON.parse(data.body).orders[0].status,'prep');
+  orders=[{id:'ORD-54321',status:'done',items:[],total:1}];backup.ordersChanged();await backup.flushOrders();
+  assert.equal(JSON.parse(data.body).orders.length,2);assert.match(board.body,/ĐÃ HOÀN TẤT/);
+  backup.stop();backup=createBackup(options);failHistory=true;const before=patches;
+  await assert.rejects(backup.flushOrders(),/503/);assert.equal(patches,before); // Never replace unreadable history with an empty/new snapshot.
+  failHistory=false;await backup.flushOrders();assert.equal(backup.status().orders.count,2);
+ }finally{backup.stop();fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+test('order-only backup endpoint requires owner key, and unconfigured backups remain pending',async()=>{
+ const backup=createBackup({dir:os.tmpdir(),env:{},snapshot:()=>({}),apply:()=>{},ordersSnapshot:()=>[]});
+ try{
+  backup.ordersChanged();assert.equal(backup.status().orders.pending,true);
+  const r=response();await backup.handle({method:'POST',headers:{}},r,{pathname:'/api/backup/orders/save'});assert.equal(r.status,401);
+  await assert.rejects(backup.flushOrders(),/Chưa cấu hình Google Drive/);assert.equal(backup.status().orders.lastSuccess,null);
+ }finally{backup.stop();}
+});

@@ -24,10 +24,10 @@ test('lost response retries the identical payload once; persistent failure retai
  await c.s.submitCustomerOrderWithBill();assert.equal(calls,2);assert.equal(payloads[0],payloads[1]);assert.equal(c.s.orders[0].id,'ORD-RETRY');
  const failed=checkout();failed.s.fetch=async()=>{throw Error('offline');};await failed.s.submitCustomerOrderWithBill();assert.equal(failed.s.cart.length,1);assert.equal(failed.s.currentPendingOrderId,'ORD-RETRY');assert.equal(failed.button.disabled,false);assert.equal(failed.s.window.__orderSubmitInFlight,false);
 });
-test('order IDs are independent of local order counts on simultaneous devices',()=>{
+test('short proposed IDs have five digits and avoid locally known IDs',()=>{
  const start=html.indexOf('    function createCustomerOrderId()'),end=html.indexOf('\n    }',start)+6;
- const s={};vm.createContext(s);vm.runInContext(html.slice(start,end),s);
- const ids=new Set(Array.from({length:200},()=>s.createCustomerOrderId()));assert.equal(ids.size,200);for(const id of ids)assert.match(id,/^ORD-[A-Z0-9-]+$/);
+ const s={orders:[]};vm.createContext(s);vm.runInContext(html.slice(start,end),s);
+ const ids=new Set();for(let i=0;i<200;i++){const id=s.createCustomerOrderId();assert.match(id,/^ORD-\d{5}$/);ids.add(id);s.orders.push({id});}assert.equal(ids.size,200);
 });
 test('HTTP repair runs even with an apparently live socket and requests conditional deltas',async()=>{
  let url,count=0;
@@ -42,4 +42,11 @@ test('real stylesheet allows complete names/descriptions and auto-height admin a
  // The explicit override wins over fixed inline heights in actual browser CSS.
  assert.match(d.getElementById('responsive-order-text-fix').textContent,/backend-order-card button\{height:auto!important/);
  }finally{dom.window.close();}
+});
+
+test('checkout adopts the server-assigned short tracking ID before storing or opening tracking',async()=>{
+ const c=checkout();let tracked;
+ c.s.fetch=async()=>({ok:true,json:async()=>({success:true,orderId:'ORD-23456'})});
+ c.s.openOrderTrackingModal=id=>{tracked=id;};await c.s.submitCustomerOrderWithBill();
+ assert.equal(c.s.orders[0].id,'ORD-23456');assert.equal(tracked,'ORD-23456');assert.equal(c.s.window.__pendingOrderSubmissionKey,'');
 });
