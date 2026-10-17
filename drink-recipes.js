@@ -105,7 +105,14 @@ function validateEnglish(english,recipe) {
   if(!english || english.sourceHash!==recipeSourceHash(recipe))bad();
   const text=(v,max)=>{if(typeof v!=='string'||v.length>max)bad();return v.trim();};
   if(!Array.isArray(english.ingredients)||english.ingredients.length!==recipe.ingredients.length)bad();
-  const ingredients=english.ingredients.map(row=>{const name=text(row?.name,300),unit=text(row?.unit,80);if(!name||!unit)bad();return{name,unit};});
+  const ingredients=english.ingredients.map((row,index)=>{
+    const name=text(row?.name,300),unit=text(row?.unit,80),source=recipe.ingredients[index];if(!name||!unit)bad();
+    const standard=u=>u.toLowerCase().replace(/^gr$/,'g');
+    if(/^(ml|l|g|gr|kg|mg|cm|mm|°c|°f)$/i.test(source.unit) && standard(unit)!==standard(source.unit))bad();
+    const digits=v=>v.match(/\d+(?:[.,]\d+)*%?/g)||[];
+    if(JSON.stringify(digits(source.name))!==JSON.stringify(digits(name)))bad();
+    return{name,unit};
+  });
   const steps=text(english.steps,15000),notes=text(english.notes,5000);
   const numbers=text=>(text.match(/\d+(?:[.,]\d+)*\s*%?/g)||[]).map(n=>n.replace(/\s/g,''));
   for(const field of ['steps','notes']){

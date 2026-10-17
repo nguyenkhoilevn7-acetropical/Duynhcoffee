@@ -84,7 +84,7 @@ test('English translation preserves quantities, uses cache, saves with matching 
  const changed={...recipe,ingredients:recipe.ingredients.map((r,i)=>({...r,amount:i?13:120}))};assert.equal(validateRecipe({...changed,english:a.english}).english,undefined);
 });
 test('translation refuses modified times, incomplete ingredient rows and changed customer percentages',async()=>{
- for(const value of [{...enValue,steps:'1. Brew tea for 10 minutes\n2. Shake with ice'},{...enValue,ingredients:[]},{...enValue,custom:'100% ice • 50% sugar'}]){
+ for(const value of [{...enValue,steps:'1. Brew tea for 10 minutes\n2. Shake with ice'},{...enValue,ingredients:[]},{...enValue,ingredients:[{name:'Jasmine tea',unit:'oz'},{name:'Sugar',unit:'g'}]},{...enValue,custom:'100% ice • 50% sugar'}]){
   const translator=createRecipeTranslator({env:{GEMINI_API_KEY:'private'},fetchImpl:async()=>candidate(value)});
   await assert.rejects(translator.translate({recipe,custom:'50% đá • 50% đường'}),/khác số liệu/);
  }
