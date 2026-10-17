@@ -25,7 +25,7 @@ test('temporary gateway HTML and polling disconnects keep the accepted job rathe
   return response(complete('one'));
  });
  assert.equal((await f.run()).isValid,true);assert.equal(f.calls.filter(c=>c.options.method==='POST').length,1);
- assert.ok(f.calls.slice(1).every(c=>c.path==='/api/receipt-scans/one'));
+ assert.ok(f.calls.slice(1).every(c=>c.path==='/api/receipt-scans/one?waitMs=4000'));
 });
 test('queued scan may take over sixty seconds and still returns authoritative rejection',async()=>{
  const f=setup(({index,advance})=>{if(index===1)return response(pending('queued'),202);advance(30000);return response(index<4?pending('queued'):complete('queued',false));});
@@ -33,7 +33,7 @@ test('queued scan may take over sixty seconds and still returns authoritative re
 });
 test('one server restart recreates missing job with the same input and then retrieves its result',async()=>{
  const f=setup(({index})=>response(index===1?pending('old'):index===2?{error:'Server restarted'}:index===3?pending('new'):complete('new'),index===2?404:200));
- assert.equal((await f.run()).isValid,true);assert.equal(f.calls.filter(c=>c.options.method==='POST').length,2);assert.equal(f.calls[0].options.body,f.calls[2].options.body);assert.equal(f.calls[3].path,'/api/receipt-scans/new');
+ assert.equal((await f.run()).isValid,true);assert.equal(f.calls.filter(c=>c.options.method==='POST').length,2);assert.equal(f.calls[0].options.body,f.calls[2].options.body);assert.equal(f.calls[3].path,'/api/receipt-scans/new?waitMs=4000');
 });
 test('validation errors are not retried and never unlock payment',async()=>{
  const f=setup(()=>response({error:'Giỏ hàng không hợp lệ'},422)),result=await f.run();
@@ -59,7 +59,14 @@ test('client sends selected toppings and compares the same 53000 payable amount'
 
 test('client timing keeps server OCR and queue timing distinct from request duration',async()=>{
  const f=setup(({advance})=>{advance(1400);const job=complete('timed');job.queueMs=300;job.result.processingMs=900;return response(job);});
- const r=await f.run();assert.equal(r.scanTiming.serverMs,900);assert.equal(r.scanTiming.queueMs,300);assert.equal(r.scanTiming.requestMs,1400);assert.equal(r.scanTiming.reusedJob,true);assert.equal(r.isValid,true);
+ const r=await f.run();assert.equal(r.scanTiming.serverMs,900);assert.equal(r.scanTiming.queueMs,300);assert.equal(r.scanTiming.requestMs,1400);assert.equal(r.scanTiming.resultInUploadResponse,true);assert.equal(r.isValid,true);
+});
+
+test('fast completion needs only the upload round trip and pending scans wait on the server without client polling delays',async()=>{
+ const fast=setup(()=>response(complete('fast')));
+ assert.equal((await fast.run()).isValid,true);assert.equal(fast.calls.length,1);assert.equal(fast.calls[0].path,'/api/receipt-scans?waitMs=4000');assert.equal(fast.calls[0].options.headers['Content-Type'],'application/json');assert.equal(fast.clock,0);
+ const slow=setup(({index})=>response(index===1?pending('slow'):complete('slow')));
+ const r=await slow.run();assert.equal(r.isValid,true);assert.equal(r.scanTiming.resultInUploadResponse,false);assert.equal(slow.calls.length,2);assert.equal(slow.calls[1].path,'/api/receipt-scans/slow?waitMs=4000');assert.equal(slow.calls[1].options.headers,undefined);assert.equal(slow.clock,0);
 });
 
 test('client forwards actual OCR progress and returns non-receipt outcome without retrying upload',async()=>{

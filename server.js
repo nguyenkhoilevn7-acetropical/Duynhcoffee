@@ -1024,18 +1024,29 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // Short requests let the browser follow existing work instead of restarting OCR.
+  // Opt-in bounded waiting delivers fast OCR in the upload response, avoiding
+  // an extra mobile network round trip. Old clients still receive pending immediately.
+  async function receiptSnapshot(job) {
+    const preferred = /^\d{1,8}$/.test(String(parsedUrl.query.waitMs || '')) ? Number(parsedUrl.query.waitMs) : 0;
+    if (!job || job.status !== 'pending' || !preferred) return job;
+    const controller = new AbortController();
+    const disconnected = () => controller.abort();
+    res.once('close', disconnected);
+    try { return await receiptJobs.wait(job.jobId, Math.min(4000, preferred), controller.signal); }
+    finally { res.removeListener('close', disconnected); }
+  }
   if (pathname === '/api/receipt-scans' && req.method === 'POST') {
     try {
       const body = await parseRequestBody(req);
       if (!Number.isSafeInteger(body.payableAmount) || body.payableAmount <= 0) throw new Error('Phiên thanh toán đã cũ. Vui lòng tải lại trang để xác minh đúng tổng tiền gồm topping');
-      sendJson(res, 202, receiptJobs.start(body, receiptVerifier.requestKey(body)));
+      const job = await receiptSnapshot(receiptJobs.start(body, receiptVerifier.requestKey(body)));
+      if (!res.destroyed) sendJson(res, job.status === 'pending' ? 202 : 200, job);
     } catch (error) { sendJson(res, 422, { error: error.message }); }
     return;
   }
   if (pathname.startsWith('/api/receipt-scans/') && req.method === 'GET') {
-    const job = receiptJobs.get(pathname.slice('/api/receipt-scans/'.length));
-    sendJson(res, job ? 200 : 404, job || { error: 'Tác vụ quét đã hết hạn hoặc máy chủ vừa khởi động lại. Vui lòng thử lại.' });
+    const job = await receiptSnapshot(receiptJobs.get(pathname.slice('/api/receipt-scans/'.length)));
+    if (!res.destroyed) sendJson(res, job ? 200 : 404, job || { error: 'Tác vụ quét đã hết hạn hoặc máy chủ vừa khởi động lại. Vui lòng thử lại.' });
     return;
   }
   // 8. POST /api/verify-receipt (preserved for existing integrations)

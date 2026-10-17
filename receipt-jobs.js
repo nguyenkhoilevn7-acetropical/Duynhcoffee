@@ -49,6 +49,7 @@ function createReceiptJobs({ verify, now = Date.now }) {
           // Map insertion order must represent completion order for eviction.
           jobs.delete(job.id);
           jobs.set(job.id, job);
+          for (const notify of job.waiters || []) notify();
           prune();
         }
       }
@@ -78,6 +79,26 @@ function createReceiptJobs({ verify, now = Date.now }) {
     prune();
     return snapshot(jobs.get(id));
   }
-  return { start, get };
+  function wait(id, timeoutMs = 0, signal) {
+    prune();
+    const job = jobs.get(id);
+    const duration = Math.min(4000, Math.max(0, Number(timeoutMs) || 0));
+    if (!job || job.status !== 'pending' || !duration || signal?.aborted) return Promise.resolve(snapshot(job));
+    job.waiters ||= new Set();
+    // Bound listeners even when a client retries repeatedly while OCR is busy.
+    if (job.waiters.size >= 20) return Promise.resolve(snapshot(job));
+    return new Promise(resolve => {
+      const done = () => {
+        clearTimeout(timer);
+        job.waiters.delete(done);
+        signal?.removeEventListener('abort', done);
+        resolve(snapshot(job));
+      };
+      const timer = setTimeout(done, duration);
+      job.waiters.add(done);
+      signal?.addEventListener('abort', done, { once: true });
+    });
+  }
+  return { start, get, wait };
 }
 module.exports = { createReceiptJobs };

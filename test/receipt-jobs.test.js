@@ -100,3 +100,27 @@ test('pending progress is sanitized, monotonic and cannot change a finished job'
  report({percent:10,phase:'unknown'});assert.equal(jobs.get(job.jobId).progress.percent,30);report({percent:NaN});assert.equal(jobs.get(job.jobId).progress.percent,30);
  report({percent:1000,phase:'comparing'});assert.equal(jobs.get(job.jobId).progress.percent,99);release({isValid:false});await tick();report({percent:1});assert.equal(jobs.get(job.jobId).status,'complete');assert.equal(jobs.get(job.jobId).progress,undefined);
 });
+
+test('bounded wait delivers completion to all waiting clients without another OCR run',async()=>{
+ let release,calls=0;const jobs=createReceiptJobs({verify:()=>{calls++;return new Promise(r=>release=r);}});
+ const job=jobs.start({image:'private'},'inline');await tick();
+ const waits=[jobs.wait(job.jobId,4000),jobs.wait(job.jobId,4000)];
+ release({isValid:false,nonReceipt:true});
+ for(const result of await Promise.all(waits)){assert.equal(result.status,'complete');assert.equal(result.result.nonReceipt,true);assert.equal(JSON.stringify(result).includes('private'),false);}
+ assert.equal(calls,1);assert.equal((await jobs.wait(job.jobId,4000)).status,'complete');assert.equal(await jobs.wait('missing',4000),null);
+});
+
+test('wait timeout and disconnected client preserve the accepted job for later retrieval',async()=>{
+ let release;const jobs=createReceiptJobs({verify:()=>new Promise(r=>release=r)});const job=jobs.start({},'timeout');await tick();
+ assert.equal((await jobs.wait(job.jobId,10)).status,'pending');
+ const controller=new AbortController(),waiting=jobs.wait(job.jobId,4000,controller.signal);controller.abort();assert.equal((await waiting).status,'pending');
+ assert.equal((await jobs.wait(job.jobId,4000,controller.signal)).status,'pending');
+ release({isValid:true});await tick();assert.equal(jobs.get(job.jobId).result.isValid,true);
+});
+
+test('failed OCR wakes waiting clients and excessive waiters do not accumulate',async()=>{
+ let reject;const jobs=createReceiptJobs({verify:()=>new Promise((_,r)=>reject=r)});const job=jobs.start({},'failed');await tick();
+ const waits=Array.from({length:20},()=>jobs.wait(job.jobId,4000));assert.equal((await jobs.wait(job.jobId,4000)).status,'pending');
+ reject(Error('temporary failure'));
+ for(const result of await Promise.all(waits)){assert.equal(result.status,'error');assert.equal(result.error,'temporary failure');}
+});

@@ -7030,7 +7030,7 @@ function toggleKitchenSoundAlert() {
         if (remaining <= 0) throw new Error('Kết nối chưa ổn định. Vui lòng thử lại cùng ảnh để tiếp tục xác minh.');
         const timeout = setTimeout(() => controller.abort(), Math.min(options.method === 'POST' ? 45000 : 20000, remaining));
         try {
-          const response = await fetch(getCloudApiUrl(path), { ...options, cache: 'no-store', signal: controller.signal });
+          const response = await fetch(getCloudApiUrl(path + '?waitMs=4000'), { ...options, cache: 'no-store', signal: controller.signal });
           let result;
           try { result = await response.json(); }
           catch (_) { throw Object.assign(new Error('Máy chủ tạm thời chưa trả được kết quả xác minh.'), { status: response.status, retryable: response.ok || response.status === 408 || response.status === 429 || response.status >= 500 }); }
@@ -7062,7 +7062,7 @@ function toggleKitchenSoundAlert() {
           }
         }
         let job = await startJob();
-        const reusedJob = job.status === 'complete';
+        const resultInUploadResponse = job.status === 'complete';
         function reportJobProgress(job) {
           if (job.status!=='pending' || !onProgressCallback) return;
           const labels={starting:'Đang chuẩn bị bộ đọc...',preparing:'Đang sàng lọc ảnh...',recognizing:'Đang nhận dạng chữ trong ảnh...',rereading:'Đang đọc kỹ vùng chưa rõ...',comparing:'Đang đối chiếu tên và số tiền...'};
@@ -7073,7 +7073,9 @@ function toggleKitchenSoundAlert() {
         let networkFailures = 0, restarts = 0;
         while (job.status === 'pending' && Date.now() < deadline) {
 
-          await pause(networkFailures ? Math.min(1000 * 2 ** networkFailures, 5000) : (Date.now() - started < 5000 ? 400 : 1000));
+          // The server waits briefly for completion. Poll immediately after a
+          // pending response; back off only when the network actually failed.
+          if (networkFailures) await pause(Math.min(1000 * 2 ** networkFailures, 5000));
           try {
             job = await request('/api/receipt-scans/' + encodeURIComponent(job.jobId));
             reportJobProgress(job);
@@ -7092,7 +7094,7 @@ function toggleKitchenSoundAlert() {
             return { ...result, isValid:false, matchedAmount:false, verificationToken:undefined,
               reason:'Số tiền máy chủ xác minh chưa khớp tổng tiền cần thanh toán. Vui lòng kiểm tra giỏ hàng và quét lại biên lai.' };
           }
-          return {...result, scanTiming:{requestMs:Date.now()-started, reusedJob,
+          return {...result, scanTiming:{requestMs:Date.now()-started, resultInUploadResponse,
             serverMs:Number.isFinite(result?.processingMs) ? result.processingMs : null,
             queueMs:Number.isFinite(job.queueMs) ? job.queueMs : null}};
         }

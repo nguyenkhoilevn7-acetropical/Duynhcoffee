@@ -23,7 +23,8 @@ test('HTTP scan starts quickly, retries share work, and completed proof is serve
  let response=await post('/api/receipt-scans',body);assert.equal(response.status,202);
  const pending=await response.json();assert.equal(pending.status,'pending');assert.ok(!pending.result);assert.ok(!pending.image);
  const retry=await(await post('/api/receipt-scans',body)).json();assert.equal(retry.jobId,pending.jobId);
- await new Promise(resolve=>setTimeout(resolve,120));
+ const inline=await fetch(base+'/api/receipt-scans?waitMs=4000',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ assert.equal(inline.status,200);const inlineJob=await inline.json();assert.equal(inlineJob.jobId,pending.jobId);assert.equal(inlineJob.status,'complete');assert.equal(inlineJob.result.isValid,true);assert.ok(inlineJob.result.verificationToken);
  const completed=await(await fetch(base+'/api/receipt-scans/'+pending.jobId)).json();
  assert.equal(completed.status,'complete');assert.equal(completed.result.isValid,true);assert.ok(completed.result.verificationToken);
  const cached=await(await post('/api/receipt-scans',body)).json();assert.equal(cached.status,'complete');assert.equal(cached.jobId,pending.jobId);
@@ -57,7 +58,7 @@ test('HTTP scan starts quickly, retries share work, and completed proof is serve
  const messages=fs.readFileSync(path.join(dir,'.push-test-log'),'utf8').trim().split('\n');assert.equal(messages.length,1);assert.match(messages[0],/Có đơn hàng mới/);
  await post('/api/config',{bankConfig:{accountHolder:'DAO KHUE NGUYEN'}});
  const changed=await(await post('/api/receipt-scans',body)).json();assert.notEqual(changed.jobId,pending.jobId);
- await new Promise(resolve=>setTimeout(resolve,120));
+ const waited=await(await fetch(base+'/api/receipt-scans/'+changed.jobId+'?waitMs=4000')).json();assert.equal(waited.status,'complete');assert.equal(waited.result.isValid,false);assert.ok(!waited.result.verificationToken);
  const rejected=await(await fetch(base+'/api/receipt-scans/'+changed.jobId)).json();assert.equal(rejected.result.isValid,false);assert.ok(!rejected.result.verificationToken);
  }finally{if(child.exitCode===null)await new Promise(resolve=>{child.once('exit',resolve);child.kill();});fs.rmSync(dir,{recursive:true,force:true});}
 });
