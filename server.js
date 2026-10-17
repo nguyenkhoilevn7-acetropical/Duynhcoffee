@@ -156,6 +156,20 @@ const delivery = createDelivery({ getOrders: () => ordersCache,
   saveOrders: () => writeJsonFile(ORDERS_FILE, ordersCache), broadcast: broadcastRealtime });
 setInterval(() => delivery.poll().catch(() => {}), 60000).unref();
 function mergeConfig(current, patch) {
+  if (patch.banner !== undefined) {
+    const images = patch.banner && patch.banner.images;
+    if (!Array.isArray(images) || images.length > 20 || images.some(src => typeof src !== 'string')) throw new Error('Banner cần tối đa 20 ảnh / video');
+    let videoBytes = 0;
+    for (const src of images) {
+      if (/^data:video\//i.test(src)) {
+        if (!/^data:video\/(mp4|webm);base64,[A-Za-z0-9+/=]+$/i.test(src)) throw new Error('Video cần định dạng MP4 hoặc WebM');
+        const bytes = Buffer.byteLength(src.split(',')[1], 'base64');
+        if (bytes > 4 * 1024 * 1024) throw new Error('Mỗi video tối đa 4 MB');
+        videoBytes += bytes;
+      }
+    }
+    if (videoBytes > 6 * 1024 * 1024 || Buffer.byteLength(JSON.stringify(patch.banner)) > 12 * 1024 * 1024) throw new Error('Banner quá lớn. Tổng video tối đa 6 MB');
+  }
   return { ...current, ...patch,
     bankConfig: { ...(current.bankConfig || {}), ...(patch.bankConfig || {}) },
     momoConfig: { ...(current.momoConfig || {}), ...(patch.momoConfig || {}) } };

@@ -135,9 +135,10 @@ function calculateAmount(items, menu, discounts, code) {
   if (!Number.isSafeInteger(total) || total <= 0) throw new Error('Số tiền không hợp lệ');
   return total;
 }
-function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineMs = 45000 }) {
+function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineMs = 45000, cacheOcr = !recognize }) {
   const secret = crypto.randomBytes(32);
-  let worker, workerReady, busy = false, workerGeneration = 0;
+  const readings = new Map(); // Text only, bounded and short-lived; never cache approval or payment totals.
+  let worker, workerReady, resetReady, busy = false, workerGeneration = 0;
   const hash = image => crypto.createHash('sha256').update(image).digest('hex');
   const sign = encoded => crypto.createHmac('sha256', secret).update(encoded).digest('base64url');
   async function warmup() {
@@ -167,13 +168,15 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
   }
   async function ocr(image, amount, holder) {
     if (recognize) return { text: await recognize(image), passes: 1 };
+    if (resetReady) await resetReady;
     await warmup();
     const activeWorker = worker;
+    const textOnly = { text:true, blocks:false, hocr:false, tsv:false, box:false, unlv:false, osd:false, pdf:false };
     const { prepareReceipt } = require('./receipt-image');
     const prepared = prepareReceipt(Buffer.from(image.split(',')[1], 'base64'), image.match(/^data:image\/(\w+)/)[1]);
     await activeWorker.setParameters({ tessedit_pageseg_mode: '6' });
     // Keep full-resolution field rows on screenshots; normalize shadows on photos.
-    const first = await activeWorker.recognize(prepared.cleaned);
+    const first = await activeWorker.recognize(prepared.cleaned, {}, textOnly);
     const comparison = compareReceipt(first.data.text, amount, holder);
     if (!shouldRetryOcr(comparison, first.data.confidence)) return { text: first.data.text, passes: 1 };
     // Sparse-text mode tolerates photographed screens and separated bank fields.
@@ -182,18 +185,26 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
     await activeWorker.reinitialize('eng+vie', 1);
     try {
       await activeWorker.setParameters({ tessedit_pageseg_mode: '11' });
-      const fallback = await activeWorker.recognize(prepared.photo || prepared.original);
+      const fallback = await activeWorker.recognize(prepared.photo || prepared.original, {}, textOnly);
       const next=compareReceipt(fallback.data.text,amount,holder);
       if(next.isValid || !shouldRetryOcr(next,fallback.data.confidence))return {text:fallback.data.text,passes:2};
       // Retain unfiltered color text when glare/lighting normalization is unhelpful.
       await activeWorker.setParameters({ tessedit_pageseg_mode: '6' });
-      const last=await activeWorker.recognize(prepared.original);
+      const last=await activeWorker.recognize(prepared.original, {}, textOnly);
       const candidates=[{text:first.data.text,passes:1,result:comparison},{text:fallback.data.text,passes:2,result:next},
         {text:last.data.text,passes:3,result:compareReceipt(last.data.text,amount,holder)}];
       const score=x=>Number(x.result.recipientReadable)+Number(x.result.amountReadable);
       candidates.sort((a,b)=>score(b)-score(a));
       return {text:candidates[0].text,passes:3};
-    } finally { await activeWorker.reinitialize('vie', 1); }
+    } finally {
+      // Restore the exact first-pass model in the background. Next OCR waits for
+      // it; the current result does not wait for model initialization again.
+      const generation = workerGeneration;
+      resetReady = activeWorker.reinitialize('vie', 1).catch(() => {
+        if (generation === workerGeneration && worker === activeWorker) { worker = null; workerReady = null; }
+        activeWorker.terminate().catch(() => {});
+      });
+    }
   }
   async function verify(body) {
     const image = body.image || body.receiptImage;
@@ -208,8 +219,15 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
     let timer;
     const processingStarted = Date.now();
     try {
-      const text = await Promise.race([ocr(image, amount, holder), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Máy chủ chưa đọc xong biên lai. Chưa thể kết luận số tiền hoặc tên người nhận sai; vui lòng thử lại.')), deadlineMs); })]);
+      const imageKey = hash(image);
+      for (const [key, entry] of readings) if (now() - entry.at >= 120000) readings.delete(key);
+      const cached = cacheOcr && readings.get(imageKey);
+      const text = cached ? { text: cached.text, passes: 0 } : await Promise.race([ocr(image, amount, holder), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Máy chủ chưa đọc xong biên lai. Chưa thể kết luận số tiền hoặc tên người nhận sai; vui lòng thử lại.')), deadlineMs); })]);
       const result = compareReceipt(text.text, amount, holder);
+      if (cacheOcr && result.recipientReadable && result.amountReadable && !cached) {
+        if (readings.size >= 8) readings.delete(readings.keys().next().value);
+        readings.set(imageKey, {text: text.text, at: now()});
+      }
       result.expectedAmount = amount;
       result.ocrPasses = text.passes;
       result.processingMs = Date.now() - processingStarted;

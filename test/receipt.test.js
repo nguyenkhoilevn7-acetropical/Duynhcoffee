@@ -104,3 +104,13 @@ test('45000 receipt cannot approve 53000 drink with 8000 topping; correct amount
  assert.equal(calculateAmount([{...items[0],qty:2}],state.menu,[{code:'OFF',percent:10}], 'OFF'),95400);
  for (const toppings of [[{id:'unknown'}],[{id:'Trân Châu Trắng'},{id:'Trân Châu Trắng'}],null]) assert.throws(()=>calculateAmount([{id:1,qty:1,toppings}],state.menu,[],null));
 });
+
+test('cached OCR text saves a reread but always rechecks current topping price, recipient and expiry',async()=>{
+ let calls=0,clock=1000;const state={menu:[{id:1,category:'tea',price:45000}],discounts:[],config:{bankConfig:{accountHolder:'DAO KHOI NGUYEN'}}};
+ const ai=createReceiptVerifier({readState:()=>state,now:()=>clock,cacheOcr:true,recognize:async()=>{calls++;return 'Giao dịch thành công\n45.000đ\nNgười nhận DAO KHOI NGUYEN';}});
+ const image='data:image/png;base64,YWJj',base={image,items:[{id:1,qty:1}],payableAmount:45000};
+ assert.equal((await ai.verify(base)).isValid,true);
+ const mismatch=await ai.verify({image,items:[{id:1,qty:1,toppings:[{id:'Trân Châu Trắng'}]}],payableAmount:53000});assert.equal(mismatch.isValid,false);assert.equal(mismatch.verificationToken,undefined);assert.equal(mismatch.ocrPasses,0);assert.equal(calls,1);
+ state.config.bankConfig.accountHolder='TRAN VAN AN';assert.equal((await ai.verify(base)).isValid,false);assert.equal(calls,1);
+ clock+=120001;await ai.verify(base);assert.equal(calls,2);
+});

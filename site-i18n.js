@@ -6,6 +6,9 @@
 })(function () {
   'use strict';
   const catalog = {
+  "Ảnh & video quảng cáo Banner:": "Banner images & advertising videos:",
+  "Tải ảnh / video từ máy (Tối đa 20)": "Upload images / videos (up to 20)",
+  "Video MP4/WebM khoảng 10 giây (tối đa 15 giây, 4 MB/clip; tổng video 6 MB). Tự phát không tiếng, có nút bật tiếng. Bấm Lưu để đồng bộ.": "MP4/WebM videos around 10 seconds (up to 15 seconds, 4 MB per clip; 6 MB total). Autoplays muted with sound controls. Save to sync.",
   "Hủy": "Cancel",
   "Tùy chọn món: Đá, độ ngọt và topping": "Item options: ice, sweetness and toppings",
   "Để trống nhóm nếu món không cho khách chọn. Giá topping được cộng theo từng ly.": "Leave a group empty to disable it. Topping prices are added per drink.",

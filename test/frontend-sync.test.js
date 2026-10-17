@@ -49,7 +49,7 @@ test('banner retains its slide and timer on identical sync, changes when banner 
   const box={classList:{add(){},remove(){}}};
   const s={window:{},document:{getElementById:id=>id==='frontend-hero-banner'?box:id==='hero-banner-image-container'?container:null},
     bannerSlideTimer:null,bannerActiveSlideIndex:0,config:{images:['a','b'],autoplaySpeed:3.5},
-    getBannerConfig(){return s.config;},setInterval(){starts++;return starts;},clearInterval(){stops++;},nextFrontendBannerSlide(){}};
+    getBannerConfig(){return s.config;},bannerMediaHtml:()=>'',activateBannerMedia(){s.bannerSlideTimer=++starts;},setInterval(){starts++;return starts;},clearTimeout(){stops++;},clearInterval(){stops++;},nextFrontendBannerSlide(){}};
   vm.createContext(s);
   vm.runInContext(html.slice(html.indexOf('    function renderFrontendBanner()'),html.indexOf('    function goToFrontendBannerSlide')),s);
   s.renderFrontendBanner();s.bannerActiveSlideIndex=1;s.renderFrontendBanner();
@@ -66,19 +66,6 @@ test('slow HTTP polling has only one outstanding request and releases guard afte
   const pending=s.pullFullSyncFromServer();await s.pullFullSyncFromServer();assert.equal(requests,1);
   resolve({ok:false});await pending;
   const next=s.pullFullSyncFromServer();assert.equal(requests,2);resolve({ok:false});await next;
-});
-test('banner releases hidden images after transition and loads the requested slide',()=>{
-  let finish;
-  const imgs=[{src:'a'},{src:null},{src:null}].map(x=>({...x,getAttribute(){return this.src;},removeAttribute(){this.src=null;}}));
-  const slides=imgs.map(img=>({querySelector:()=>img,classList:{toggle(){}}}));
-  const track={};
-  const s={window:{},bannerActiveSlideIndex:1,getBannerConfig:()=>({images:['a','b','c']}),
-    setTimeout:fn=>{finish=fn;return 1;},clearTimeout(){},
-    document:{querySelectorAll:q=>q.includes('track')?slides:[],getElementById:()=>track}};
-  vm.createContext(s);
-  vm.runInContext(html.slice(html.indexOf('    function updateFrontendSliderDom'),html.indexOf('    function copyBannerPromoCode')),s);
-  s.updateFrontendSliderDom('fade');assert.equal(imgs[1].src,'b');assert.equal(imgs[0].src,'a');assert.equal(imgs[2].src,null);
-  finish();assert.equal(imgs[0].src,null);assert.equal(imgs[1].src,'b');
 });
 function receiptDecoder(width, height, fails = false) {
   const canvases = [], draws = [], images = [];

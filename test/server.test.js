@@ -29,6 +29,13 @@ test('HTTP menu/config save succeeds, empty values survive restart, private sour
  assert.equal(r.status,200);assert.equal((await r.json()).success,true);assert.deepEqual(await(await fetch(base+'/api/menu')).json(),menu);
  r=await fetch(base+'/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({bankConfig:{accountHolder:'DAO KHUE NGUYEN'},banner:{images:[]}})});
  assert.equal(r.status,200);assert.equal((await r.json()).success,true);
+ const clip='data:video/mp4;base64,YWJj';
+ r=await fetch(base+'/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({banner:{images:['https://example.test/banner.jpg',clip]}})});assert.equal(r.status,200);
+ assert.deepEqual((await(await fetch(base+'/api/config')).json()).banner.images,['https://example.test/banner.jpg',clip]);
+ r=await fetch(base+'/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({banner:{images:['data:video/quicktime;base64,YWJj']}})});assert.equal(r.status,500);
+ assert.deepEqual((await(await fetch(base+'/api/config')).json()).banner.images,['https://example.test/banner.jpg',clip]);
+ await stop();await start();assert.equal((await(await fetch(base+'/api/config')).json()).banner.images[1],clip);
+ await fetch(base+'/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({banner:{images:[]}})});
  r=await fetch(base+'/api/menu',{method:'POST',headers:{'Content-Type':'application/json'},body:'[]'});assert.equal(r.status,200);
  for(const route of ['/server.js','/menu-ai.js','/delivery.js','/admin-push.js','/.admin-push.json','/drive-backup.js','/receipt-jobs.js','/store_config.json','/api/backup/status']) assert.ok([401,404].includes((await fetch(base+route)).status));
  for(const route of ['/privacy.html','/terms.html','/backup.html']){const html=await(await fetch(base+route)).text();assert.match(html,/<\/body>\s*<\/html>\s*$/);}
