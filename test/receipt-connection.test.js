@@ -61,3 +61,8 @@ test('client timing keeps server OCR and queue timing distinct from request dura
  const f=setup(({advance})=>{advance(1400);const job=complete('timed');job.queueMs=300;job.result.processingMs=900;return response(job);});
  const r=await f.run();assert.equal(r.scanTiming.serverMs,900);assert.equal(r.scanTiming.queueMs,300);assert.equal(r.scanTiming.requestMs,1400);assert.equal(r.scanTiming.reusedJob,true);assert.equal(r.isValid,true);
 });
+
+test('client forwards actual OCR progress and returns non-receipt outcome without retrying upload',async()=>{
+ const f=setup(({index})=>index===1?response({jobId:'p',status:'pending',progress:{percent:12,phase:'preparing'}},202):index===2?response({jobId:'p',status:'pending',progress:{percent:48,phase:'recognizing'}}):response({jobId:'p',status:'complete',result:{isValid:false,nonReceipt:true,reason:'Not a bank receipt'}}));
+ const r=await f.run();assert.equal(r.nonReceipt,true);assert.equal(r.isValid,false);assert.ok(f.progress.some(x=>x[0]===12));assert.ok(f.progress.some(x=>x[0]===48));assert.equal(f.calls.filter(x=>x.options.method==='POST').length,1);
+});

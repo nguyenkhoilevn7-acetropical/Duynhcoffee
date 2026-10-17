@@ -93,3 +93,10 @@ test('queue timing measures waiting independently of recognition time',async()=>
  const first=jobs.start({},'first');await tick();clock=10;const second=jobs.start({},'second');clock=110;releases.shift()({processingMs:110});await tick();clock=120;releases.shift()({processingMs:10});await tick();
  assert.equal(jobs.get(first.jobId).queueMs,0);assert.equal(jobs.get(second.jobId).queueMs,100);assert.equal(jobs.get(second.jobId).result.processingMs,10);
 });
+
+test('pending progress is sanitized, monotonic and cannot change a finished job',async()=>{
+ let report,release;const jobs=createReceiptJobs({verify:(body,update)=>{report=update;return new Promise(resolve=>release=resolve);}});const job=jobs.start({},'progress');await tick();
+ report({percent:30,phase:'recognizing',private:'hidden'});assert.deepEqual(jobs.get(job.jobId).progress,{percent:30,phase:'recognizing'});
+ report({percent:10,phase:'unknown'});assert.equal(jobs.get(job.jobId).progress.percent,30);report({percent:NaN});assert.equal(jobs.get(job.jobId).progress.percent,30);
+ report({percent:1000,phase:'comparing'});assert.equal(jobs.get(job.jobId).progress.percent,99);release({isValid:false});await tick();report({percent:1});assert.equal(jobs.get(job.jobId).status,'complete');assert.equal(jobs.get(job.jobId).progress,undefined);
+});

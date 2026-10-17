@@ -18,6 +18,7 @@ function prepareReceipt(buffer, mime) {
   const width = Math.max(1, Math.round(image.width * scale));
   const height = Math.max(1, Math.round(image.height * scale));
   const original = new PNG({ width, height }), cleaned = new PNG({ width, height });
+  let colorfulPixels=0;
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
     const source = (Math.min(image.height - 1, Math.floor(y / scale)) * image.width + Math.min(image.width - 1, Math.floor(x / scale))) * 4;
     const target = (y * width + x) * 4;
@@ -26,6 +27,7 @@ function prepareReceipt(buffer, mime) {
     const red = image.data[source] * alpha + white;
     const green = image.data[source + 1] * alpha + white;
     const blue = image.data[source + 2] * alpha + white;
+    if(Math.max(red,green,blue)-Math.min(red,green,blue)>45) colorfulPixels++;
     original.data[target] = red; original.data[target + 1] = green; original.data[target + 2] = blue;
     original.data[target + 3] = cleaned.data[target + 3] = 255;
   }
@@ -87,8 +89,21 @@ function prepareReceipt(buffer, mime) {
     return normalizeLighting(crop);
   }
   const options = { deflateLevel: 1 };
-  let originalPng,photoPng,photoPrepared=false;
+  let originalPng,photoPng,photoPrepared=false,screeningPng;
   return { cleaned: PNG.sync.write(cleaned, options),
+    get screening() {
+      if (Math.max(width,height)<=1000 || colorfulPixels/(width*height)<0.12) return null;
+      if (!screeningPng) {
+        const factor=Math.min(1,800/Math.max(width,height));
+        const small=new PNG({width:Math.max(1,Math.round(width*factor)),height:Math.max(1,Math.round(height*factor))});
+        for(let y=0;y<small.height;y++)for(let x=0;x<small.width;x++){
+          const p=(Math.min(height-1,Math.floor(y/factor))*width+Math.min(width-1,Math.floor(x/factor)))*4;
+          const q=(y*small.width+x)*4;for(let c=0;c<4;c++)small.data[q+c]=original.data[p+c];
+        }
+        screeningPng=PNG.sync.write(small,options);
+      }
+      return screeningPng;
+    },
     get original() { return originalPng || (originalPng = PNG.sync.write(original, options)); },
     get photo() { if(!photoPrepared){photoPrepared=true;const crop=screenCrop();photoPng=crop?PNG.sync.write(crop,options):null;}return photoPng; }
   };

@@ -98,6 +98,20 @@ function compareReceipt(text, amount, holder) {
       !matchedAmount?(amountReadable?'Số tiền trên biên lai không khớp tiền nước cần thanh toán.':'Chưa đọc rõ số tiền giao dịch trên biên lai. Hãy tải ảnh gốc rõ nét hơn.') : '' };
 }
 
+// This triage never approves a payment. It only avoids repeated OCR on
+// clearly unrelated documents; ambiguous/photographed receipts retain fallback.
+function classifyReceiptText(text) {
+  const rows=String(text || '').split(/\r?\n/).map(normalize).filter(Boolean);
+  const whole=rows.join(' ');
+  const success=/\b(?:GIAO DICH|CHUYEN TIEN|CHUYEN KHOAN|THANH TOAN) THANH CONG\b|\b(?:TRANSFER SUCCESSFUL|SUCCESSFUL TRANSFER|PAYMENT SUCCESSFUL)\b/.test(whole);
+  const recipient=rows.some(row=>/^(?:TEN (?:NGUOI )?(?:NHAN|THU HUONG)|NGUOI (?:NHAN|THU HUONG)|RECIPIENT|BENEFICIARY)\b/.test(row));
+  const bank=/(?:VIETCOMBANK|VCB DIGIBANK|SACOMBANK|TECHCOMBANK|MBBANK|BIDV|VIETINBANK|ZALOPAY|MOMO|NGAN HANG|BANK)\b/.test(whole);
+  const transfer=rows.some(row=>/^(?:MA GIAO DICH|THOI GIAN (?:GIAO DICH|THANH TOAN)|TAI KHOAN NHAN|SO TIEN (?:CHUYEN|GIAO DICH)|TRANSACTION ID|TRANSFER AMOUNT)\b/.test(row));
+  if(success || recipient || transfer || bank) return 'possible_receipt';
+  if (/THANH TOAN DON HANG/.test(whole) && /CHUA XAC MINH DUOC/.test(whole) && /CHAM DE DOI ANH|VUI LONG QUET LAI/.test(whole)) return 'unrelated';
+  const menuSignals=[/\bCOFFEE\b/,/\bTEA\b/,/\bCART\b/,/\bBUY NOW\b/,/\bADD\b/,/\bMENU\b/,/\bGIO HANG\b/,/\bMUA NGAY\b/,/\bCA PHE\b/,/\bTOPPING\b/,/\bTHANH TOAN DON HANG\b/].filter(pattern=>pattern.test(whole)).length;
+  return menuSignals>=3 ? 'unrelated' : 'unclear';
+}
 function shouldRetryOcr(comparison, confidence) {
   if (comparison.isValid) return false;
   // A readable mismatch is already a decision. Reread only uncertain fields,
@@ -139,6 +153,8 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
   const secret = crypto.randomBytes(32);
   const readings = new Map(); // Text only, bounded and short-lived; never cache approval or payment totals.
   let worker, workerReady, resetReady, busy = false, workerGeneration = 0;
+  let activeProgress = null, progressBase = 5, progressSpan = 0;
+  const progress = (percent,phase) => { if(activeProgress) activeProgress({percent,phase}); };
   const hash = image => crypto.createHash('sha256').update(image).digest('hex');
   const sign = encoded => crypto.createHmac('sha256', secret).update(encoded).digest('base64url');
   async function warmup() {
@@ -159,7 +175,7 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
         const source = language === 'vie' ? path.join(__dirname, 'ocr-data', 'vie.traineddata.gz') : path.join(data.langPath + '_best_int', language + '.traineddata.gz');
         fs.copyFileSync(source, path.join(languageDir, language + '.traineddata.gz'));
       }
-      const initialized = await createWorker('vie', 1, { langPath: languageDir, gzip: true, cacheMethod: 'none', errorHandler: () => {} });
+      const initialized = await createWorker('vie', 1, { langPath: languageDir, gzip: true, cacheMethod: 'none', logger: event => { if (generation === workerGeneration && event.status === 'recognizing text' && Number.isFinite(event.progress)) progress(progressBase + Math.round(event.progress * progressSpan), 'recognizing'); }, errorHandler: () => {} });
       if (generation !== workerGeneration) { await initialized.terminate(); throw new Error('OCR initialization cancelled'); }
       worker = initialized;
       await worker.setParameters({ tessedit_pageseg_mode: '6' });
@@ -171,18 +187,36 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
     if (resetReady) await resetReady;
     await warmup();
     const activeWorker = worker;
+    progress(8,'preparing');
     const textOnly = { text:true, blocks:false, hocr:false, tsv:false, box:false, unlv:false, osd:false, pdf:false };
     const { prepareReceipt } = require('./receipt-image');
     const prepared = prepareReceipt(Buffer.from(image.split(',')[1], 'base64'), image.match(/^data:image\/(\w+)/)[1]);
     await activeWorker.setParameters({ tessedit_pageseg_mode: '6' });
+    // A small first look can identify a menu/page without decoding it three times.
+    // Never use this low-resolution screening result to approve a receipt.
+    const screening = prepared.screening;
+    if (screening) {
+      progressBase=10; progressSpan=20;
+      const peek=await activeWorker.recognize(screening,{},textOnly);
+      if (classifyReceiptText(peek.data.text)==='unrelated') return {text:peek.data.text,passes:1,nonReceipt:true};
+    }
+    progressBase=screening ? 30 : 10; progressSpan=screening ? 40 : 60;
     // Keep full-resolution field rows on screenshots; normalize shadows on photos.
     const first = await activeWorker.recognize(prepared.cleaned, {}, textOnly);
     const comparison = compareReceipt(first.data.text, amount, holder);
+    const kind = classifyReceiptText(first.data.text);
+    if (kind==='unrelated') return {text:first.data.text,passes:1,nonReceipt:true};
+    // No payment cues after a complete first read: stop rather than spend two
+    // more passes on photos/blank images. An enclosed photographed screen keeps
+    // its original crop fallback for glare and low light.
+    if (!comparison.isValid && kind==='unclear' && !comparison.recipientReadable && !prepared.photo) return {text:first.data.text,passes:1,unreadable:true};
     if (!shouldRetryOcr(comparison, first.data.confidence)) return { text: first.data.text, passes: 1 };
     // Sparse-text mode tolerates photographed screens and separated bank fields.
     // Each pass is compared as one complete receipt; never join matching fields
     // from different passes or infer missing text from the expected recipient.
+    progress(72,'rereading');
     await activeWorker.reinitialize('eng+vie', 1);
+    progressBase=72; progressSpan=13;
     try {
       await activeWorker.setParameters({ tessedit_pageseg_mode: '11' });
       const fallback = await activeWorker.recognize(prepared.photo || prepared.original, {}, textOnly);
@@ -190,6 +224,7 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
       if(next.isValid || !shouldRetryOcr(next,fallback.data.confidence))return {text:fallback.data.text,passes:2};
       // Retain unfiltered color text when glare/lighting normalization is unhelpful.
       await activeWorker.setParameters({ tessedit_pageseg_mode: '6' });
+      progressBase=85; progressSpan=10;
       const last=await activeWorker.recognize(prepared.original, {}, textOnly);
       const candidates=[{text:first.data.text,passes:1,result:comparison},{text:fallback.data.text,passes:2,result:next},
         {text:last.data.text,passes:3,result:compareReceipt(last.data.text,amount,holder)}];
@@ -206,7 +241,7 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
       });
     }
   }
-  async function verify(body) {
+  async function verify(body, onProgress) {
     const image = body.image || body.receiptImage;
     if (typeof image !== 'string' || !/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(image) || image.length > 6 * 1024 * 1024) throw new Error('Hãy tải ảnh PNG, JPEG hoặc WebP dưới 4 MB');
     const state = readState();
@@ -216,6 +251,8 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
     if (!normalize(holder)) throw new Error('Chưa cấu hình tên người nhận');
     if (busy) throw new Error('Máy chủ đang đọc một biên lai khác. Vui lòng thử lại sau');
     busy = true;
+    activeProgress = typeof onProgress === 'function' ? onProgress : null;
+    progress(5,'starting');
     let timer;
     const processingStarted = Date.now();
     try {
@@ -223,8 +260,15 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
       for (const [key, entry] of readings) if (now() - entry.at >= 120000) readings.delete(key);
       const cached = cacheOcr && readings.get(imageKey);
       const text = cached ? { text: cached.text, passes: 0 } : await Promise.race([ocr(image, amount, holder), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Máy chủ chưa đọc xong biên lai. Chưa thể kết luận số tiền hoặc tên người nhận sai; vui lòng thử lại.')), deadlineMs); })]);
+      progress(97,'comparing');
       const result = compareReceipt(text.text, amount, holder);
-      if (cacheOcr && result.recipientReadable && result.amountReadable && !cached) {
+      if (text.nonReceipt || text.unreadable) {
+        result.isValid=false;
+        result.nonReceipt=!!text.nonReceipt;
+        result.unreadable=!!text.unreadable;
+        result.reason=text.nonReceipt ? 'Ảnh này không phải biên lai chuyển khoản ngân hàng. Vui lòng tải ảnh giao dịch thành công.' : 'Chưa đọc được thông tin chuyển khoản trong ảnh. Hãy tải biên lai ngân hàng rõ nét hơn.';
+      }
+      if (cacheOcr && !text.nonReceipt && !text.unreadable && result.recipientReadable && result.amountReadable && !cached) {
         if (readings.size >= 8) readings.delete(readings.keys().next().value);
         readings.set(imageKey, {text: text.text, at: now()});
       }
@@ -241,7 +285,7 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
       workerReady = null;
       if (worker) { const oldWorker = worker; worker = null; oldWorker.terminate().catch(() => {}); }
       throw new Error(recognize || error.message.includes('chưa đọc xong') ? error.message : 'Không đọc được biên lai trên máy chủ. Vui lòng thử ảnh rõ nét hơn');
-    } finally { clearTimeout(timer); busy = false; }
+    } finally { clearTimeout(timer); activeProgress = null; busy = false; }
   }
   function assertVerified(order) {
     const parts = String(order.verificationToken || '').split('.');
@@ -270,4 +314,4 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
   }
   return { verify, assertVerified, warmup, requestKey };
 }
-module.exports = { normalize, compareReceipt, calculateAmount, createReceiptVerifier, shouldRetryOcr };
+module.exports = { normalize, compareReceipt, calculateAmount, createReceiptVerifier, shouldRetryOcr, classifyReceiptText };

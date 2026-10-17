@@ -24,6 +24,7 @@ function createReceiptJobs({ verify, now = Date.now }) {
     if (!job) return null;
     const result = { status: job.status, jobId: job.id };
     if (job.status === 'complete') { result.result = job.result; result.queueMs = Math.max(0, job.startedAt - job.createdAt); }
+    if (job.status === 'pending' && job.progress) result.progress = {...job.progress};
     if (job.status === 'error') result.error = job.error;
     return result;
   }
@@ -33,7 +34,11 @@ function createReceiptJobs({ verify, now = Date.now }) {
         const job = queue.shift();
         job.startedAt = now();
         try {
-          job.result = await verify(job.body);
+          job.result = await verify(job.body, update => {
+            if (job.status!=='pending' || !update || !Number.isFinite(update.percent)) return;
+            const phase=['starting','preparing','recognizing','rereading','comparing'].includes(update.phase) ? update.phase : 'recognizing';
+            job.progress={percent:Math.max(job.progress?.percent || 0, Math.min(99, Math.max(0,Math.round(update.percent)))),phase};
+          });
           job.status = 'complete';
         } catch (error) {
           job.error = error instanceof Error ? error.message : 'Không đọc được biên lai. Vui lòng thử lại.';

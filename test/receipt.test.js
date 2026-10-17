@@ -114,3 +114,10 @@ test('cached OCR text saves a reread but always rechecks current topping price, 
  state.config.bankConfig.accountHolder='TRAN VAN AN';assert.equal((await ai.verify(base)).isValid,false);assert.equal(calls,1);
  clock+=120001;await ai.verify(base);assert.equal(calls,2);
 });
+
+test('triage rejects menus and failed checkout screenshots but preserves bank and photographed receipt cues',()=>{
+ const {classifyReceiptText}=require('../receipt-verification');
+ for(const text of ['Coffee Tea Menu Add Buy Now Cart 42,000 VND','Thanh Toán Đơn Hàng\nChưa xác minh được biên lai\nChạm để đổi ảnh khác\nVui lòng quét lại'])assert.equal(classifyReceiptText(text),'unrelated');
+ for(const text of ['Giao dịch thành công\n42,000 VND\nTên người nhận DAO KHOI NGUYEN','ZaloPay\n39.000đ\nDAO KHOI NGUYEN','Ảnh tối\nNgân hàng nhận Vietcombank\nMenu'])assert.equal(classifyReceiptText(text),'possible_receipt');
+ assert.equal(classifyReceiptText(''),'unclear');
+});

@@ -6,6 +6,19 @@
 })(function () {
   'use strict';
   const catalog = {
+  "Đang xử lý:": "Processing:",
+  "giây": "seconds",
+  "Đang chuẩn bị ảnh...": "Preparing image...",
+  "Đang chuẩn bị bộ đọc...": "Preparing receipt reader...",
+  "Đang sàng lọc ảnh...": "Screening image...",
+  "Đang nhận dạng chữ trong ảnh...": "Reading text from image...",
+  "Đang đọc kỹ vùng chưa rõ...": "Rereading unclear details...",
+  "Đang đối chiếu tên và số tiền...": "Checking recipient and amount...",
+  "Đang chờ máy chủ đọc ảnh...": "Waiting for the receipt reader...",
+  "Ảnh chưa phù hợp để xác minh chuyển khoản.": "This image cannot be used to verify a bank transfer.",
+  "Vui lòng chọn ảnh biên lai ngân hàng khác": "Please select another bank receipt image",
+  "Ảnh này không phải biên lai chuyển khoản ngân hàng. Vui lòng tải ảnh giao dịch thành công.": "This image is not a bank transfer receipt. Please upload an image of a successful transaction.",
+  "Chưa đọc được thông tin chuyển khoản trong ảnh. Hãy tải biên lai ngân hàng rõ nét hơn.": "Transfer details could not be read. Please upload a clearer bank receipt.",
   "Đang nhận dạng chữ và đối chiếu thông tin biên lai...": "Reading text and checking receipt details...",
   "ĐÃ ĐỐI CHIẾU: KHỚP TÊN VÀ SỐ TIỀN TRÊN BIÊN LAI": "CHECKED: RECIPIENT AND AMOUNT MATCH THE RECEIPT",
   "ĐÃ KHỚP TÊN VÀ SỐ TIỀN TRÊN BIÊN LAI": "RECIPIENT AND AMOUNT MATCH THE RECEIPT",

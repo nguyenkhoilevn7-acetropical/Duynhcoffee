@@ -164,7 +164,7 @@ const imageOnlyConfig = bannerImagesOnlyConfig(configCache);
 if (imageOnlyConfig !== configCache) { configCache = imageOnlyConfig; writeJsonFile(CONFIG_FILE, configCache); }
 
 const receiptVerifier = createReceiptVerifier({ readState: () => ({ menu: menuCache, config: configCache, discounts: discountsCache }) });
-const receiptJobs = createReceiptJobs({ verify: body => receiptVerifier.verify(body) });
+const receiptJobs = createReceiptJobs({ verify: (body, onProgress) => receiptVerifier.verify(body, onProgress) });
 const adminPush = createAdminPush({ dir: ROOT_DIR, readConfig: () => configCache, backup: backupService });
 await adminPush.initialize();
 const notifiedOrderIds = new Set(ordersCache.map(order => String(order.id)));

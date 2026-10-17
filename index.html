@@ -3168,6 +3168,17 @@ body {
       margin: 0 auto;
       background: #000;
     }
+    .receipt-upload-box.processing {
+      background:#FFF7ED !important;
+      border:2px solid #F59E0B !important;
+    }
+    .receipt-upload-box.processing .receipt-scanner-frame {
+      border:2px solid #F59E0B !important;
+    }
+    .receipt-upload-box.processing #ai-scan-step-ticker {
+      color:#9A3412; font-weight:700; white-space:pre-line;
+      font-variant-numeric:tabular-nums;
+    }
     /* Receipt progress is static: no laser, blur, grid or looping repaint. */
     .ai-scanner-overlay, .ai-scanner-grid, .ai-laser-beam,
     .ai-target-reticle, .ai-hud-corner, .ai-spinner-ring {
@@ -5511,6 +5522,7 @@ body {
     }
     function invalidateReceiptVerification() {
       receiptScanGeneration++;
+      if (typeof clearActiveReceiptScanTimers === 'function') clearActiveReceiptScanTimers();
       receiptVerificationToken = null;
       receiptVerificationContext = null;
       isReceiptValid = false;
@@ -7014,7 +7026,7 @@ function toggleKitchenSoundAlert() {
         } finally { clearTimeout(timeout); }
       }
       try {
-        if (onProgressCallback) onProgressCallback(25, 'Đang gửi ảnh biên lai...');
+        if (onProgressCallback) onProgressCallback(5, 'Đang gửi ảnh biên lai...');
         const items = order ? order.items.map(i => ({ id: i.id, qty: i.qty, toppings: i.toppings || [] })) : cart.map(c => ({ id: c.item.id, qty: c.qty, toppings: c.toppings || [] }));
         const upload = {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -7025,27 +7037,34 @@ function toggleKitchenSoundAlert() {
             try { return await request('/api/receipt-scans', upload); }
             catch (error) {
               if (!retryable(error) || attempt >= 3 || Date.now() >= deadline) throw error;
-              if (onProgressCallback) onProgressCallback(35, 'Đường truyền chậm, đang tự kết nối lại để xác minh...');
+              if (onProgressCallback) onProgressCallback(5, 'Đường truyền chậm, đang tự kết nối lại để xác minh...');
               await pause(Math.min(1000 * 2 ** attempt, 5000));
             }
           }
         }
         let job = await startJob();
         const reusedJob = job.status === 'complete';
-        if (job.status === 'pending' && onProgressCallback) onProgressCallback(45, 'Đã gửi ảnh, đang xác minh số tiền và người nhận...');
+        function reportJobProgress(job) {
+          if (job.status!=='pending' || !onProgressCallback) return;
+          const labels={starting:'Đang chuẩn bị bộ đọc...',preparing:'Đang sàng lọc ảnh...',recognizing:'Đang nhận dạng chữ trong ảnh...',rereading:'Đang đọc kỹ vùng chưa rõ...',comparing:'Đang đối chiếu tên và số tiền...'};
+          const pct=Number.isFinite(job.progress?.percent) ? job.progress.percent : 5;
+          onProgressCallback(pct,labels[job.progress?.phase] || 'Đang chờ máy chủ đọc ảnh...');
+        }
+        reportJobProgress(job);
         let networkFailures = 0, restarts = 0;
         while (job.status === 'pending' && Date.now() < deadline) {
-          if (Date.now() - started > 5000 && onProgressCallback) onProgressCallback(65, 'Máy chủ vẫn đang đọc biên lai; đang chờ kết quả...');
+
           await pause(networkFailures ? Math.min(1000 * 2 ** networkFailures, 5000) : (Date.now() - started < 5000 ? 400 : 1000));
           try {
             job = await request('/api/receipt-scans/' + encodeURIComponent(job.jobId));
+            reportJobProgress(job);
             networkFailures = 0;
           } catch (error) {
             // A deployment can clear in-memory jobs. Recreate once with the
             // exact image/cart, rather than requiring the customer to re-upload.
             if (error.status === 404 && restarts++ === 0) { job = await startJob(); networkFailures = 0; continue; }
             if (!retryable(error) || ++networkFailures > 6 || Date.now() >= deadline) throw error;
-            if (onProgressCallback) onProgressCallback(65, 'Đường truyền chậm, đang tự kết nối lại để xác minh...');
+            if (onProgressCallback) onProgressCallback(job.progress?.percent || 5, 'Đường truyền chậm, đang tự kết nối lại để xác minh...');
           }
         }
         if (job.status === 'complete') {
@@ -7104,6 +7123,7 @@ function toggleKitchenSoundAlert() {
       const rawBeverage = cart.reduce((s, c) => s + (c.item.price * c.qty), 0);
       const beverageTotal = activeDiscount ? Math.max(0, rawBeverage - activeDiscount.amount) : rawBeverage;
 
+      if (uploadBox) uploadBox.className = 'receipt-upload-box processing';
       if (statusBox) {
         statusBox.style.display = 'none';
         statusBox.innerHTML = '';
@@ -7118,6 +7138,16 @@ function toggleKitchenSoundAlert() {
       const scanGeneration = ++receiptScanGeneration;
       const scanContext = paymentContext();
       const receiptPreparationStarted = Date.now();
+      let readingPercent=1, readingStep='Đang chuẩn bị ảnh...';
+      function renderReadingProgress() {
+        if(scanGeneration!==receiptScanGeneration) {clearInterval(readingTimer);return;}
+        const seconds=((Date.now()-receiptPreparationStarted)/1000).toFixed(1);
+        if(tickerEl) tickerEl.textContent=`Đang xử lý: ${readingPercent}% · ${seconds} giây\n${readingStep}`;
+        if(submitBtn) submitBtn.textContent=`⏳ ${readingPercent}% · ${seconds} giây — ${readingStep}`;
+      }
+      const readingTimer=setInterval(renderReadingProgress,500);
+      activeReceiptScanTimers.push(readingTimer);
+      renderReadingProgress();
       compressReceiptImage(file, async function(dataUrl) {
         const preparationMs = Date.now() - receiptPreparationStarted;
         if (scanGeneration !== receiptScanGeneration) return;
@@ -7151,7 +7181,7 @@ function toggleKitchenSoundAlert() {
           laserBeam.className = 'ai-laser-beam';
         }
         if (scannerFrame) {
-          scannerFrame.style.border = '2px solid #10B981';
+          scannerFrame.style.border = '2px solid #F59E0B';
           scannerFrame.style.boxShadow = '0 0 18px rgba(16, 185, 129, 0.45)';
         }
         if (reticleLabel) reticleLabel.textContent = 'AI SCANNING (20%)...';
@@ -7160,19 +7190,12 @@ function toggleKitchenSoundAlert() {
 
         function updateScanProgressUi(pct, stepText) {
           if (scanGeneration !== receiptScanGeneration) return;
-          if (reticleLabel) reticleLabel.textContent = `AI SCANNING (${pct}%)...`;
-          if (submitBtn) submitBtn.innerHTML = `<span>⏳</span> <span>${stepText}</span>`;
-          if (tickerEl) {
-            tickerEl.innerHTML = `
-              <div class="ai-scan-step-badge">
-                <span class="ai-spinner-ring"></span>
-                <span>🔍 ${stepText}</span>
-              </div>
-            `;
-          }
+          if(Number.isFinite(pct)) readingPercent=Math.max(readingPercent,Math.min(99,Math.round(pct)));
+          readingStep=stepText;
+          renderReadingProgress();
         }
 
-        updateScanProgressUi(20, `Đang quét ký tự OCR & đối chiếu số tiền (${formatMoney(beverageTotal)})...`);
+        updateScanProgressUi(3, `Đang quét ký tự OCR & đối chiếu số tiền (${formatMoney(beverageTotal)})...`);
 
 
         // Helper KẾT LUẬN HỢP LỆ (100%)
@@ -7227,6 +7250,15 @@ function toggleKitchenSoundAlert() {
             ? resObj.reason
             : `Hình ảnh không khớp người thụ hưởng (${storeConfig.bankConfig?.accountHolder}) hoặc không khớp số tiền (${formatMoney(beverageTotal)})!`;
 
+          if (uploadBox) uploadBox.className = 'receipt-upload-box error';
+          if (scannerFrame) scannerFrame.style.border = '3px solid #DC2626';
+          if (resObj?.nonReceipt || resObj?.unreadable) {
+            if (tickerEl) tickerEl.textContent='Ảnh chưa phù hợp để xác minh chuyển khoản.';
+            if (statusBox) {statusBox.style.display='block';statusBox.className='smart-validation-status error';statusBox.textContent=reasonMsg;}
+            if (submitBtn) {submitBtn.disabled=true;submitBtn.textContent='Vui lòng chọn ảnh biên lai ngân hàng khác';}
+            showSmsToast('Chưa xác minh được biên lai',reasonMsg);
+            return;
+          }
           if (resObj && resObj.verificationUnavailable) {
             if (overlay) overlay.style.display = 'none';
             if (laserBeam) laserBeam.style.display = 'none';
@@ -8525,6 +8557,8 @@ async function openPaymentCheckoutModal() {
     }
 
     function closePaymentCheckoutModal() {
+      if (typeof clearActiveReceiptScanTimers === 'function') clearActiveReceiptScanTimers();
+      if (typeof receiptScanGeneration !== 'undefined') receiptScanGeneration++;
       const modal = document.getElementById('checkout-modal');
       if (modal && modal.style.display === 'flex') {
         modal.style.display = 'none';
