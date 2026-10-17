@@ -20,6 +20,8 @@ const { createDelivery, protectOrderWrite, transition } = require('./delivery');
 const { createMenuAI } = require('./menu-ai');
 const menuAI = createMenuAI();
 const {validateOptions}=require('./menu-options');
+const {validateRecipe,createRecipeScanner}=require('./drink-recipes');
+const recipeScanner=createRecipeScanner();
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const ROOT_DIR = __dirname;
@@ -27,6 +29,7 @@ const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
 const ORDERS_FILE = path.join(ROOT_DIR, 'orders.json');
 const CONFIG_FILE = path.join(ROOT_DIR, 'store_config.json');
 const MENU_FILE = path.join(ROOT_DIR, 'menu.json');
+const RECIPES_FILE = path.join(ROOT_DIR, 'drink-recipes.json');
 const DISCOUNTS_FILE = path.join(ROOT_DIR, 'discounts.json');
 
 // Lấy địa chỉ IP mạng nội bộ (Wi-Fi / LAN)
@@ -70,7 +73,7 @@ function writeJsonFile(filePath, data) {
     const temporary = filePath + '.tmp';
     fs.writeFileSync(temporary, JSON.stringify(data, null, 2), 'utf8');
     fs.renameSync(temporary, filePath);
-    if (backupService && [CONFIG_FILE, MENU_FILE, DISCOUNTS_FILE].includes(filePath)) backupService.changed();
+    if (backupService && [CONFIG_FILE, MENU_FILE, DISCOUNTS_FILE, RECIPES_FILE].includes(filePath)) backupService.changed();
     return true;
   } catch (err) {
     console.error(`Lỗi ghi file ${filePath}:`, err.message);
@@ -85,7 +88,7 @@ const DEFAULT_STORE_CONFIG = {"storeName": "Mom’s Tea & Coffee", "storeSlogan"
 async function startApplication() {
 backupService = createBackup({
   dir: ROOT_DIR,
-  snapshot: () => ({ menu: menuCache, config: configCache, discounts: discountsCache }),
+  snapshot: () => ({ menu: menuCache, config: configCache, discounts: discountsCache, recipes: readJsonFile(RECIPES_FILE, {}) }),
   apply: data => {
     menuCache = data.menu;
     // Secrets remain local and are never restored from Drive.
@@ -971,6 +974,38 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  if (pathname === '/api/drink-recipes/scan' && req.method === 'POST') {
+    res.setHeader('Cache-Control','no-store');
+    if (!adminPush.verify((req.headers.authorization || '').replace(/^Bearer /, ''))) { sendJson(res,401,{error:'Vui lòng đăng nhập quản trị để đọc ảnh công thức.'}); return; }
+    try {sendJson(res,200,await recipeScanner.scan(await parseRequestBody(req)));}
+    catch(error) {sendJson(res,error.status || 503,{error:error.message});}
+    return;
+  }
+
+  // Recipes are private: never included in the public menu or WebSocket snapshots.
+  if (pathname === '/api/drink-recipes') {
+    res.setHeader('Cache-Control', 'no-store');
+    if (!adminPush.verify((req.headers.authorization || '').replace(/^Bearer /, ''))) {
+      sendJson(res, 401, {error: 'Vui lòng đăng nhập lại quản trị để xem công thức.'}); return;
+    }
+    try {
+      if (!['GET','POST'].includes(req.method)) { sendJson(res, 405, {error: 'Phương thức không hỗ trợ'}); return; }
+      const body = req.method === 'POST' ? await parseRequestBody(req) : parsedUrl.query;
+      const id = String(body.itemId || '');
+      if (!/^[a-zA-Z0-9_-]{1,100}$/.test(id) || ['__proto__','constructor','prototype'].includes(id)) { sendJson(res, 400, {error:'Mã món không hợp lệ'}); return; }
+      menuCache = readJsonFile(MENU_FILE, menuCache);
+      if (!menuCache.some(item => String(item.id) === id)) { sendJson(res, 404, {error:'Món đã bị xóa hoặc không còn trong thực đơn.'}); return; }
+      const recipes = readJsonFile(RECIPES_FILE, {});
+      const current = Object.hasOwn(recipes, id) ? recipes[id] : null;
+      if (req.method === 'GET') { sendJson(res, 200, {recipe:current}); return; }
+      if ((body.version || '') !== (current?.version || '')) { sendJson(res, 409, {error:'Công thức đã đổi trên thiết bị khác. Đóng và mở lại để tải bản mới trước khi sửa.'}); return; }
+      const recipe = {...validateRecipe(body.recipe), version:crypto.randomUUID()};
+      writeJsonFile(RECIPES_FILE, {...recipes, [id]:recipe});
+      sendJson(res, 200, {success:true, recipe, backup:backupService.status()});
+    } catch (error) { sendJson(res, error.status || 500, {error:error.message}); }
+    return;
+  }
+
   // 6. GET & POST /api/menu
   if (pathname === '/api/menu') {
     if (req.method === 'GET') {
@@ -1063,7 +1098,7 @@ const server = http.createServer(async (req, res) => {
   // Source code and local data are not static assets.
   let normalized;
   try { normalized = path.posix.normalize(decodeURIComponent(cleanPath)); } catch { sendJson(res, 400, { error: 'Đường dẫn không hợp lệ' }); return; }
-  if (normalized.split('/').some(part => part.startsWith('.')) || ['server.js', 'menu-ai.js', 'delivery.js', 'admin-push.js', 'drive-backup.js', 'receipt-verification.js', 'receipt-jobs.js', 'receipt-image.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || normalized.startsWith('/test/') || /\.(tmp|md)$/.test(normalized)) {
+  if (normalized.split('/').some(part => part.startsWith('.')) || ['server.js', 'drink-recipes.js', 'drink-recipes.json', 'menu-ai.js', 'delivery.js', 'admin-push.js', 'drive-backup.js', 'receipt-verification.js', 'receipt-jobs.js', 'receipt-image.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || normalized.startsWith('/test/') || /\.(tmp|md)$/.test(normalized)) {
     sendJson(res, 404, { error: 'Không tìm thấy' }); return;
   }
   if (cleanPath === '/' || cleanPath === '/admin' || cleanPath === '/pos') {
@@ -1191,3 +1226,4 @@ startApplication().catch(() => {
   console.error('[Startup] Không phục hồi được backup; dừng để tránh ghi đè dữ liệu. Kiểm tra OAuth và Drive.');
   process.exitCode = 1;
 });
+

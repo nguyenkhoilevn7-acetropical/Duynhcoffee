@@ -71,7 +71,7 @@ test('menu sync detects category, order and translated text changes',()=>{
 test('real server broadcasts edits and display order to two live clients, HTTP fallback and reconnect after restart',async()=>{
  const os=require('node:os'),net=require('node:net'),{spawn}=require('node:child_process'),WS=require('ws');
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'duynh-menu-order-'));
- for(const name of ['server.js','menu-options.js','menu-ai.js','delivery.js','admin-push.js','order-notifications-sw.js','admin-notifications.js','drive-backup.js','receipt-verification.js','receipt-jobs.js','index.html']) fs.copyFileSync(path.join(__dirname,'..',name),path.join(dir,name));
+ for(const name of ['server.js','drink-recipes.js','menu-options.js','menu-ai.js','delivery.js','admin-push.js','order-notifications-sw.js','admin-notifications.js','drive-backup.js','receipt-verification.js','receipt-jobs.js','index.html']) fs.copyFileSync(path.join(__dirname,'..',name),path.join(dir,name));
  const port=await new Promise(resolve=>{const n=net.createServer();n.listen(0,'127.0.0.1',()=>{const p=n.address().port;n.close(()=>resolve(p));});});
  const base='http://127.0.0.1:'+port;let child;const sockets=[];
  async function start(){child=spawn(process.execPath,['server.js'],{cwd:dir,env:{PATH:process.env.PATH,PORT:String(port)},stdio:['ignore','pipe','pipe']});
@@ -114,3 +114,4 @@ test('editing a product saves all fields and selected position only on server ac
   else{assert.deepEqual(ids(s.menu),[2,3,1]);const item=s.menu[2];assert.equal(item.name,'New tea');assert.equal(item.name_en,'EN New tea');assert.equal(item.price,49000);assert.equal(item.stock,12);assert.equal(item.isBestSeller,true);assert.equal(item.category,'coffee');assert.equal(item.description,'New description');assert.equal(item.image,values['edit-menu-image-url']);assert.equal(writes.length,1);}
  }
 });
+

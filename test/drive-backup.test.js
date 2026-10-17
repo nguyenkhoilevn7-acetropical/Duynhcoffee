@@ -104,3 +104,14 @@ test('OAuth callback binds cookie, consumes state, leaves activation to Render s
  const replay=response();await b.handle({method:'GET',headers:{cookie}},replay,{pathname:'/api/backup/google/callback',query:{state,code:'test'}});assert.equal(replay.status,400);assert.equal(calls,1);
  }finally{b.stop();fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('recipes round trip in Drive backup; restoring an older backup preserves local recipes',async()=>{
+ const f=fixture();try{
+ const recipes={'1':{ingredients:[{name:'Trà lài',amount:120,unit:'ml'}],steps:'Ủ trà',notes:'',version:'v1'}};
+ f.setCurrent({menu:[{id:1,name:'Tea',price:45000}],config:{},discounts:[],recipes});
+ await f.backup.flush();assert.deepEqual(JSON.parse(f.files[0].bytes).recipes,recipes);
+ await f.backup.initialize();assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.dir,'drink-recipes.json'))),recipes);
+ f.setCurrent({menu:[],config:{},discounts:[]});await f.backup.flush();await f.backup.initialize();
+ assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.dir,'drink-recipes.json'))),recipes);
+ }finally{f.cleanup();}
+});

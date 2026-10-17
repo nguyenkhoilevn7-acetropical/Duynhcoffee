@@ -2,6 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const {validateRecipeStore} = require('./drink-recipes');
 const SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const TAG = 'duynh-backup-v1';
 const MAX_BYTES = 25 * 1024 * 1024;
@@ -18,6 +19,7 @@ function validate(value) {
       !Number.isFinite(Date.parse(value.createdAt))) throw new Error('Backup không đúng định dạng');
   if (value.menu.some(x => !x || typeof x.name !== 'string' || !Number.isFinite(x.price) || x.price < 0))
     throw new Error('Menu trong backup không hợp lệ');
+  if (value.recipes !== undefined) validateRecipeStore(value.recipes);
   const clean = sanitize(value);
   if (JSON.stringify(clean) !== JSON.stringify(value)) throw new Error('Backup chứa trường bí mật không được phép');
   return clean;
@@ -94,6 +96,7 @@ function createBackup({ dir, snapshot, apply, fetchImpl = global.fetch, env = pr
       return result;
     }
     const entries = [['menu.json', data.menu], ['store_config.json', preserveSecrets(data.config, localConfig)], ['discounts.json', data.discounts]];
+    if (data.recipes !== undefined) entries.push(['drink-recipes.json', data.recipes]);
     const staged = [];
     try {
       for (const [name, value] of entries) {
@@ -113,7 +116,7 @@ function createBackup({ dir, snapshot, apply, fetchImpl = global.fetch, env = pr
     const startRevision = revision;
     const current = snapshot();
     const data = validate({ schema: TAG, createdAt: new Date().toISOString(), menu: sanitize(current.menu),
-      config: sanitize(current.config), discounts: sanitize(current.discounts) });
+      config: sanitize(current.config), discounts: sanitize(current.discounts), ...(current.recipes !== undefined ? {recipes:sanitize(current.recipes)} : {}) });
     const bytes = Buffer.from(JSON.stringify(data));
     if (bytes.length > MAX_BYTES) throw new Error('Backup vượt giới hạn 25 MB');
     // Resumable upload also supports menus with embedded images larger than 5 MB.
@@ -240,3 +243,4 @@ function createBackup({ dir, snapshot, apply, fetchImpl = global.fetch, env = pr
   return { initialize, changed, flush, handle, status, stop, loadPushState, savePushState };
 }
 module.exports = { createBackup, sanitize, validate, TAG };
+

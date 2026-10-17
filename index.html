@@ -3245,6 +3245,8 @@ body {
     .tracked-item-custom { color:#64748B; font-size:0.78rem; }
     .tracked-item-price { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; margin-top:4px; }
   </style>
+<link rel="stylesheet" href="admin-recipes.css">
+<script src="admin-recipes.js" defer></script>
 <script src="menu-options.js" defer></script>
 <script src="site-i18n.js" defer></script>
 <script src="admin-notifications.js" defer></script>
@@ -8916,7 +8918,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         const customSpecs = cleanCorruptedText(it.custom);
 
         return `
-          <div style="display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px dashed #E2E8F0;">
+          <div role="button" tabindex="0" data-drink-recipe="${orderText(String(itemObj?.id || it.id || ''))}" data-recipe-qty="${orderText(String(it.qty))}" data-recipe-custom="${orderText(String(it.custom || ''))}" aria-label="Xem công thức món" style="display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px dashed #E2E8F0;">
             <img src="${itemImg}" alt="${dishName}" 
                  style="width: 48px; height: 48px; border-radius: 8px; object-fit: cover; border: 1.5px solid #CBD5E1; background: #FFF; flex-shrink: 0;"
                  onerror="this.onerror=null; this.src=window.getSafeProductImageFallback('${cat}', '${dishName.replace(/'/g, "\\\'")}');">
@@ -8927,6 +8929,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
                 </span>
                 <span style="font-weight: 700; color: #475569; font-size: 0.85rem;">${formatMoney(it.total || (it.price * it.qty))}</span>
               </div>
+              <span class="recipe-open-hint">Nhấn để xem ảnh và công thức pha chế</span>
               ${customSpecs ? `<div style="font-size: 0.82rem; color: #0284C7; font-weight: 600; margin-top: 3px; background: #F0F9FF; padding: 2px 6px; border-radius: 4px; display: inline-block;">${customSpecs}</div>` : ''}
             </div>
           </div>
@@ -9000,7 +9003,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         const customSpecs = cleanCorruptedText(it.custom);
 
         return `
-          <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px dashed #E2E8F0;">
+          <div role="button" tabindex="0" data-drink-recipe="${orderText(String(itemObj?.id || it.id || ''))}" data-recipe-qty="${orderText(String(it.qty))}" data-recipe-custom="${orderText(String(it.custom || ''))}" aria-label="Xem công thức món" style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px dashed #E2E8F0;">
             <img src="${itemImg}" alt="${dishName}" 
                  style="width: 52px; height: 52px; border-radius: 12px; object-fit: cover; border: 1.5px solid #CBD5E1; background: #FFF; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.06);"
                  onerror="this.onerror=null; this.src=window.getSafeProductImageFallback('${cat}', '${dishName.replace(/'/g, "\\'")}');">
@@ -9015,6 +9018,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
                   ${formatMoney(it.total || (it.price * it.qty))}
                 </div>
               </div>
+              <span class="recipe-open-hint">Nhấn để xem ảnh và công thức pha chế</span>
               ${customSpecs ? `
                 <div style="font-size: 0.84rem; color: #0284C7; font-weight: 700; margin-top: 3px; background: #F0F9FF; padding: 2px 8px; border-radius: 6px; display: inline-block;">
                   🍹 ${customSpecs}
@@ -10110,6 +10114,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
               <div style="display:flex; gap:6px;">
                 <button type="button" class="nav-btn" ${menuIndex === 0 ? 'disabled' : ''} onclick="moveMenuItem(${orderText(JSON.stringify(String(m.id)))}, -1)" aria-label="Đưa món ${menuIndex + 1} lên trước">↑ Trước</button>
                 <button type="button" class="nav-btn" ${menuIndex === menu.length - 1 ? 'disabled' : ''} onclick="moveMenuItem(${orderText(JSON.stringify(String(m.id)))}, 1)" aria-label="Đưa món ${menuIndex + 1} xuống sau">↓ Sau</button>
+                <button type="button" class="nav-btn" data-drink-recipe="${orderText(String(m.id))}" data-recipe-edit="1">Công thức</button>
                 <button type="button" class="nav-btn" style="padding:4px 8px; font-size:0.75rem;" onclick="openEditMenuModal(${orderText(JSON.stringify(String(m.id)))})">
                   ✏️ Sửa
                 </button>
@@ -11893,4 +11898,5 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 <div style="text-align:center;padding:12px;font-size:13px"><a href="/privacy.html">Chính sách bảo mật</a> · <a href="/terms.html">Điều khoản</a> · <a href="/backup.html">Quản trị backup</a></div>
 </body>
 </html>
+
 

@@ -4,7 +4,7 @@ const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),net=
 const {spawn}=require('node:child_process');
 test('HTTP scan starts quickly, retries share work, and completed proof is server verified',async()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'duynh-scan-api-'));
- for(const name of ['server.js','menu-options.js','menu-ai.js','delivery.js','admin-push.js','order-notifications-sw.js','admin-notifications.js','drive-backup.js','receipt-jobs.js','index.html'])fs.copyFileSync(path.join(__dirname,'..',name),path.join(dir,name));
+ for(const name of ['server.js','drink-recipes.js','menu-options.js','menu-ai.js','delivery.js','admin-push.js','order-notifications-sw.js','admin-notifications.js','drive-backup.js','receipt-jobs.js','index.html'])fs.copyFileSync(path.join(__dirname,'..',name),path.join(dir,name));
  const verifier=path.join(__dirname,'..','receipt-verification.js');
  const pushModule=path.join(__dirname,'..','admin-push.js');
  fs.writeFileSync(path.join(dir,'admin-push.js'),`const real=require(${JSON.stringify(pushModule)});const fs=require('node:fs');module.exports={createAdminPush:options=>real.createAdminPush({...options,sendImpl:async(sub,payload)=>fs.appendFileSync(${JSON.stringify(path.join(dir,'.push-test-log'))},payload+'\\n')})};`);
@@ -62,3 +62,4 @@ test('HTTP scan starts quickly, retries share work, and completed proof is serve
  const rejected=await(await fetch(base+'/api/receipt-scans/'+changed.jobId)).json();assert.equal(rejected.result.isValid,false);assert.ok(!rejected.result.verificationToken);
  }finally{if(child.exitCode===null)await new Promise(resolve=>{child.once('exit',resolve);child.kill();});fs.rmSync(dir,{recursive:true,force:true});}
 });
+
