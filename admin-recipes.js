@@ -1,8 +1,30 @@
 /* Private drink preparation recipes; loaded only on an explicit admin action. */
 (() => {
   'use strict';
+  function textLines(value) {
+    return String(value || '').replace(/\r\n?/g,'\n').split(/\n+|\s*[•·]\s*|;\s*/).map(line=>line.trim()).filter(Boolean);
+  }
+  function preparationSteps(value) {
+    const text=String(value || '').replace(/\r\n?/g,'\n')
+      .replace(/(^|\s)(?:bước\s*\d+\s*[:.)-]\s*|\d+[.)]\s+|[①②③④⑤⑥⑦⑧⑨⑩]\s*)/gi,'\n');
+    return textLines(text).map(line=>line.replace(/^[-–—]\s+/, '').trim()).filter(Boolean);
+  }
+  function customerRequests(value) {
+    return textLines(value).flatMap(line=>line.split(/,\s*(?=(?:không|ít|thêm|nhiều|bớt|tách|đá|đường|ngọt|topping)\b)/iu)).map(x=>x.trim()).filter(Boolean);
+  }
+  function requestIcon(value) {
+    const text=String(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').toLowerCase();
+    if(/\b(?:da|ice)\b/.test(text))return '🧊';
+    if(/ngot|đuong|duong|sweet|sugar/.test(text))return '🍬';
+    if(/topping|tran chau|thach/.test(text))return '🧋';
+    if(/sua|milk/.test(text))return '🥛';
+    if(/nong|hot/.test(text))return '♨️';
+    return '📣';
+  }
+  if(typeof module==='object' && module.exports)module.exports={textLines,preparationSteps,customerRequests,requestIcon};
+  if(typeof document==='undefined')return;
   let state = null, opener = null, requestId = 0;
-  const ingredientIcon = name => /trà/i.test(name)?'🍃':/cà phê|coffee/i.test(name)?'☕':/sữa|kem/i.test(name)?'🥛':/đá|nước/i.test(name)?'💧':/chanh|cam/i.test(name)?'🍋':/dâu/i.test(name)?'🍓':'🥄';
+  const ingredientIcon = name => /trà/i.test(name)?'🍃':/cà phê|cafe|café|coffee/i.test(name)?'☕':/trứng/i.test(name)?'🥚':/sữa|kem/i.test(name)?'🥛':/đá|nước/i.test(name)?'💧':/chanh|cam/i.test(name)?'🍋':/dâu/i.test(name)?'🍓':'🥄';
   const el = id => document.getElementById(id);
   const txt = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const number = value => Number(value).toLocaleString('vi-VN', {maximumFractionDigits:3});
@@ -19,7 +41,7 @@
     if (el('drink-recipe-modal')) return;
     const root = document.createElement('div'); root.id='drink-recipe-modal'; root.className='modal-overlay';
     root.setAttribute('role','dialog'); root.setAttribute('aria-modal','true'); root.setAttribute('aria-labelledby','recipe-title');
-    root.innerHTML='<div class="modal-card recipe-card"><div class="modal-header"><h2 id="recipe-title">Công thức pha chế</h2><button type="button" class="modal-close" aria-label="Đóng công thức" id="recipe-close">✕</button></div><div class="modal-body"><div id="recipe-photo"></div><p id="recipe-order"></p><p id="recipe-message" role="status" aria-live="polite"></p><div id="recipe-content"></div></div></div>';
+    root.innerHTML='<div class="modal-card recipe-card"><div class="modal-header"><h2 id="recipe-title">Công thức pha chế</h2><button type="button" class="modal-close" aria-label="Đóng công thức" id="recipe-close">✕</button></div><div class="modal-body"><div id="recipe-photo"></div><p id="recipe-order"></p><div id="recipe-notices"></div><p id="recipe-message" role="status" aria-live="polite"></p><div id="recipe-content"></div></div></div>';
     document.body.append(root); el('recipe-close').onclick=close;
     root.addEventListener('keydown', e => {
       if(e.key==='Escape') {e.preventDefault();close();}
@@ -48,7 +70,8 @@
       const image=document.createElement('img'); image.src=getSafeDrinkImage(item.image,item.category,item.name); image.alt=item.name; image.className='recipe-image';
       image.onerror=()=>{el('recipe-photo').textContent='Chưa có ảnh món';}; el('recipe-photo').append(image);
     } else el('recipe-photo').textContent='Chưa có ảnh món';
-    el('recipe-order').textContent='Định lượng chuẩn cho 1 ly · Số lượng: '+number(state.qty)+' ly'+(custom?' · Yêu cầu khách: '+custom:'');
+    el('recipe-order').textContent='Định lượng chuẩn cho 1 ly · Số lượng: '+number(state.qty)+' ly';
+    renderNotices();
     el('recipe-content').replaceChildren();el('recipe-message').textContent='Đang tải công thức…';
     el('drink-recipe-modal').style.display='flex';el('recipe-close').focus();
     try {
@@ -61,11 +84,19 @@
       const retry=document.createElement('button');retry.className='nav-btn';retry.textContent='Thử tải lại';retry.onclick=()=>window.openDrinkRecipe(id,qty,custom,edit);el('recipe-content').append(retry);
     }
   };
+  function renderNotices() {
+    const requests=customerRequests(state.custom), notes=textLines(state.recipe?.notes);
+    el('recipe-notices').innerHTML=(!requests.length&&!notes.length)?'':
+      '<section class="recipe-notices" aria-label="Lưu ý pha chế"><h3>⚠️ Lưu ý</h3>'+
+      (requests.length?'<div class="recipe-customer-box"><h4>Yêu cầu của khách</h4><ul class="recipe-note-list">'+requests.map(line=>'<li><span aria-hidden="true">'+requestIcon(line)+'</span><strong>'+txt(line)+'</strong></li>').join('')+'</ul></div>':'')+
+      (notes.length?'<ul class="recipe-note-list recipe-owner-notes">'+notes.map(line=>'<li><span aria-hidden="true">📌</span><span>'+txt(line)+'</span></li>').join('')+'</ul>':'')+'</section>';
+  }
   function renderView() {
     state.editing=false;state.dirty=false;state.sourceImage=state.recipe?.sourceImage || '';
     const recipe=state.recipe, rows=recipe?.ingredients || [];
+    renderNotices();
     el('recipe-content').innerHTML=(recipe ? '<h3>Nguyên liệu</h3>'+(rows.length ? '<div class="recipe-table-wrap"><table class="recipe-table"><thead><tr><th>Nguyên liệu</th><th>1 ly</th>'+(state.qty>1?'<th>'+number(state.qty)+' ly</th>':'')+'</tr></thead><tbody>'+rows.map(r=>'<tr><td><span aria-hidden="true">'+ingredientIcon(r.name)+'</span> '+txt(r.name)+'</td><td>'+number(r.amount)+' '+txt(r.unit)+'</td>'+(state.qty>1?'<td>'+number(r.amount*state.qty)+' '+txt(r.unit)+'</td>':'')+'</tr>').join('')+'</tbody></table></div>' : '<p>Chưa nhập nguyên liệu.</p>')+
-      '<h3>Cách pha</h3><p class="recipe-text">'+txt(recipe.steps||'Chưa nhập cách pha.')+'</p>'+(recipe.notes?'<h3>Lưu ý</h3><p class="recipe-text">'+txt(recipe.notes)+'</p>':'') : '<p>Chưa có công thức. Anh nhập nguyên liệu và cách pha cho món này nhé.</p>')+
+      '<h3>Cách pha</h3>'+(preparationSteps(recipe.steps).length?'<ol class="recipe-steps">'+preparationSteps(recipe.steps).map(step=>'<li>'+txt(step)+'</li>').join('')+'</ol>':'<p>Chưa nhập cách pha.</p>') : '<p>Chưa có công thức. Anh nhập nguyên liệu và cách pha cho món này nhé.</p>')+
       '<p class="recipe-hint">Định lượng nhân theo số ly; điều chỉnh đá, độ ngọt và topping theo yêu cầu khách.</p><button type="button" class="nav-btn" id="recipe-edit">'+(recipe?'Chỉnh sửa công thức':'Thiết lập công thức')+'</button>';
     if(state.sourceImage){const details=document.createElement('details');const summary=document.createElement('summary');summary.textContent='Xem ảnh công thức gốc';const image=document.createElement('img');image.src=state.sourceImage;image.alt='Ảnh công thức gốc';image.className='recipe-source-image';details.append(summary,image);el('recipe-content').append(details);}
     el('recipe-edit').onclick=renderEditor;
@@ -79,12 +110,13 @@
   }
   function renderEditor() {
     state.editing=true;const recipe=state.recipe || {ingredients:[],steps:'',notes:''};
-    el('recipe-content').innerHTML='<form id="recipe-form"><section class="recipe-upload"><label for="recipe-file">Đọc công thức từ hình ảnh</label><input id="recipe-file" type="file" accept="image/jpeg,image/png,image/webp"><p>Chọn ảnh công thức cho 1 ly. AI điền bản nháp; anh kiểm tra lại trước khi lưu.</p><p id="recipe-scan-message" role="status" aria-live="polite"></p><div id="recipe-source-preview"></div></section><p>Nhập công thức chuẩn cho <b>1 ly</b>. Ảnh món lấy từ phần quản lý thực đơn.</p><div id="recipe-rows"></div><button type="button" class="nav-btn" id="recipe-add-row">+ Thêm nguyên liệu</button><label class="recipe-label">Cách pha từng bước<textarea id="recipe-steps" rows="6" maxlength="10000"></textarea></label><label class="recipe-label">Lưu ý pha chế<textarea id="recipe-notes" rows="3" maxlength="3000"></textarea></label><p id="recipe-save-message" role="status" aria-live="polite"></p><div class="recipe-actions"><button type="button" class="nav-btn" id="recipe-cancel">Quay lại</button><button type="submit" class="nav-btn recipe-primary" id="recipe-save">Lưu công thức</button></div></form>';
+    el('recipe-content').innerHTML='<form id="recipe-form"><section class="recipe-upload"><label for="recipe-file">Đọc công thức từ hình ảnh</label><input id="recipe-file" type="file" accept="image/jpeg,image/png,image/webp"><p>Chọn ảnh công thức cho 1 ly. AI điền bản nháp; anh kiểm tra lại trước khi lưu.</p><p id="recipe-scan-message" role="status" aria-live="polite"></p><ul id="recipe-scan-warnings" class="recipe-scan-warnings"></ul><div id="recipe-source-preview"></div></section><p>Nhập công thức chuẩn cho <b>1 ly</b>. Ảnh món lấy từ phần quản lý thực đơn.</p><div id="recipe-rows"></div><button type="button" class="nav-btn" id="recipe-add-row">+ Thêm nguyên liệu</button><label class="recipe-label">Cách pha từng bước<textarea id="recipe-steps" rows="6" maxlength="10000" placeholder="Mỗi bước một dòng:&#10;1. Chuẩn bị nguyên liệu&#10;2. Pha theo công thức"></textarea></label><label class="recipe-label">Lưu ý pha chế<textarea id="recipe-notes" rows="3" maxlength="3000"></textarea></label><p id="recipe-save-message" role="status" aria-live="polite"></p><div class="recipe-actions"><button type="button" class="nav-btn" id="recipe-cancel">Quay lại</button><button type="submit" class="nav-btn recipe-primary" id="recipe-save">Lưu công thức</button></div></form>';
     (recipe.ingredients.length?recipe.ingredients:[{}]).forEach(addRow);
-    el('recipe-steps').value=recipe.steps;el('recipe-notes').value=recipe.notes;
+    el('recipe-steps').value=preparationSteps(recipe.steps).map((step,index)=>(index+1)+'. '+step).join('\n');el('recipe-notes').value=recipe.notes;
+    renderNotices();
     showSourcePreview();
     el('recipe-file').onchange=scanImage;
-    el('recipe-form').oninput=()=>{state.dirty=true;};
+    el('recipe-form').oninput=event=>{state.dirty=true;const input=event.target;if(input?.matches('input[data-field]') && input.value.trim()){input.classList.remove('recipe-needs-review');input.removeAttribute('aria-invalid');}};
     el('recipe-add-row').onclick=()=>{const row=addRow();state.dirty=true;row.querySelector('input').focus();};
     el('recipe-cancel').onclick=()=>{if(!state.dirty || confirm('Bỏ các thay đổi chưa lưu?')){el('recipe-message').textContent='';renderView();}};
     el('recipe-form').onsubmit=save;
@@ -112,15 +144,19 @@
     if(nonempty && !confirm('Dùng nội dung đọc từ ảnh thay cho bản công thức đang hiển thị? Bản đã lưu chỉ đổi khi anh nhấn Lưu công thức.')){event.target.value='';return;}
     state.scanning=true;
     const controls=[...el('recipe-form').querySelectorAll('button,input,textarea')];controls.forEach(n=>n.disabled=true);el('recipe-close').disabled=true;
+    el('recipe-scan-warnings').replaceChildren();
     const message=el('recipe-scan-message');message.textContent='Đang chuẩn bị ảnh…';message.classList.add('recipe-reading');
     try {
       const image=await prepareImage(file);message.textContent='Đang đọc nguyên liệu, định lượng và cách pha…';
       const result=await api('POST',{scan:true,image});
       el('recipe-rows').replaceChildren();(result.ingredients.length?result.ingredients:[{}]).forEach(addRow);
-      el('recipe-steps').value=result.steps;
-      el('recipe-notes').value=[result.notes,...result.warnings.map(x=>'Cần kiểm tra: '+x)].filter(Boolean).join('\n');
+      el('recipe-steps').value=preparationSteps(result.steps).map((step,index)=>(index+1)+'. '+step).join('\n');
+      el('recipe-notes').value=result.notes;
+      const warnings=[...(result.warnings || [])];
+      for(const row of el('recipe-rows').children){for(const input of row.querySelectorAll('input')){if(!input.value.trim()){input.classList.add('recipe-needs-review');input.setAttribute('aria-invalid','true');}}}
+      el('recipe-scan-warnings').innerHTML=warnings.map(line=>'<li>⚠️ '+txt(line)+'</li>').join('');
       state.sourceImage=image;state.dirty=true;showSourcePreview();
-      message.textContent='Đã đọc ảnh. Anh kiểm tra nội dung và bổ sung ô còn thiếu trước khi lưu.'+(result.warnings.length?' '+result.warnings.join(' '):'');
+      message.textContent='Đã điền nguyên liệu, định lượng, cách pha và lưu ý vào từng ô. Anh kiểm tra các ô được đánh dấu trước khi lưu.';
     } catch(error){message.textContent=error.message;}
     finally{state.scanning=false;message.classList.remove('recipe-reading');controls.forEach(n=>n.disabled=false);el('recipe-close').disabled=false;event.target.value='';}
   }
@@ -136,7 +172,7 @@
     state.saving=true;el('recipe-save-message').textContent='Đang lưu công thức…';
     const controls=[...el('recipe-form').querySelectorAll('button,input,textarea')];controls.forEach(n=>n.disabled=true);el('recipe-close').disabled=true;
     try {
-      const result=await api('POST',{itemId:state.id,version:state.recipe?.version || '',recipe:{ingredients,steps:el('recipe-steps').value,notes:el('recipe-notes').value,sourceImage:state.sourceImage || ''}});
+      const result=await api('POST',{itemId:state.id,version:state.recipe?.version || '',recipe:{ingredients,steps:preparationSteps(el('recipe-steps').value).join('\n'),notes:el('recipe-notes').value,sourceImage:state.sourceImage || ''}});
       state.recipe=result.recipe;renderView();
       el('recipe-message').textContent='Đã lưu công thức.'+(result.backup?.connected?' Đã lên lịch sao lưu Google Drive.':'');
     } catch(error) {el('recipe-save-message').textContent=error.message;}

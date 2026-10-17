@@ -45,7 +45,7 @@ const extracted={isRecipe:true,ingredients:[{name:'Sữa',amount:'12.5',unit:'ml
 test('photo extraction sends image securely, preserves missing values and never invents amounts',async()=>{
  let request;
  const scanner=createRecipeScanner({env:{GEMINI_API_KEY:'private'},fetchImpl:async(url,opts)=>{request={url,opts};return candidate({...extracted,ingredients:[...extracted.ingredients,{name:'Trà',amount:'không rõ',unit:''}],warnings:['Thiếu định lượng trà']});}});
- const result=await scanner.scan({image});assert.equal(result.ingredients[1].amount,'');assert.equal(result.ingredients[1].unit,'');assert.deepEqual(result.warnings,['Thiếu định lượng trà']);
+ const result=await scanner.scan({image});assert.equal(result.ingredients[1].amount,'');assert.equal(result.ingredients[1].unit,'');assert.equal(result.warnings[0],'Thiếu định lượng trà');assert.match(result.warnings[1],/định lượng, đơn vị/);
  assert.equal(request.opts.headers['x-goog-api-key'],'private');assert.match(request.url,/gemini-flash-latest/);assert.equal(JSON.parse(request.opts.body).contents[0].parts[1].inlineData.data,'aGVsbG8=');assert.doesNotMatch(JSON.stringify(result),/private/);
  assert.deepEqual(validateRecipe({...recipe,sourceImage:image}).sourceImage,image);
  for(const invalid of ['https://example.test/a.jpg','data:image/svg+xml;base64,aA==','x'.repeat(2000001)])assert.throws(()=>validateSourceImage(invalid));
@@ -58,4 +58,15 @@ test('unrelated/batch photos, quota, no key and malformed AI output fail without
   [()=>candidate(extracted,'MAX_TOKENS'),/chưa đọc đủ/],
   [()=>candidate({...extracted,ingredients:[{name:'Bad'}]}),/chưa đọc đủ/]
  ])await assert.rejects(createRecipeScanner({env:{GEMINI_API_KEY:'private'},fetchImpl:async()=>response()}).scan({image}),pattern);
+});
+
+test('structured OCR separates actions, notes and quantities; numeric comma and count units survive',async()=>{
+ let body;
+ const scanner=createRecipeScanner({env:{GEMINI_API_KEY:'private'},fetchImpl:async(url,opts)=>{body=JSON.parse(opts.body);return candidate({isRecipe:true,ingredients:[{name:'Trứng',amount:'1',unit:'quả'},{name:'Sữa',amount:'12,5',unit:'ml'},{name:'Trà',amount:'10-15',unit:'g'}],steps:['Đánh trứng trong 2 phút','Rót cà phê vào ly'],notes:['Dùng ngay sau khi pha','Không đun sôi'],warnings:[]});}});
+ const result=await scanner.scan({image});
+ assert.deepEqual(result.ingredients[0],{name:'Trứng',amount:'1',unit:'quả'});
+ assert.equal(result.ingredients[1].amount,'12.5');assert.equal(result.ingredients[2].amount,'');
+ assert.equal(result.steps,'Đánh trứng trong 2 phút\nRót cà phê vào ly');
+ assert.equal(result.notes,'Dùng ngay sau khi pha\nKhông đun sôi');assert.doesNotMatch(result.notes,/cần kiểm tra/);
+ assert.match(result.warnings[0],/dòng 3/);assert.equal(body.generationConfig.responseSchema.properties.steps.type,'ARRAY');
 });
