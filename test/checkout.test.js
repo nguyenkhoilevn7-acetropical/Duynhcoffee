@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const html=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8');
 function setup() {
   const elements=new Map();
-  for(const id of ['pay-bank-name','pay-bank-account','pay-bank-holder','setting-store-name','setting-store-slogan','setting-store-address','setting-store-phone','setting-bank-account','setting-bank-holder','setting-bank-name','btn-submit-customer-order','checkout-modal']) elements.set(id,{value:'',textContent:'',style:{display:'none'}});
+  for(const id of ['pay-bank-name','pay-bank-account','pay-bank-holder','setting-store-name','setting-store-slogan','setting-store-address','setting-store-phone','setting-bank-account','setting-bank-holder','setting-bank-name','btn-submit-customer-order','checkout-modal','smart-validation-status','receipt-upload-preview-state','receipt-upload-idle-state','receipt-upload-box']) elements.set(id,{value:'',textContent:'',style:{display:'none'}});
   const sandbox={console,document:{activeElement:null,getElementById:id=>elements.get(id)},
     localStorage:{setItem(){}},storeConfig:{bankConfig:{bin:'970436',accountNumber:'123',accountHolder:'ĐÀO KHÔI NGUYÊN'},banner:{images:['saved']}},
     cart:[{item:{id:1,price:45000},qty:1}],activeDiscount:null,isReceiptValid:false,bannerUploadedImages:[],lastConfigVersion:1,
@@ -33,7 +33,9 @@ test('failed save keeps acknowledged settings; recipient changes invalidate prio
   s.fetch=async()=>({ok:false,status:500,json:async()=>({error:'disk error'})});await s.saveStoreSettings();
   assert.equal(s.storeConfig.bankConfig.accountHolder,'ĐÀO KHÔI NGUYÊN');
   vm.runInContext("receiptVerificationToken='proof';receiptVerificationContext=paymentContext();isReceiptValid=true;",s);
+  e.get('smart-validation-status').style.display='block';e.get('smart-validation-status').textContent='OLD MATCH';e.get('receipt-upload-preview-state').style.display='block';
   s.applyServerConfig({bankConfig:{accountHolder:'NEW NAME'}},2);
+  assert.equal(e.get('smart-validation-status').style.display,'none');assert.equal(e.get('smart-validation-status').textContent,'');assert.equal(e.get('receipt-upload-preview-state').style.display,'none');
   assert.equal(s.isReceiptValid,false);assert.equal(e.get('btn-submit-customer-order').disabled,true);
 });
 test('HTML scripts parse, expected payment fields exist, and export is complete',()=>{

@@ -6,6 +6,8 @@
 })(function () {
   'use strict';
   const catalog = {
+  "ĐÃ ĐỐI CHIẾU: KHỚP TÊN VÀ SỐ TIỀN TRÊN BIÊN LAI": "CHECKED: RECIPIENT AND AMOUNT MATCH THE RECEIPT",
+  "ĐÃ KHỚP TÊN VÀ SỐ TIỀN TRÊN BIÊN LAI": "RECIPIENT AND AMOUNT MATCH THE RECEIPT",
   "Thử lại thông tin thanh toán": "Retry payment details",
   "Đang cập nhật thông tin thanh toán...": "Updating payment details...",
   "Chưa cập nhật được thông tin ngân hàng. Hãy thử lại trước khi chuyển tiền.": "Bank details could not be updated. Retry before transferring payment.",

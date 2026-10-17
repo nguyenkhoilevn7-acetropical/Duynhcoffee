@@ -5586,6 +5586,14 @@ body {
       receiptVerificationToken = null;
       receiptVerificationContext = null;
       isReceiptValid = false;
+      const result = document.getElementById('smart-validation-status');
+      if (result) { result.style.display = 'none'; result.textContent = ''; result.className = 'smart-validation-status'; }
+      const preview = document.getElementById('receipt-upload-preview-state');
+      const idle = document.getElementById('receipt-upload-idle-state');
+      if (preview) preview.style.display = 'none';
+      if (idle) idle.style.display = 'block';
+      const uploadBox = document.getElementById('receipt-upload-box');
+      if (uploadBox) uploadBox.className = 'receipt-upload-box';
       const button = document.getElementById('btn-submit-customer-order');
       if (button) { button.disabled = true; button.textContent = 'Vui lòng quét biên lai cho thông tin thanh toán hiện tại'; }
     }
@@ -7251,7 +7259,7 @@ function toggleKitchenSoundAlert() {
           if (tickerEl) {
             tickerEl.innerHTML = `
               <div class="ai-scan-step-badge" style="background:#ECFDF5; border-color:#10B981; color:#065F46; font-weight:800;">
-                <span>✅</span> <span>[100%] KẾT LUẬN AI: HÓA ĐƠN HỢP LỆ — KHỚP TÊN VÀ SỐ TIỀN!</span>
+                <span>✅</span> <span>ĐÃ ĐỐI CHIẾU: KHỚP TÊN VÀ SỐ TIỀN TRÊN BIÊN LAI</span>
               </div>
             `;
           }
@@ -7260,7 +7268,7 @@ function toggleKitchenSoundAlert() {
             statusBox.className = 'smart-validation-status valid';
             statusBox.innerHTML = `
               <div style="font-weight: 800; color: #166534; display: flex; align-items: center; gap: 6px; font-size: 0.88rem;">
-                <span>✅</span> <span>KẾT LUẬN XÉT DUYỆT AI (100%): HÓA ĐƠN HỢP LỆ</span>
+                <span>✅</span> <span>ĐÃ KHỚP TÊN VÀ SỐ TIỀN TRÊN BIÊN LAI</span>
               </div>
               <div style="font-size: 0.79rem; color: #15803D; margin-top: 5px; line-height: 1.55; background: #FFFFFF; padding: 8px 10px; border-radius: 8px; border: 1px solid #86EFAC;">
                 • <b>Tên người hưởng:</b> ✅ <b>${resObj && resObj.matchedHolder ? resObj.matchedHolder : storeConfig.bankConfig?.accountHolder}</b> (khớp)<br>
