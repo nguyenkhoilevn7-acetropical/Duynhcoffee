@@ -8480,15 +8480,19 @@ let checkoutPaymentReady = false;
       setCheckoutPaymentReady(false);
       if (!checkoutPaymentRequest) {
         checkoutPaymentRequest = (async () => {
+          for (let attempt=0;attempt<2;attempt++) {
           const controller = typeof AbortController === 'function' ? new AbortController() : null;
-          const timer = controller ? setTimeout(() => controller.abort(), 5000) : null;
+          const timer = controller ? setTimeout(() => controller.abort(), 15000) : null;
           try {
             const response = await fetch(getCloudApiUrl('/api/payment-config'), {cache:'no-store', ...(controller ? {signal:controller.signal} : {})});
             if (!response.ok) throw new Error('Payment configuration unavailable');
             const config = await response.json();
             if (!config.bankConfig?.accountNumber || !config.bankConfig?.accountHolder) throw new Error('Payment account missing');
             applyServerConfig({bankConfig:config.bankConfig});
-          } finally { if (timer) clearTimeout(timer); }
+            return;
+          } catch (error) { if(attempt===1) throw error; }
+          finally { if (timer) clearTimeout(timer); }
+          }
         })();
       }
       try { await checkoutPaymentRequest; setCheckoutPaymentReady(true); }
