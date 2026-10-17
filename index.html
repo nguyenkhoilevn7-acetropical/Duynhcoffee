@@ -7000,6 +7000,24 @@ function toggleKitchenSoundAlert() {
       callback(dataUrl);
     }
 
+    async function createReceiptScreeningImage(source) {
+      // The browser already decodes photos natively. Send a small rejection-only
+      // preview so unrelated images need no full-size server JPEG decoding.
+      const image=new Image();
+      try {
+        await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=source;});
+        const scale=Math.min(1,600/Math.max(image.width,image.height));
+        const canvas=document.createElement('canvas');
+        canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));
+        const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0,canvas.width,canvas.height);
+        const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+        let colored=0,count=0;
+        for(let i=0;i<pixels.length;i+=64){count++;if(Math.max(pixels[i],pixels[i+1],pixels[i+2])-Math.min(pixels[i],pixels[i+1],pixels[i+2])>45)colored++;}
+        return colored/count>=0.12 ? canvas.toDataURL('image/png') : undefined;
+      } catch (_) {return undefined;}
+      finally {image.onload=image.onerror=null;image.src='';}
+    }
+
     async function runClientVerifyData(base64Str, expAmt, onProgressCallback, order = null) {
       // A slow upload or lost response must not abandon an accepted OCR job.
       // Retrying this same image/cart is deduplicated by the server.
@@ -7028,9 +7046,10 @@ function toggleKitchenSoundAlert() {
       try {
         if (onProgressCallback) onProgressCallback(5, 'Đang gửi ảnh biên lai...');
         const items = order ? order.items.map(i => ({ id: i.id, qty: i.qty, toppings: i.toppings || [] })) : cart.map(c => ({ id: c.item.id, qty: c.qty, toppings: c.toppings || [] }));
+        const screeningImage=typeof createReceiptScreeningImage==='function' ? await createReceiptScreeningImage(base64Str) : undefined;
         const upload = {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: base64Str, items, payableAmount: expAmt, discountCode: order ? order.discount?.code : activeDiscount?.code })
+          body: JSON.stringify({ image: base64Str, screeningImage, items, payableAmount: expAmt, discountCode: order ? order.discount?.code : activeDiscount?.code })
         };
         async function startJob() {
           for (let attempt = 0; ; attempt++) {

@@ -182,19 +182,27 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
     })().catch(error => { if (generation === workerGeneration) workerReady = null; throw error; });
     return workerReady;
   }
-  async function ocr(image, amount, holder) {
+  async function ocr(image, amount, holder, screeningImage) {
     if (recognize) return { text: await recognize(image), passes: 1 };
     if (resetReady) await resetReady;
     await warmup();
     const activeWorker = worker;
     progress(8,'preparing');
     const textOnly = { text:true, blocks:false, hocr:false, tsv:false, box:false, unlv:false, osd:false, pdf:false };
+    let suppliedScreening=typeof screeningImage==='string' && screeningImage.length<800000 && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(screeningImage);
+    const screeningBuffer=suppliedScreening ? Buffer.from(screeningImage.split(',')[1],'base64') : null;
+    suppliedScreening=!!(screeningBuffer && screeningBuffer.length>=24 && screeningBuffer.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])) && screeningBuffer.readUInt32BE(16)>0 && screeningBuffer.readUInt32BE(16)<=600 && screeningBuffer.readUInt32BE(20)>0 && screeningBuffer.readUInt32BE(20)<=600);
+    if(suppliedScreening) {
+      progressBase=10;progressSpan=20;
+      const peek=await activeWorker.recognize(screeningBuffer,{},textOnly);
+      if(classifyReceiptText(peek.data.text)==='unrelated') return {text:peek.data.text,passes:1,nonReceipt:true};
+    }
     const { prepareReceipt } = require('./receipt-image');
     const prepared = prepareReceipt(Buffer.from(image.split(',')[1], 'base64'), image.match(/^data:image\/(\w+)/)[1]);
     await activeWorker.setParameters({ tessedit_pageseg_mode: '6' });
     // A small first look can identify a menu/page without decoding it three times.
     // Never use this low-resolution screening result to approve a receipt.
-    const screening = prepared.screening;
+    const screening = suppliedScreening ? null : prepared.screening;
     if (screening) {
       progressBase=10; progressSpan=20;
       const peek=await activeWorker.recognize(screening,{},textOnly);
@@ -259,7 +267,7 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
       const imageKey = hash(image);
       for (const [key, entry] of readings) if (now() - entry.at >= 120000) readings.delete(key);
       const cached = cacheOcr && readings.get(imageKey);
-      const text = cached ? { text: cached.text, passes: 0 } : await Promise.race([ocr(image, amount, holder), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Máy chủ chưa đọc xong biên lai. Chưa thể kết luận số tiền hoặc tên người nhận sai; vui lòng thử lại.')), deadlineMs); })]);
+      const text = cached ? { text: cached.text, passes: 0 } : await Promise.race([ocr(image, amount, holder, body.screeningImage), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Máy chủ chưa đọc xong biên lai. Chưa thể kết luận số tiền hoặc tên người nhận sai; vui lòng thử lại.')), deadlineMs); })]);
       progress(97,'comparing');
       const result = compareReceipt(text.text, amount, holder);
       if (text.nonReceipt || text.unreadable) {
