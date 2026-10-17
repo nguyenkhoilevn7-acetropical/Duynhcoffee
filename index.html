@@ -4149,7 +4149,9 @@ body {
         </div>
 
         <!-- NHÓM 6: VIETQR THANH TOÁN TIỀN NƯỚC -->
-        <div class="ios-checkout-group">
+        <p id="checkout-bank-status" role="status" style="padding:12px;color:#52624c;display:none"></p>
+        <button type="button" id="checkout-bank-retry" class="nav-btn" style="display:none" onclick="refreshCheckoutPaymentConfig()">Thử lại thông tin thanh toán</button>
+        <div class="ios-checkout-group" id="checkout-payment-details">
           <div class="ios-group-title">💳 Chuyển khoản tiền nước qua VietQR</div>
           <div class="ios-group-card" style="text-align: center;">
             <p style="font-size: 0.78rem; color: #636366; margin-bottom: 8px;">
@@ -7097,7 +7099,7 @@ function toggleKitchenSoundAlert() {
         let networkFailures = 0, restarts = 0;
         while (job.status === 'pending' && Date.now() < deadline) {
           if (Date.now() - started > 5000 && onProgressCallback) onProgressCallback(65, 'Máy chủ vẫn đang đọc biên lai; đang chờ kết quả...');
-          await pause(networkFailures ? Math.min(1000 * 2 ** networkFailures, 5000) : 1000);
+          await pause(networkFailures ? Math.min(1000 * 2 ** networkFailures, 5000) : (Date.now() - started < 5000 ? 400 : 1000));
           try {
             job = await request('/api/receipt-scans/' + encodeURIComponent(job.jobId));
             networkFailures = 0;
@@ -7137,6 +7139,7 @@ function toggleKitchenSoundAlert() {
       }
 
       if (!file) return;
+      if (!checkoutPaymentReady) { showSmsToast('Thông tin thanh toán', 'Chờ cập nhật thông tin ngân hàng rồi tải biên lai.'); return; }
       // Selecting the same file must trigger a new change event on retry.
       const receiptInput = document.getElementById('receipt-file-input');
       if (receiptInput) receiptInput.value = '';
@@ -7720,7 +7723,7 @@ function openProductCustomModal(itemId) {
         cart[editingCartIndex].custom = customStr;
 
         editingCartIndex = null;
-        saveLocalData();
+        if (typeof debouncedSaveLocalData === 'function') debouncedSaveLocalData(); else saveLocalData();
         updateCartBadge();
         renderCartDrawerItems();
         if (typeof renderCheckoutItemsPreview === 'function') {
@@ -7749,7 +7752,7 @@ function openProductCustomModal(itemId) {
         });
       }
 
-      saveLocalData();
+      if (typeof debouncedSaveLocalData === 'function') debouncedSaveLocalData(); else saveLocalData();
       updateCartBadge();
       renderCartDrawerItems();
       if (typeof renderCheckoutItemsPreview === 'function') {
@@ -7773,9 +7776,7 @@ function openProductCustomModal(itemId) {
       confirmAddToCartFromCustomModal();
       closeProductCustomModal();
       closeCartDrawer();
-      setTimeout(() => {
-        openPaymentCheckoutModal();
-      }, 40);
+      openPaymentCheckoutModal();
     }
     window.confirmInstantCheckoutFromCustomModal = confirmInstantCheckoutFromCustomModal;
 
@@ -8478,16 +8479,46 @@ function openProductCustomModal(itemId) {
     window.lockScreenScroll = lockScreenScroll;
     window.unlockScreenScroll = unlockScreenScroll;
 
+let checkoutPaymentReady = false;
+    let checkoutPaymentRequest = null;
+    function setCheckoutPaymentReady(ready, failed = false) {
+      checkoutPaymentReady = ready;
+      const details = document.getElementById('checkout-payment-details');
+      const status = document.getElementById('checkout-bank-status');
+      const retry = document.getElementById('checkout-bank-retry');
+      const input = document.getElementById('receipt-file-input');
+      if (details) details.style.display = ready ? '' : 'none';
+      if (status) { status.style.display = ready ? 'none' : 'block'; status.textContent = failed ? 'Chưa cập nhật được thông tin ngân hàng. Hãy thử lại trước khi chuyển tiền.' : 'Đang cập nhật thông tin thanh toán...'; }
+      if (retry) retry.style.display = failed ? '' : 'none';
+      if (input) input.disabled = !ready;
+    }
+    async function refreshCheckoutPaymentConfig() {
+      setCheckoutPaymentReady(false);
+      if (!checkoutPaymentRequest) {
+        checkoutPaymentRequest = (async () => {
+          const controller = typeof AbortController === 'function' ? new AbortController() : null;
+          const timer = controller ? setTimeout(() => controller.abort(), 5000) : null;
+          try {
+            const response = await fetch(getCloudApiUrl('/api/payment-config'), {cache:'no-store', ...(controller ? {signal:controller.signal} : {})});
+            if (!response.ok) throw new Error('Payment configuration unavailable');
+            const config = await response.json();
+            if (!config.bankConfig?.accountNumber || !config.bankConfig?.accountHolder) throw new Error('Payment account missing');
+            applyServerConfig({bankConfig:config.bankConfig});
+          } finally { if (timer) clearTimeout(timer); }
+        })();
+      }
+      try { await checkoutPaymentRequest; setCheckoutPaymentReady(true); }
+      catch (_) { setCheckoutPaymentReady(false, true); }
+      finally { checkoutPaymentRequest = null; }
+    }
+    window.refreshCheckoutPaymentConfig = refreshCheckoutPaymentConfig;
 async function openPaymentCheckoutModal() {
-      try {
-        const response = await fetch(getCloudApiUrl('/api/config'), { cache: 'no-store' });
-        if (!response.ok) throw new Error('Không lấy được thông tin thanh toán mới nhất');
-        applyServerConfig(await response.json());
-      } catch (error) { alert(error.message); return; }
       if (!cart || cart.length === 0) {
         alert("Giỏ hàng của bạn đang trống! Vui lòng chọn món trước khi thanh toán.");
         return;
       }
+      const existingCheckout = document.getElementById('checkout-modal');
+      if (!existingCheckout || existingCheckout.style.display === 'flex') return;
       hideFloatingCartNow();
       closeCartDrawer();
 
@@ -8555,6 +8586,8 @@ async function openPaymentCheckoutModal() {
       if (modal) {
         if (modal.style.display !== 'flex') lockScreenScroll();
         modal.style.display = 'flex';
+        // Show the form before starting any network request.
+        refreshCheckoutPaymentConfig();
       }
     }
 

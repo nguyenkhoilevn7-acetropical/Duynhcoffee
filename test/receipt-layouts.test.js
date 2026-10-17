@@ -51,3 +51,8 @@ test('a longer or different recipient name cannot match a substring of its token
    assert.equal(compareReceipt('Giao dịch thành công\n39.000đ\nNgười nhận '+wrong,39000,'DAO KHOI NGUYEN').isValid,false);
 });
 module.exports=layouts;
+
+test('iPhone VCB layout reads 42000 VND and payee independently of sender text and transaction ID',()=>{
+ const text='VCB Digibank\nGiao dịch thành công!\n42,000 VND\n19:23 Thứ Hai 12/10/2026\nTài khoản nhận 9911989890\nTên người nhận DAO KHOI NGUYEN\nNgân hàng nhận Vietcombank\nNội dung TRAN THI KIM MAI chuyen tien\nPhí chuyển tiền Miễn phí\nMã giao dịch 16502422734';
+ assert.equal(compareReceipt(text,42000,'DAO KHOI NGUYEN').isValid,true);assert.equal(compareReceipt(text,45000,'DAO KHOI NGUYEN').isValid,false);assert.equal(compareReceipt(text,42000,'TRAN THI KIM MAI').isValid,false);
+});

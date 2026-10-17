@@ -943,6 +943,13 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Small, fresh payment snapshot: checkout does not download banner assets.
+  if (pathname === '/api/payment-config' && req.method === 'GET') {
+    configCache = bannerImagesOnlyConfig(readJsonFile(CONFIG_FILE, configCache));
+    sendJson(res, 200, {bankConfig: configCache.bankConfig || {}});
+    return;
+  }
+
   // 5. GET & POST /api/config
   if (pathname === '/api/config') {
     if (req.method === 'GET') {

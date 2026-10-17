@@ -43,6 +43,7 @@ test('HTTP menu/config save succeeds, empty values survive restart, private sour
  await stop();await start();assert.deepEqual(await(await fetch(base+'/api/menu')).json(),[]);
  const config=await(await fetch(base+'/api/config')).json();assert.equal(config.bankConfig.accountHolder,'DAO KHUE NGUYEN');assert.deepEqual(config.banner.images,[]);
  r=await fetch(base+'/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({bankConfig:{accountHolder:'DAO KHOI NGUYEN'}})});
+ const payment=await(await fetch(base+'/api/payment-config')).json();assert.equal(payment.bankConfig.accountHolder,'DAO KHOI NGUYEN');assert.deepEqual(Object.keys(payment),['bankConfig']);
  const changed=await r.json();assert.equal(changed.config.bankConfig.accountHolder,'DAO KHOI NGUYEN');assert.ok(changed.configVersion);assert.equal(changed.config.bankConfig.bin,'970436');
  r=await fetch(base+'/api/verify-receipt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:'not an image',items:[{id:91,qty:1}]})});assert.equal(r.status,422);assert.equal((await r.json()).isValid,false);
  r=await fetch(base+'/api/receipt-scans',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:'not an image',items:[{id:91,qty:1}]})});assert.equal(r.status,422);

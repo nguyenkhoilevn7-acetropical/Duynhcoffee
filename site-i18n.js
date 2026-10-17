@@ -6,6 +6,9 @@
 })(function () {
   'use strict';
   const catalog = {
+  "Thử lại thông tin thanh toán": "Retry payment details",
+  "Đang cập nhật thông tin thanh toán...": "Updating payment details...",
+  "Chưa cập nhật được thông tin ngân hàng. Hãy thử lại trước khi chuyển tiền.": "Bank details could not be updated. Retry before transferring payment.",
   "CHỈ NHẬN ẢNH": "IMAGES ONLY",
   "Banner hiện chỉ hỗ trợ hình ảnh để giữ trang tải nhanh.": "The banner supports images only to keep the page fast.",
   "Hủy": "Cancel",
