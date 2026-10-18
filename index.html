@@ -9443,18 +9443,45 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
     function createAdminShippingOrderCard(order) {
-      const id = escapeDeliveryText(order.id);
-      const items = (order.items || []).map(item => '<div>' + escapeDeliveryText(item.qty) + ' × ' + escapeDeliveryText(item.name) + ' — ' + formatMoney(item.total ?? item.price * item.qty) + '</div>').join('');
+      const safe = escapeDeliveryText;
+      const id = safe(order.id);
+      const items = (Array.isArray(order.items) ? order.items : []).map(item => {
+        const product = menu.find(m => m.id === item.id || m.name === item.name);
+        const category = product?.category || 'tea';
+        const image = getSafeDrinkImage(product?.image || item.image, category, item.name);
+        const qty = Number(item.qty) || 1;
+        const name = safe(cleanCorruptedText(item.name || product?.name || 'Món nước'));
+        const options = safe(cleanCorruptedText(item.custom || ''));
+        const toppings = Array.isArray(item.toppings) ? item.toppings.map(t => safe(typeof t === 'string' ? t : t.name || '')).filter(Boolean).join(', ') : '';
+        return '<div style="display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px dashed #CBD5E1;">' +
+          '<img src="' + safe(image) + '" alt="' + name + '" style="width:58px;height:58px;object-fit:cover;border-radius:10px;border:1px solid #CBD5E1;flex-shrink:0;" loading="lazy">' +
+          '<div style="flex:1;min-width:0;"><div style="display:flex;justify-content:space-between;gap:8px;align-items:start;">' +
+          '<strong style="color:#0F172A;">' + safe(qty) + ' × ' + name + '</strong><b style="white-space:nowrap;color:#166534;">' + formatMoney(item.total ?? ((Number(item.price) || 0) * qty)) + '</b></div>' +
+          (options ? '<div style="color:#0369A1;font-size:.84rem;margin-top:5px;">🍹 ' + options + '</div>' : '') +
+          (toppings ? '<div style="color:#475569;font-size:.82rem;margin-top:4px;">Thêm: ' + toppings + '</div>' : '') +
+          '</div></div>';
+      }).join('');
       const linked = !!order.deliveryCarrierOrderId;
-      const label = order.isLocalTest ? '🧪 ĐƠN THỬ — GIAO SHIPPER GIẢ LẬP' : order.deliveryStatus === 'failed' ? 'GIAO HÀNG GẶP SỰ CỐ' : 'SHIPPER ĐANG GIAO HÀNG';
-      const linkButtons = linked ? '<button type="button" class="nav-btn" onclick="syncDeliveryOrder(' + escapeDeliveryText(JSON.stringify(order.id)) + ')">Kiểm tra với hãng</button>' :
-        '<button type="button" class="nav-btn" onclick="dispatchOrderToPartner(' + escapeDeliveryText(JSON.stringify(order.id)) + ', &quot;ahamove&quot;)">Liên kết Ahamove</button>' +
-        '<button type="button" class="nav-btn" onclick="dispatchOrderToPartner(' + escapeDeliveryText(JSON.stringify(order.id)) + ', &quot;lalamove&quot;)">Liên kết Lalamove</button>';
-      return '<article class="backend-order-card" style="padding:16px;border-left:4px solid #EA580C;">' +
-        '<b>' + label + '</b><h3>' + id + '</h3><p>' + escapeDeliveryText(order.customerName) + '</p>' + items +
-        '<p>' + escapeDeliveryText(order.deliveryPartnerName || '') + ' • ' + escapeDeliveryText(order.trackingCode || 'Chưa liên kết vận đơn thật') + '</p>' +
-        '<p>Đã bàn giao cho shipper; chưa xác nhận khách đã nhận.</p>' +
-        (order.deliverySyncError ? '<p>' + escapeDeliveryText(order.deliverySyncError) + '</p>' : '') + (order.isLocalTest ? '' : linkButtons) + '</article>';
+      const label = order.isLocalTest ? '🧪 ĐƠN THỬ — GIAO SHIPPER GIẢ LẬP' : order.deliveryStatus === 'failed' ? '⚠️ GIAO HÀNG GẶP SỰ CỐ' : '🛵 SHIPPER ĐANG GIAO HÀNG';
+      const quotedId = safe(JSON.stringify(String(order.id)));
+      const linkButtons = linked ? '<button type="button" class="nav-btn" onclick="syncDeliveryOrder(' + quotedId + ')">Kiểm tra với hãng</button>' :
+        '<button type="button" class="nav-btn" onclick="dispatchOrderToPartner(' + quotedId + ', &quot;ahamove&quot;)">Liên kết Ahamove</button>' +
+        '<button type="button" class="nav-btn" onclick="dispatchOrderToPartner(' + quotedId + ', &quot;lalamove&quot;)">Liên kết Lalamove</button>';
+      const receiptButton = order.receiptImage ? '<button type="button" class="nav-btn" onclick="openReceiptViewerModal(' + quotedId + ')">🔍 Xem Bill Chuyển Khoản</button>' : '';
+      return '<article class="backend-order-card" style="padding:16px;border-left:5px solid #EA580C;background:white;border-radius:15px;" id="card-' + id + '">' +
+        '<div style="background:#FFF7ED;color:#9A3412;padding:9px 12px;border-radius:9px;font-weight:800;">' + label + '</div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:start;gap:12px;margin:12px 0;">' +
+        '<div><h3 style="margin:0;color:#0F172A;">' + id + '</h3><div style="font-weight:700;color:#334155;">Khách: ' + safe(cleanCorruptedText(order.customerName || 'Khách')) + ' • 📞 ' + safe(order.phone || '') + '</div>' +
+        '<div style="font-size:.82rem;color:#64748B;">📍 ' + safe(cleanCorruptedText(order.deliveryAddress || order.address || 'Giao hàng tận nơi')) + '</div></div>' +
+        '<b style="color:#166534;white-space:nowrap;">' + formatMoney(order.beverageTotal ?? order.total) + '</b></div>' +
+        '<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:10px 12px;margin:10px 0;">' +
+        '<b style="font-size:.82rem;color:#475569;">MÓN KHÁCH ĐẶT</b>' + (items || '<p>Chưa có chi tiết món</p>') + '</div>' +
+        '<div style="background:#F1F5F9;padding:9px;border-radius:8px;color:#334155;font-size:.86rem;">Tiền nước: <b>' + formatMoney(order.beverageTotal ?? order.total) + '</b> • Phí giao: <b>' + formatMoney(order.shippingFee ?? 0) + '</b></div>' +
+        '<p style="font-size:.83rem;color:#475569;">🛵 ' + safe(order.deliveryPartnerName || 'Đơn giao hàng') + ' • ' + safe(order.trackingCode || 'Chưa liên kết vận đơn thật') +
+        (order.driver?.name ? ' • Tài xế: ' + safe(order.driver.name) : '') + '</p>' +
+        '<p style="font-size:.8rem;color:#9A3412;">Đã bàn giao cho shipper; chưa xác nhận khách đã nhận.</p>' +
+        (order.deliverySyncError ? '<p style="color:#B91C1C;">' + safe(order.deliverySyncError) + '</p>' : '') +
+        '<div style="display:flex;flex-wrap:wrap;gap:8px;">' + receiptButton + (order.isLocalTest ? '' : linkButtons) + '</div></article>';
     }
 
     // DUYỆT ĐƠN (NEW -> PREP)
