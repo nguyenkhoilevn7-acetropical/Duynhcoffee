@@ -6,6 +6,16 @@
 })(function () {
   'use strict';
   const catalog = {
+  "AI Gemini: tạo mô tả và dịch Việt–Anh bằng kết nối API của quán.": "Gemini AI: generate descriptions and translate Vietnamese–English using the store's API connection.",
+  "Bản tiếng Anh chưa dịch đầy đủ. Nội dung cũ vẫn được giữ; vui lòng thử lại.": "The English translation is incomplete. Your existing content is preserved; please try again.",
+  "Dự án Gemini API đã chạm giới hạn theo ngày. Kiểm tra hạn mức trong Google AI Studio; bản gốc vẫn được giữ.": "The Gemini API project has reached a daily limit. Check the quota in Google AI Studio; your original content is preserved.",
+  "Gemini API đang giới hạn lượt gọi. Vui lòng chờ rồi thử lại; bản gốc vẫn được giữ.": "Gemini API requests are rate limited. Wait before trying again; your original content is preserved.",
+  "API key Gemini chưa hợp lệ hoặc thiếu quyền. Kiểm tra GEMINI_API_KEY và dự án trong Google AI Studio.": "The Gemini API key is invalid or lacks permission. Check GEMINI_API_KEY and the project in Google AI Studio.",
+  "Dự án Gemini API cần kiểm tra trạng thái thanh toán hoặc số dư trong Google AI Studio.": "Check this Gemini API project's billing status or balance in Google AI Studio.",
+  "Gemini API tạm thời chưa xử lý được. Nội dung hiện tại vẫn được giữ; vui lòng thử lại.": "Gemini API is temporarily unavailable. Your existing content is preserved; please try again.",
+  "Chưa kết nối được Gemini API. Nội dung hiện tại vẫn được giữ; vui lòng thử lại.": "Could not connect to Gemini API. Your existing content is preserved; please try again.",
+  "Chưa cấu hình GEMINI_API_KEY trên Render. Nội dung hiện tại vẫn được giữ.": "GEMINI_API_KEY has not been configured on Render. Your existing content is preserved.",
+  "Đang xử lý nhiều yêu cầu AI. Vui lòng thử lại sau một phút.": "Many AI requests are being processed. Please try again in one minute.",
   "Liên hệ với quán": "Contact the store",
   "Liên hệ qua Facebook": "Contact us on Facebook",
   "TikTok — Sắp có": "TikTok — Coming soon",

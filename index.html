@@ -5045,7 +5045,7 @@ body {
       const trimmed = vietnameseText.trim();
       if (window.DuynhI18n) {
         const translated = window.DuynhI18n.translate(trimmed, 'en');
-        if (translated !== trimmed) return translated;
+        if (translated !== trimmed && cleanMenuEnglish(translated)) return translated;
       }
       if (EXACT_DISH_NAMES[trimmed]) return EXACT_DISH_NAMES[trimmed];
 
@@ -5053,7 +5053,7 @@ body {
       for (const [pattern, replacement] of FNB_AI_DICTIONARY) {
         res = res.replace(pattern, replacement);
       }
-      return res;
+      return cleanMenuEnglish(res);
     }
     window.translateFnbText = translateFnbText;
 
@@ -5209,7 +5209,7 @@ body {
     function getItemLocalizedName(item) {
       if (!item) return '';
       if (currentLang === 'en') {
-        return item.name_en || translateFnbText(item.name);
+        return cleanMenuEnglish(item.name_en) || translateFnbText(item.name) || item.name;
       }
       return cleanCorruptedText(item.name_vi || (window.DuynhI18n ? window.DuynhI18n.translate(item.name, 'vi') : item.name));
     }
@@ -5218,7 +5218,7 @@ body {
     function getItemLocalizedDesc(item) {
       if (!item) return '';
       if (currentLang === 'en') {
-        return item.description_en || translateFnbText(item.description || 'Fresh ingredients every day.');
+        return cleanMenuEnglish(item.description_en) || translateFnbText(item.description || '');
       }
       const original = item.description_vi || item.description || 'Thơm ngon mát lạnh, nguyên liệu tươi mỗi ngày.';
       return cleanCorruptedText(window.DuynhI18n ? window.DuynhI18n.translate(original, 'vi') : original);
@@ -5231,8 +5231,8 @@ body {
       if (!api) return;
       const pairs = {}, privateValues = [storeConfig?.bankConfig?.accountHolder, storeConfig?.bankConfig?.accountNumber];
       for (const item of menu) {
-        if (item.name_en) pairs[item.name_vi || item.name] = item.name_en;
-        if (item.description_en) pairs[item.description_vi || item.description] = item.description_en;
+        if (cleanMenuEnglish(item.name_en)) pairs[item.name_vi || item.name] = item.name_en;
+        if (cleanMenuEnglish(item.description_en)) pairs[item.description_vi || item.description] = item.description_en;
         if(item.options && window.MenuOptions) for(const group of Object.values(menuOptionsFor(item))) for(const option of group) if(option.name_en)pairs[option.name]=option.name_en;
       }
       for (const category of getCategoriesList()) if (category.name_en) pairs[category.name_vi || category.name] = category.name_en;
@@ -7520,7 +7520,7 @@ function toggleKitchenSoundAlert() {
     let editingCartIndex = null;
 
     function menuOptionsFor(item) { return window.MenuOptions.getOptions(item); }
-    function optionLabel(option) { return currentLang==='en' ? (option.name_en || translateFnbText(option.name)) : option.name; }
+    function optionLabel(option) { return currentLang==='en' ? (option.name_en || translateFnbText(option.name) || option.name) : option.name; }
     function renderCustomOptions(item) {
       const options=menuOptionsFor(item);
       activeIce=options.ice.some(o=>o.name===activeIce)?activeIce:(options.ice[0]?.name || '');
@@ -10294,6 +10294,10 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
     // AI drafts stay inside the modal until an acknowledged menu save.
     const menuAIStates = {};
+    function cleanMenuEnglish(value) {
+      const text=typeof value==='string'?value.trim():'';
+      return /[À-ỹĐđ]/.test(text.replace(/caf[ée]|crème brûlée|jalapeño|piña colada/gi,'')) ? '' : text;
+    }
     const menuAIEl = (context, field) => document.getElementById(context + '-menu-' + field);
     function menuAISnapshot(context) {
       return JSON.stringify(['name','image-url','desc'].map(field => menuAIEl(context,field)?.value.trim() || ''));
@@ -10306,12 +10310,14 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       const previous = menuAIStates[context];
       if (previous) { clearTimeout(previous.timer); previous.closed = true; }
       menuAIEl(context,'ai-manual').style.display = 'none';
-      menuAIStates[context] = { signature: menuAISnapshot(context), ok: context === 'edit', customDescription: false };
-      menuAIMessage(context, 'AI Gemini miễn phí: nhập tên và tải ảnh để tự tạo mô tả Việt–Anh.');
+      const complete=Boolean(cleanMenuEnglish(menuAIEl(context,'name-en').value) && cleanMenuEnglish(menuAIEl(context,'desc-en').value));
+      menuAIStates[context] = { signature: menuAISnapshot(context), ok: context === 'edit' && complete, customDescription: false };
+      menuAIMessage(context, 'AI Gemini: tạo mô tả và dịch Việt–Anh bằng kết nối API của quán.');
     }
     function scheduleMenuAI(context, field) {
       const state = menuAIStates[context];
       if (!state || state.closed) return;
+      if (field === 'category') return;
       if (field === 'desc') state.customDescription = true;
       if (field === 'name') menuAIEl(context,'name-en').value = '';
       // Never display a stale English description as the translation of an edited dish.
@@ -10319,7 +10325,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       state.ok = false;
       clearTimeout(state.timer);
       menuAIMessage(context, 'Đang chờ nhập xong để tạo nội dung Việt–Anh...');
-      state.timer = setTimeout(() => generateMenuAI(context), 1200);
+      state.timer = setTimeout(() => generateMenuAI(context), 2000);
     }
     async function menuAIImage(context) {
       const image = menuAIEl(context,'image-url').value.trim();
@@ -10346,6 +10352,9 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     async function generateMenuAI(context) {
       const state = menuAIStates[context];
       if (!state || state.closed) return false;
+      if (state.retryAt && Date.now() < state.retryAt) {
+        menuAIMessage(context, 'Gemini API đang giới hạn lượt gọi. Vui lòng chờ rồi thử lại; bản gốc vẫn được giữ.');return false;
+      }
       clearTimeout(state.timer);
       const signature = menuAISnapshot(context);
       if (!menuAIEl(context,'name').value.trim()) return false;
@@ -10356,22 +10365,26 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       menuAIMessage(context, 'AI đang đọc tên, ảnh và viết mô tả Việt–Anh...');
       state.pending = (async () => {
         try {
-          const image = await menuAIImage(context);
+          const image = untouched.desc.trim() ? '' : await menuAIImage(context).catch(() => '');
           if (state.closed || state.ticket !== ticket || menuAISnapshot(context) !== signature) return false;
           const response = await fetch(getCloudApiUrl('/api/menu-ai/generate'), {
             method: 'POST', headers: {'Content-Type':'application/json', Authorization:'Bearer '+(localStorage.getItem('duynh_admin_api_token') || localStorage.getItem('duynh_admin_push_token') || '')},
-            body: JSON.stringify({name:menuAIEl(context,'name').value.trim(),image,description:state.customDescription ? untouched.desc : ''}),
+            body: JSON.stringify({name:menuAIEl(context,'name').value.trim(),image,description:untouched.desc}),
             signal: AbortSignal.timeout(50000)
           });
           const result = await response.json();
-          if (!response.ok) throw Error(result.error || 'Chưa tạo được nội dung AI. Vui lòng thử lại.');
+          if (!response.ok) {
+            if(result.retryAfterSeconds)state.retryAt=Date.now()+Math.min(86400,Math.max(1,Number(result.retryAfterSeconds)))*1000;
+            throw Error(result.error || 'Chưa tạo được nội dung AI. Vui lòng thử lại.');
+          }
           if (state.closed || state.ticket !== ticket || menuAISnapshot(context) !== signature) return false;
           for (const [field,key] of [['name-en','name_en'],['desc','description'],['desc-en','description_en']]) {
             if (typeof result[key] !== 'string' || !result[key].trim()) throw Error('AI chưa trả đủ nội dung Việt–Anh.');
           }
+          if(!cleanMenuEnglish(result.name_en) || !cleanMenuEnglish(result.description_en))throw Error('Bản tiếng Anh chưa dịch đầy đủ. Nội dung cũ vẫn được giữ; vui lòng thử lại.');
           for (const [field,key] of [['name-en','name_en'],['desc','description'],['desc-en','description_en']]) {
             const el = menuAIEl(context,field);
-            if (el.value === untouched[field] && !(field === 'desc' && state.customDescription)) el.value = result[key];
+            if (el.value === untouched[field] && !(field === 'desc' && (state.customDescription || untouched.desc.trim()))) el.value = result[key];
           }
           state.signature = menuAISnapshot(context); state.ok = true;
           menuAIMessage(context, 'Đã tạo nội dung Việt–Anh. Anh có thể sửa trước khi lưu.');
@@ -10419,8 +10432,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
       document.getElementById('edit-menu-id').value = item.id;
       document.getElementById('edit-menu-name').value = item.name;
-      document.getElementById('edit-menu-name-en').value = item.name_en || translateFnbText(item.name);
-      document.getElementById('edit-menu-desc-en').value = item.description_en || translateFnbText(item.description || '');
+      document.getElementById('edit-menu-name-en').value = cleanMenuEnglish(item.name_en) || translateFnbText(item.name);
+      document.getElementById('edit-menu-desc-en').value = cleanMenuEnglish(item.description_en) || translateFnbText(item.description || '');
       populateCategorySelectDropdowns(item.category, 'edit');
       toggleInlineCategoryCreator('edit', false);
       document.getElementById('edit-menu-category').value = item.category;
@@ -10437,6 +10450,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       resetMenuAI('edit');
       renderMenuOptionsEditor('edit', item);
       document.getElementById('edit-menu-modal').style.display = 'flex';
+      if(!menuAIStates.edit.ok)menuAIStates.edit.timer=setTimeout(()=>generateMenuAI('edit'),500);
     }
 
     function closeEditMenuModal() {
@@ -10512,8 +10526,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       if (newImg) item.image = newImg;
       item.name_vi = item.name;
       item.description_vi = item.description;
-      item.name_en = document.getElementById('edit-menu-name-en')?.value.trim() || translateFnbText(item.name);
-      item.description_en = document.getElementById('edit-menu-desc-en')?.value.trim() || translateFnbText(item.description);
+      item.name_en = cleanMenuEnglish(document.getElementById('edit-menu-name-en')?.value) || translateFnbText(item.name);
+      item.description_en = cleanMenuEnglish(document.getElementById('edit-menu-desc-en')?.value) || translateFnbText(item.description);
 
       const draft = menu.map(m => String(m.id) === String(item.id) ? item : m);
       const positioned = positionMenuItem(draft, item.id, document.getElementById('edit-menu-position')?.value || 'keep');
@@ -10632,8 +10646,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
       // Sinh ID độc nhất vô nhị dựa trên timestamp + random (chống 100% đụng độ ID giữa các máy)
       const newId = generateUniqueMenuItemId();
-      const autoNameEn = document.getElementById('add-menu-name-en')?.value.trim() || translateFnbText(name);
-      const autoDescEn = document.getElementById('add-menu-desc-en')?.value.trim() || (desc ? translateFnbText(desc) : 'Freshly prepared daily with premium ingredients.');
+      const autoNameEn = cleanMenuEnglish(document.getElementById('add-menu-name-en')?.value) || translateFnbText(name);
+      const autoDescEn = cleanMenuEnglish(document.getElementById('add-menu-desc-en')?.value) || (desc ? translateFnbText(desc) : '');
 
       const newItem = {
         options: typeof readMenuOptionsEditor==='function' ? readMenuOptionsEditor('add') : undefined,

@@ -671,7 +671,7 @@ const server = http.createServer(async (req, res) => {
       if (pathname.endsWith('/status') && req.method === 'GET') sendJson(res, 200, menuAI.status());
       else if (pathname.endsWith('/generate') && req.method === 'POST') sendJson(res, 200, await menuAI.generate(await parseRequestBody(req)));
       else sendJson(res, 405, { error: 'Phương thức không hợp lệ.' });
-    } catch (error) { sendJson(res, error.status || 503, { error: error.message }); }
+    } catch (error) { sendJson(res, error.status || 503, { error: error.message,code:error.code || 'MENU_AI_ERROR',retryAfterSeconds:error.retryAfterSeconds || 0,retryable:!!error.retryable }); }
     return;
   }
   if (pathname === '/api/delivery/status' && req.method === 'GET') {
