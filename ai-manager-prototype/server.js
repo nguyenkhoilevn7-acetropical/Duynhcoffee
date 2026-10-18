@@ -6,7 +6,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 const HOST = process.env.AI_MANAGER_HOST || '127.0.0.1';
-const PORT = Number(process.env.AI_MANAGER_PORT || 3107);
+const PORT = Number(process.env.PORT || process.env.AI_MANAGER_PORT || 3107);
 const API_KEY = process.env.XAI_API_KEY || '';
 const MODEL = process.env.XAI_MODEL || 'grok-4.3';
 const ACCESS_TOKEN = process.env.AI_MANAGER_ACCESS_TOKEN || '';
@@ -54,6 +54,7 @@ async function grokAnswer(message, business) {
   } finally { clearTimeout(timer); }
 }
 const file=path.join(__dirname,'index.html');
+if (!['127.0.0.1','::1'].includes(HOST) && !ACCESS_TOKEN) { console.error('Public staging requires AI_MANAGER_ACCESS_TOKEN'); process.exit(1); }
 const server=http.createServer(async (req,res)=>{
   if(req.url==='/health'&&req.method==='GET') return json(res,200,{status:'ok',mode:'demo-read-only',grokConfigured:!!API_KEY});
   if(req.url==='/'&&req.method==='GET') {
