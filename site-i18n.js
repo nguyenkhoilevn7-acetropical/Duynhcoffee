@@ -6,6 +6,7 @@
 })(function () {
   'use strict';
   const catalog = {
+  "📊 Doanh Thu & Lợi Nhuận": "📊 Sales & Profit",
   "AI Gemini: tạo mô tả và dịch Việt–Anh bằng kết nối API của quán.": "Gemini AI: generate descriptions and translate Vietnamese–English using the store's API connection.",
   "Bản tiếng Anh chưa dịch đầy đủ. Nội dung cũ vẫn được giữ; vui lòng thử lại.": "The English translation is incomplete. Your existing content is preserved; please try again.",
   "Dự án Gemini API đã chạm giới hạn theo ngày. Kiểm tra hạn mức trong Google AI Studio; bản gốc vẫn được giữ.": "The Gemini API project has reached a daily limit. Check the quota in Google AI Studio; your original content is preserved.",

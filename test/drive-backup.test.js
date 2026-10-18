@@ -170,3 +170,12 @@ test('order-only backup endpoint requires owner key, and unconfigured backups re
   await assert.rejects(backup.flushOrders(),/Chưa cấu hình Google Drive/);assert.equal(backup.status().orders.lastSuccess,null);
  }finally{backup.stop();}
 });
+test('private cost history round trips through backup without entering public config',async()=>{
+ const f=fixture();try{
+ const profitSettings={version:'cost-history-v1',rates:{'1':[{from:'0001-01-01T00:00:00.000Z',percent:25}]}};
+ f.setCurrent({menu:[{id:1,name:'Tea',price:50000}],config:{storeName:'Mom'},discounts:[],profitSettings});
+ f.backup.changed();await f.backup.flush();assert.deepEqual(JSON.parse(f.files[0].bytes).profitSettings,profitSettings);
+ await f.backup.initialize();assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.dir,'profit-settings.json'))),profitSettings);
+ assert.equal(JSON.parse(fs.readFileSync(path.join(f.dir,'store_config.json'))).profitSettings,undefined);
+ }finally{f.cleanup();}
+});

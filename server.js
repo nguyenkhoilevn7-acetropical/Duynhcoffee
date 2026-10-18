@@ -19,6 +19,8 @@ const { createAdminPush } = require('./admin-push');
 const { createDelivery, protectOrderWrite, transition } = require('./delivery');
 const { createMenuAI } = require('./menu-ai');
 const menuAI = createMenuAI();
+const profitReport = require('./profit-report');
+const { exportReport } = require('./profit-excel');
 const {validateOptions}=require('./menu-options');
 const {validateRecipe,createRecipeScanner,createRecipeTranslator,recipeSourceHash}=require('./drink-recipes');
 const recipeScanner=createRecipeScanner();
@@ -30,6 +32,7 @@ const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
 const ORDERS_FILE = path.join(ROOT_DIR, 'orders.json');
 const CONFIG_FILE = path.join(ROOT_DIR, 'store_config.json');
 const MENU_FILE = path.join(ROOT_DIR, 'menu.json');
+const PROFIT_FILE = path.join(ROOT_DIR, 'profit-settings.json');
 const RECIPES_FILE = path.join(ROOT_DIR, 'drink-recipes.json');
 const DISCOUNTS_FILE = path.join(ROOT_DIR, 'discounts.json');
 
@@ -75,7 +78,7 @@ function writeJsonFile(filePath, data) {
     fs.writeFileSync(temporary, JSON.stringify(data, null, 2), 'utf8');
     fs.renameSync(temporary, filePath);
     if (backupService && filePath === ORDERS_FILE) backupService.ordersChanged();
-    if (backupService && [CONFIG_FILE, MENU_FILE, DISCOUNTS_FILE, RECIPES_FILE].includes(filePath)) backupService.changed();
+    if (backupService && [CONFIG_FILE, MENU_FILE, DISCOUNTS_FILE, RECIPES_FILE, PROFIT_FILE].includes(filePath)) backupService.changed();
     return true;
   } catch (err) {
     console.error(`Lỗi ghi file ${filePath}:`, err.message);
@@ -91,7 +94,7 @@ async function startApplication() {
 backupService = createBackup({
   dir: ROOT_DIR,
   ordersSnapshot: () => readJsonFile(ORDERS_FILE, []),
-  snapshot: () => ({ menu: menuCache, config: configCache, discounts: discountsCache, recipes: readJsonFile(RECIPES_FILE, {}) }),
+  snapshot: () => ({ menu: menuCache, config: configCache, discounts: discountsCache, recipes: readJsonFile(RECIPES_FILE, {}), profitSettings: readJsonFile(PROFIT_FILE, profitReport.emptySettings()) }),
   apply: data => {
     menuCache = data.menu;
     // Secrets remain local and are never restored from Drive.
@@ -1069,6 +1072,28 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Finance uses private, authenticated endpoints and a separate persisted rate history.
+  if (pathname === '/api/admin/profits' || pathname === '/api/admin/profits/settings' || pathname === '/api/admin/profits/export') {
+    if (!adminPush.verify((req.headers.authorization || '').replace(/^Bearer /, ''))) {sendJson(res,401,{error:'Vui lòng đăng nhập lại quản trị để xem doanh thu và lợi nhuận.'});return;}
+    try {
+      const settings=profitReport.validateSettings(readJsonFile(PROFIT_FILE, profitReport.emptySettings()));
+      const currentMenu=readJsonFile(MENU_FILE, menuCache);
+      if(pathname.endsWith('/settings') && req.method==='POST') {
+        const updated=profitReport.updateSettings(settings,await parseRequestBody(req),currentMenu);
+        writeJsonFile(PROFIT_FILE,updated);
+        sendJson(res,200,{success:true,version:updated.version});return;
+      }
+      if(req.method!=='GET' || pathname.endsWith('/settings')){sendJson(res,405,{error:'Phương thức không hỗ trợ.'});return;}
+      const report=profitReport.buildReport(readJsonFile(ORDERS_FILE,[]),settings,parsedUrl.query.date || profitReport.vnDay(new Date()));
+      if(pathname.endsWith('/export')) {
+        const bytes=exportReport(report);
+        res.writeHead(200,{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':'attachment; filename="Mom-Profit-'+report.date+'.xlsx"','Content-Length':bytes.length,'Cache-Control':'no-store'});res.end(bytes);return;
+      }
+      sendJson(res,200,{report,version:settings.version,menu:currentMenu.map(m=>({id:String(m.id),name:m.name,name_en:m.name_en,price:m.price,percent:settings.rates[String(m.id)]?.at(-1)?.percent??null}))});
+    } catch(error){sendJson(res,error.status||500,{error:error.message});}
+    return;
+  }
+
   // Recipes are private: never included in the public menu or WebSocket snapshots.
   if (pathname === '/api/drink-recipes') {
     res.setHeader('Cache-Control', 'no-store');
@@ -1186,7 +1211,7 @@ const server = http.createServer(async (req, res) => {
   // Source code and local data are not static assets.
   let normalized;
   try { normalized = path.posix.normalize(decodeURIComponent(cleanPath)); } catch { sendJson(res, 400, { error: 'Đường dẫn không hợp lệ' }); return; }
-  if (normalized.split('/').some(part => part.startsWith('.')) || ['server.js', 'drink-recipes.js', 'drink-recipes.json', 'menu-ai.js', 'delivery.js', 'admin-push.js', 'drive-backup.js', 'receipt-verification.js', 'receipt-jobs.js', 'receipt-image.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || normalized.startsWith('/test/') || /\.(tmp|md)$/.test(normalized)) {
+  if (normalized.split('/').some(part => part.startsWith('.')) || ['profit-report.js', 'profit-excel.js', 'profit-settings.json', 'server.js', 'drink-recipes.js', 'drink-recipes.json', 'menu-ai.js', 'delivery.js', 'admin-push.js', 'drive-backup.js', 'receipt-verification.js', 'receipt-jobs.js', 'receipt-image.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || normalized.startsWith('/test/') || /\.(tmp|md)$/.test(normalized)) {
     sendJson(res, 404, { error: 'Không tìm thấy' }); return;
   }
   if (cleanPath === '/' || cleanPath === '/admin' || cleanPath === '/pos') {

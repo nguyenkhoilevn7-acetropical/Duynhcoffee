@@ -3288,6 +3288,8 @@ body {
 .customer-social-links [hidden]{display:none!important}
 </style>
 <script src="admin-recipes.js" defer></script>
+<link rel="stylesheet" href="admin-profits.css">
+<script src="admin-profits.js" defer></script>
 <script src="menu-options.js" defer></script>
 <script src="site-i18n.js" defer></script>
 <script src="admin-notifications.js" defer></script>
@@ -3440,6 +3442,7 @@ body {
         <button type="button" class="backend-tab-btn" id="btn-tab-all" onclick="switchBackendTab('tab-all', this)">
           📋 Tất Cả Đơn
         </button>
+        <button type="button" class="backend-tab-btn" id="btn-tab-profits" onclick="switchBackendTab('tab-profits', this)">📊 Doanh Thu &amp; Lợi Nhuận</button>
         <button type="button" class="backend-tab-btn" id="btn-tab-menu" onclick="switchBackendTab('tab-menu', this)">
           🍵 Thực Đơn & Kho
         </button>
@@ -3793,6 +3796,7 @@ body {
         </div>
       </div>
 
+      <div id="tab-profits" class="backend-tab-content"></div>
       <div id="tab-settings" class="backend-tab-content">
         <div style="max-width: 600px; background: #FFF; border: 1px solid var(--border); border-radius: 14px; padding: 24px;">
           <h3 style="color: var(--primary-dark); margin-bottom: 16px;">Cài Đặt Quán & Tài Khoản Ngân Hàng</h3>
@@ -10070,7 +10074,9 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       if (target) target.classList.add('active');
       if (btnElem) btnElem.classList.add('active');
 
-      if (tabId === 'tab-banner') {
+      if (tabId === 'tab-profits') {
+        window.DuynhProfits?.open();
+      } else if (tabId === 'tab-banner') {
         loadBannerSettingsToAdmin();
       } else if (tabId === 'tab-all') {
         renderAdminAllOrdersTable();
