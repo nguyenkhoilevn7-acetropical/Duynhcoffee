@@ -124,3 +124,25 @@ test('failed OCR wakes waiting clients and excessive waiters do not accumulate',
  reject(Error('temporary failure'));
  for(const result of await Promise.all(waits)){assert.equal(result.status,'error');assert.equal(result.error,'temporary failure');}
 });
+
+
+test('disk queue accepts 100 unique scans, reports position, bounds storage, and removes image bodies after work',async()=>{
+ const fs=require('node:fs'),os=require('node:os'),path=require('node:path');const dir=fs.mkdtempSync(path.join(os.tmpdir(),'receipt-spool-'));const releases=[];
+ const jobs=createReceiptJobs({dir,maxPending:100,verify:body=>new Promise(resolve=>releases.push(()=>resolve({number:body.number}))) });
+ try{
+ const ids=Array.from({length:100},(_,number)=>jobs.start({number,image:'private-image'},'k'+number).jobId);
+ assert.equal(jobs.get(ids[99]).queuePosition,100);assert.equal(fs.readdirSync(path.join(dir,'.receipt-queue')).length,100);
+ assert.throws(()=>jobs.start({},'overflow'),e=>e.status===429);assert.equal(jobs.start({},'k0').jobId,ids[0]);
+ await tick();for(let i=0;i<100;i++){assert.equal(releases.length,1);releases.shift()();await tick();}
+ for(let i=0;i<100;i++){assert.equal(jobs.get(ids[i]).status,'complete');assert.equal(jobs.get(ids[i]).result.number,i);}
+ assert.equal(fs.readdirSync(path.join(dir,'.receipt-queue')).length,0);
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+test('disk queue recovers accepted pending scans with stable ids and respects its byte budget',async()=>{
+ const fs=require('node:fs'),os=require('node:os'),path=require('node:path');const dir=fs.mkdtempSync(path.join(os.tmpdir(),'receipt-recover-')),id='a'.repeat(48);
+ try{
+ const spool=path.join(dir,'.receipt-queue');fs.mkdirSync(spool);fs.writeFileSync(path.join(spool,id+'.json'),JSON.stringify({id,key:'restored',createdAt:Date.now(),body:{value:42}}));
+ const jobs=createReceiptJobs({dir,maxPending:100,maxQueuedBytes:500,verify:async body=>({value:body.value})});assert.equal(jobs.get(id).status,'pending');await tick();assert.equal(jobs.get(id).result.value,42);
+ assert.throws(()=>jobs.start({image:'x'.repeat(501)},'too-big'),e=>e.status===429);
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});

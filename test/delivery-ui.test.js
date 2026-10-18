@@ -38,3 +38,16 @@ test('incoming carrier completion updates tracked order and customer sees only t
  s.handleIncomingMeshPayload({type:'ORDER_STATUS',data:{orderId:'ORD-1',status:'done',order:{id:'ORD-1',status:'done',deliveryStatus:'delivered',deliveryVerifiedAtIso:'later'}}});assert.equal(calls.toast,1);assert.equal(order.deliveryVerifiedAtIso,'later');
  order.status='shipping';s.handleIncomingMeshPayload({type:'ORDER_STATUS',orderId:'ORD-1',status:'done'},'local_tab');assert.equal(order.status,'shipping');
 });
+
+test('approving kitchen waits for server and never advertises a handover button after a failed save',async()=>{
+ const order={id:'ORD-1',status:'new'},toasts=[];let release;
+ const s={window:{},findOrderById:()=>order,Set,showSmsToast:(...a)=>toasts.push(a),playKitchenPrepAlertSound(){},deliveryAdminRequest:()=>new Promise(r=>release=r)};
+ vm.createContext(s);vm.runInContext(section('    async function approveOrder(', '    // Bàn giao cho shipper'),s);
+ const work=s.approveOrder(order.id);assert.equal(order.status,'new');const duplicate=s.approveOrder(order.id);await duplicate;assert.equal(s.window.pendingOrderActions.size,1);
+ order.status='prep';release({success:true});await work;assert.equal(s.window.pendingOrderActions.size,0);assert.match(toasts[0][0],/VÀO BẾP/);
+});
+test('expired handover session clears both stale tokens and remembers the intended server action for login',async()=>{
+ const removed=[],s={window:{},localStorage:{getItem:()=> 'expired',removeItem:k=>removed.push(k)},isUserAdmin:()=>true,document:{getElementById:()=>({style:{}})},getCloudApiUrl:p=>p,AbortSignal,
+ fetch:async()=>({ok:false,status:401,json:async()=>({error:'Please sign in'})})};vm.createContext(s);vm.runInContext(section('    async function deliveryAdminRequest(', '    async function dispatchOrderToPartner('),s);
+ await assert.rejects(s.deliveryAdminRequest('/api/orders/ORD-1/status',{status:'shipping'}),/sign in/);assert.deepEqual(removed,['duynh_admin_api_token','duynh_admin_push_token']);assert.equal(s.window.pendingDeliveryAction.body.status,'shipping');
+});

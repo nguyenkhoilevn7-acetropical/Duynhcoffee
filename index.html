@@ -7161,7 +7161,7 @@ function toggleKitchenSoundAlert() {
     async function runClientVerifyData(base64Str, expAmt, onProgressCallback, order = null) {
       // A slow upload or lost response must not abandon an accepted OCR job.
       // Retrying this same image/cart is deduplicated by the server.
-      const started = Date.now(), deadline = started + 180000;
+      const started = Date.now(); let deadline = started + 180000;
       const pause = ms => new Promise(resolve => setTimeout(resolve, Math.min(ms, Math.max(0, deadline - Date.now()))));
       const retryable = error => error.retryable || error.name === 'AbortError' || error instanceof TypeError;
       async function request(path, options = {}) {
@@ -7186,7 +7186,8 @@ function toggleKitchenSoundAlert() {
       try {
         if (onProgressCallback) onProgressCallback(5, 'Đang gửi ảnh biên lai...');
         const items = order ? order.items.map(i => ({ id: i.id, qty: i.qty, toppings: i.toppings || [] })) : cart.map(c => ({ id: c.item.id, qty: c.qty, toppings: c.toppings || [] }));
-        const screeningImage=typeof createReceiptScreeningImage==='function' ? await createReceiptScreeningImage(base64Str) : undefined;
+        // Server derives screening from the source image; avoid a second preview upload.
+        const screeningImage=undefined;
         const upload = {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: base64Str, screeningImage, items, payableAmount: expAmt, discountCode: order ? order.discount?.code : activeDiscount?.code })
@@ -7195,9 +7196,9 @@ function toggleKitchenSoundAlert() {
           for (let attempt = 0; ; attempt++) {
             try { return await request('/api/receipt-scans', upload); }
             catch (error) {
-              if (!retryable(error) || attempt >= 3 || Date.now() >= deadline) throw error;
-              if (onProgressCallback) onProgressCallback(5, 'Đường truyền chậm, đang tự kết nối lại để xác minh...');
-              await pause(Math.min(1000 * 2 ** attempt, 5000));
+              if (!retryable(error) || Date.now() >= deadline) throw error;
+              if (onProgressCallback) onProgressCallback(5, error.status===429 ? 'Đang nhận nhiều ảnh, hệ thống tự gửi lại. Vui lòng giữ trang mở...' : 'Đường truyền chậm, đang tự kết nối lại để xác minh...');
+              await pause(Math.min(1000 * 2 ** Math.min(attempt,3), 5000) * (0.7 + Math.random()*0.6));
             }
           }
         }
@@ -7205,6 +7206,10 @@ function toggleKitchenSoundAlert() {
         const resultInUploadResponse = job.status === 'complete';
         function reportJobProgress(job) {
           if (job.status!=='pending' || !onProgressCallback) return;
+          if (job.queuePosition > 0) {
+            deadline=Math.max(deadline,Math.min(started+15*60000,Date.now()+180000));
+            onProgressCallback(5,'Đang chờ lượt quét · vị trí số '+job.queuePosition+'. Vui lòng giữ trang mở.'); return;
+          }
           const labels={starting:'Đang chuẩn bị bộ đọc...',preparing:'Đang sàng lọc ảnh...',recognizing:'Đang nhận dạng chữ trong ảnh...',rereading:'Đang đọc kỹ vùng chưa rõ...',comparing:'Đang đối chiếu tên và số tiền...'};
           const pct=Number.isFinite(job.progress?.percent) ? job.progress.percent : 5;
           onProgressCallback(pct,labels[job.progress?.phase] || 'Đang chờ máy chủ đọc ảnh...');
@@ -8905,6 +8910,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     }
 
     function closeAdminLoginModal() {
+      window.pendingDeliveryAction = null;
       document.getElementById('admin-login-modal').style.display = 'none';
       if (!isUserAdmin()) switchView('customer');
     }
@@ -8925,8 +8931,13 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         sessionStorage.setItem('duynh_admin_auth', '1');
         localStorage.setItem('duynh_admin_auth', '1');
         if (passwordInput) passwordInput.value = '';
+        const pending = window.pendingDeliveryAction;
         closeAdminLoginModal();
         switchView('backend');
+        if (pending) {
+          try { await deliveryAdminRequest(pending.path, pending.body); showSmsToast('Đã cập nhật đơn', 'Thao tác vừa chọn đã được lưu trên máy chủ.'); }
+          catch (error) { showSmsToast('Chưa cập nhật được đơn', error.message); }
+        }
         showSmsToast('🔓 ĐĂNG NHẬP THÀNH CÔNG!', 'Chào mừng Chủ quán đến với cổng Quản trị Mom’s Tea & Coffee.');
       } catch (error) {
         if (errBox) { errBox.style.display = 'block'; errBox.textContent = error.message; }
@@ -8934,6 +8945,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     }
 
     function logoutAdmin() {
+      window.pendingDeliveryAction = null;
       if (window.DuynhAdminNotifications) window.DuynhAdminNotifications.disable({ logout: true }).catch(() => {});
       sessionStorage.removeItem('duynh_admin_auth');
       localStorage.removeItem('duynh_admin_auth');
@@ -9325,8 +9337,9 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     async function deliveryAdminRequest(path, body = {}) {
       const token = localStorage.getItem('duynh_admin_api_token') || localStorage.getItem('duynh_admin_push_token');
       if (!isUserAdmin() || !token) {
+        window.pendingDeliveryAction = {path, body};
         document.getElementById('admin-login-modal').style.display = 'flex';
-        throw new Error('Vui lòng đăng nhập lại quản trị để liên kết giao hàng.');
+        throw new Error('Vui lòng đăng nhập lại quản trị để cập nhật trạng thái đơn.');
       }
       const response = await fetch(getCloudApiUrl(path), {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
@@ -9336,6 +9349,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       if (!response.ok || !result.success) {
         if (response.status === 401) {
           localStorage.removeItem('duynh_admin_api_token');
+          localStorage.removeItem('duynh_admin_push_token');
+          window.pendingDeliveryAction = {path, body};
           document.getElementById('admin-login-modal').style.display = 'flex';
         }
         throw new Error(result.error || 'Chưa đồng bộ được hãng giao hàng.');
@@ -9395,35 +9410,35 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     }
 
     // DUYỆT ĐƠN (NEW -> PREP)
-    function approveOrder(orderId) {
+    async function approveOrder(orderId) {
       const order = findOrderById(orderId);
-      if (!order) return;
-
-      order.status = 'prep';
-      order.paymentStatus = 'paid_verified';
-      saveLocalData();
-      broadcastMeshEvent('ORDER_STATUS', { orderId, status: 'prep' });
-
-      fetch(getCloudApiUrl(`/api/orders/${orderId}/status`), {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'prep' })
-      }).catch(() => {});
-
-      playKitchenPrepAlertSound();
-      showSmsToast("☕ ĐÃ DUYỆT ĐƠN VÀO BẾP!", `Đơn ${orderId} đã chuyển sang Tab Đang Pha Chế.`);
-      renderAllBackendTabs();
+      if (!order || order.status !== 'new') return;
+      window.pendingOrderActions ||= new Set();
+      if (window.pendingOrderActions.has(order.id)) return;
+      window.pendingOrderActions.add(order.id);
+      try {
+        await deliveryAdminRequest('/api/orders/' + encodeURIComponent(order.id) + '/status', {status:'prep'});
+        playKitchenPrepAlertSound();
+        showSmsToast('☕ ĐÃ DUYỆT ĐƠN VÀO BẾP!', `Đơn ${order.id} đã được máy chủ lưu vào mục Đang Pha Chế.`);
+      } catch (error) { showSmsToast('Chưa duyệt được đơn', error.message); }
+      finally { window.pendingOrderActions.delete(order.id); }
     }
 
     // Bàn giao cho shipper chưa phải là giao thành công đến khách.
     async function completeOrder(orderId) {
       const order = findOrderById(orderId);
-      if (!order || order.status !== 'prep') return;
+      if (!order) { showSmsToast('Chưa tìm thấy đơn', 'Vui lòng tải lại danh sách đơn.'); return; }
+      if (order.status === 'shipping') { showSmsToast('Đơn đã giao cho shipper', 'Trạng thái đã được lưu.'); return; }
+      if (order.status !== 'prep') { showSmsToast('Đơn chưa vào bếp', 'Duyệt đơn vào bếp thành công trước khi bàn giao shipper.'); return; }
+      window.pendingOrderActions ||= new Set();
+      if (window.pendingOrderActions.has(order.id)) return;
+      window.pendingOrderActions.add(order.id);
       try {
         await deliveryAdminRequest('/api/orders/' + encodeURIComponent(orderId) + '/status', { status: 'shipping' });
         playSuccessChime();
         showSmsToast('🛵 ĐÃ GIAO CHO SHIPPER', 'Đơn đang giao; chờ hãng xác nhận khách đã nhận.');
       } catch (error) { showSmsToast('Chưa bàn giao được đơn', error.message); }
+      finally { window.pendingOrderActions.delete(order.id); }
     }
 
     function restoreOrder(orderId) {

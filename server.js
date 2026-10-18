@@ -174,7 +174,8 @@ const imageOnlyConfig = bannerImagesOnlyConfig(configCache);
 if (imageOnlyConfig !== configCache) { configCache = imageOnlyConfig; writeJsonFile(CONFIG_FILE, configCache); }
 
 const receiptVerifier = createReceiptVerifier({ readState: () => ({ menu: menuCache, config: configCache, discounts: discountsCache }) });
-const receiptJobs = createReceiptJobs({ verify: (body, onProgress) => receiptVerifier.verify(body, onProgress) });
+let receiptUploadReaders = 0;
+const receiptJobs = createReceiptJobs({ dir:ROOT_DIR, maxPending:100, verify: (body, onProgress) => receiptVerifier.verify(body, onProgress) });
 const adminPush = createAdminPush({ dir: ROOT_DIR, readConfig: () => configCache, backup: backupService });
 await adminPush.initialize();
 const notifiedOrderIds = new Set(ordersCache.map(order => String(order.id)));
@@ -245,17 +246,17 @@ const MIME_TYPES = {
 };
 
 // Hàm đọc body với kích thước hỗ trợ upload ảnh Base64 (tối đa 25MB)
-function parseRequestBody(req) {
+function parseRequestBody(req, maxBytes = 25 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
-    const MAX_SIZE = 25 * 1024 * 1024; // 25MB
+    const MAX_SIZE = maxBytes;
 
     req.on('data', chunk => {
       size += chunk.length;
       if (size > MAX_SIZE) {
         req.destroy();
-        reject(new Error('Payload quá lớn (Vượt quá giới hạn 25MB)'));
+        reject(Object.assign(new Error('Payload quá lớn. Vui lòng tải ảnh nhỏ hơn.'),{status:413}));
         return;
       }
       chunks.push(chunk);
@@ -1184,12 +1185,25 @@ const server = http.createServer(async (req, res) => {
     finally { res.removeListener('close', disconnected); }
   }
   if (pathname === '/api/receipt-scans' && req.method === 'POST') {
+    // Bound simultaneous base64 parsing independently from the disk-backed OCR queue.
+    if (Number(req.headers['content-length'] || 0) > 7 * 1024 * 1024) {sendJson(res,413,{error:'Ảnh tải lên quá lớn. Vui lòng dùng ảnh dưới 4 MB.'});req.resume();return;}
+    if (receiptUploadReaders >= 4) {
+      res.setHeader('Retry-After','1');sendJson(res,429,{error:'Đang nhận nhiều ảnh. Hệ thống sẽ tự gửi lại sau ít giây.'});req.resume();return;
+    }
+    receiptUploadReaders++;
+    let job;
     try {
-      const body = await parseRequestBody(req);
+      const body = await parseRequestBody(req, 7 * 1024 * 1024);
       if (!Number.isSafeInteger(body.payableAmount) || body.payableAmount <= 0) throw new Error('Phiên thanh toán đã cũ. Vui lòng tải lại trang để xác minh đúng tổng tiền gồm topping');
-      const job = await receiptSnapshot(receiptJobs.start(body, receiptVerifier.requestKey(body)));
-      if (!res.destroyed) sendJson(res, job.status === 'pending' ? 202 : 200, job);
-    } catch (error) { sendJson(res, 422, { error: error.message }); }
+      job = receiptJobs.start(body, receiptVerifier.requestKey(body));
+    } catch (error) {
+      if(error.status===429)res.setHeader('Retry-After','5');
+      sendJson(res,error.status || 422,{error:error.message});return;
+    } finally { receiptUploadReaders--; }
+    try {
+      job=await receiptSnapshot(job);
+      if (!res.destroyed) sendJson(res,job.status==='pending'?202:200,job);
+    } catch(error){if(!res.destroyed)sendJson(res,503,{error:'Chưa tải được trạng thái quét. Vui lòng thử lại cùng ảnh.'});}
     return;
   }
   if (pathname.startsWith('/api/receipt-scans/') && req.method === 'GET') {
@@ -1211,7 +1225,7 @@ const server = http.createServer(async (req, res) => {
   // Source code and local data are not static assets.
   let normalized;
   try { normalized = path.posix.normalize(decodeURIComponent(cleanPath)); } catch { sendJson(res, 400, { error: 'Đường dẫn không hợp lệ' }); return; }
-  if (normalized.split('/').some(part => part.startsWith('.')) || ['profit-report.js', 'profit-excel.js', 'profit-settings.json', 'server.js', 'drink-recipes.js', 'drink-recipes.json', 'menu-ai.js', 'delivery.js', 'admin-push.js', 'drive-backup.js', 'receipt-verification.js', 'receipt-jobs.js', 'receipt-image.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || normalized.startsWith('/test/') || /\.(tmp|md)$/.test(normalized)) {
+  if (normalized.split('/').some(part => part.startsWith('.')) || ['profit-report.js', 'profit-excel.js', 'profit-settings.json', 'server.js', 'drink-recipes.js', 'drink-recipes.json', 'menu-ai.js', 'delivery.js', 'admin-push.js', 'drive-backup.js', 'receipt-verification.js', 'receipt-jobs.js', 'receipt-image.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || (normalized.startsWith('/test/') || normalized.startsWith('/scripts/')) || /\.(tmp|md)$/.test(normalized)) {
     sendJson(res, 404, { error: 'Không tìm thấy' }); return;
   }
   if (cleanPath === '/' || cleanPath === '/admin' || cleanPath === '/pos') {
