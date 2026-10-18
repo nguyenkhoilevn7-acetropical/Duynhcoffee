@@ -179,14 +179,33 @@ const delivery = createDelivery({ getOrders: () => ordersCache,
   saveOrders: () => writeJsonFile(ORDERS_FILE, ordersCache), broadcast: broadcastRealtime });
 setInterval(() => delivery.poll().catch(() => {}), 60000).unref();
 function mergeConfig(current, patch) {
+  for (const [field,domain] of [['facebookUrl','facebook.com'],['tiktokUrl','tiktok.com']]) {
+    if (patch[field] === undefined || patch[field] === '') continue;
+    let valid=false;
+    try {const url=new URL(patch[field]);valid=typeof patch[field]==='string' && patch[field].length<=2048 && url.protocol==='https:' && !url.username && !url.password && !url.port && (url.hostname===domain || url.hostname.endsWith('.'+domain));} catch {}
+    if(!valid)throw Object.assign(new Error('Link Facebook hoặc TikTok không hợp lệ. Vui lòng dùng link HTTPS của đúng nền tảng.'),{status:422});
+  }
+  const deletedCategoryIds = [...new Set([...(current.deletedCategoryIds || []),...(Array.isArray(patch.deletedCategoryIds) ? patch.deletedCategoryIds : [])])];
+  if (deletedCategoryIds.some(id=>typeof id!=='string' || !id || id.length>200 || /[<>]/.test(id))) throw Object.assign(new Error('Mã danh mục không hợp lệ'),{status:422});
   if (patch.banner !== undefined) {
     const images = patch.banner && patch.banner.images;
     if (!Array.isArray(images) || images.length > 20 || images.some(src => typeof src !== 'string')) throw Object.assign(new Error('Banner cần tối đa 20 hình ảnh'), {status:422});
     if (images.some(src => /^data:video\/|^blob:|\.(?:mp4|webm|mov)(?:[?#]|$)/i.test(src))) throw Object.assign(new Error('Banner hiện chỉ hỗ trợ hình ảnh để giữ trang tải nhanh'), {status:422});
   }
-  return { ...current, ...patch,
+  const merged = { ...current, ...patch,
+    ...(deletedCategoryIds.length ? {deletedCategoryIds} : {}),
     bankConfig: { ...(current.bankConfig || {}), ...(patch.bankConfig || {}) },
     momoConfig: { ...(current.momoConfig || {}), ...(patch.momoConfig || {}) } };
+  if (Array.isArray(merged.categories)) merged.categories=merged.categories.filter(c=>!deletedCategoryIds.includes(c.id));
+  if (Array.isArray(merged.categoryOrder)) merged.categoryOrder=merged.categoryOrder.filter(id=>!deletedCategoryIds.includes(id));
+  return merged;
+}
+function visibleCategoryIds(config) {
+  return new Set(['tea','coffee','bakery',...(config.categories || []).map(c=>c.id)].filter(id=>!(config.deletedCategoryIds || []).includes(id)));
+}
+function assertMenuCategories(items) {
+  if (items.some(item=>(configCache.deletedCategoryIds || []).includes(item.category)))
+    throw Object.assign(new Error('Danh mục đã được xóa trên thiết bị khác. Vui lòng tải lại thực đơn trước khi lưu.'),{status:409});
 }
 function allocateShortOrderId(orders) {
   const used=new Set(orders.map(order=>String(order.id)));
@@ -414,6 +433,7 @@ function handleClientWsMessage(payload, senderClient) {
     writeJsonFile(ORDERS_FILE, ordersCache);
     broadcastRealtime('NEW_ORDER', payload.order, senderClient, payload.senderId);
   } else if (type === 'MENU_UPDATE' && Array.isArray(payload.menu)) {
+    try { assertMenuCategories(payload.menu); } catch (_) { return; }
     menuCache = payload.menu;
     writeJsonFile(MENU_FILE, menuCache);
     broadcastRealtime('MENU_UPDATE', menuCache, senderClient, payload.senderId);
@@ -795,6 +815,7 @@ const server = http.createServer(async (req, res) => {
             writeJsonFile(ORDERS_FILE, ordersCache);
           }
           if (Array.isArray(body.menu) && body.menu.length > 0) {
+            assertMenuCategories(body.menu);
             menuCache = body.menu;
             writeJsonFile(MENU_FILE, menuCache);
           }
@@ -970,6 +991,32 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Delete only after checking current server data; preserve products and historical orders.
+  const categoryDeleteMatch = pathname.match(/^\/api\/menu\/categories\/([^/]+)$/);
+  if (categoryDeleteMatch && req.method === 'DELETE') {
+    if (!adminPush.verify((req.headers.authorization || '').replace(/^Bearer /,''))) {sendJson(res,401,{error:'Vui lòng đăng nhập lại quản trị để xóa danh mục.'});return;}
+    try {
+      const body=await parseRequestBody(req),id=decodeURIComponent(categoryDeleteMatch[1]);
+      const currentConfig=readJsonFile(CONFIG_FILE,configCache),currentMenu=readJsonFile(MENU_FILE,menuCache);
+      const ids=visibleCategoryIds(currentConfig),replacement=body.replacementId;
+      if (!ids.has(id)) {sendJson(res,404,{error:'Danh mục không còn tồn tại. Vui lòng tải lại thực đơn.'});return;}
+      const affected=currentMenu.filter(item=>item.category===id);
+      if (affected.length && (replacement===id || !ids.has(replacement))) {sendJson(res,409,{error:'Danh mục còn món. Hãy chọn một danh mục khác để chuyển món sang trước khi xóa.'});return;}
+      const nextMenu=currentMenu.map(item=>item.category===id ? {...item,category:replacement} : item);
+      const nextConfig=mergeConfig(currentConfig,{deletedCategoryIds:[id]});
+      if (affected.length && !writeJsonFile(MENU_FILE,nextMenu)) throw new Error('Không lưu được danh mục mới cho các món.');
+      if (!writeJsonFile(CONFIG_FILE,nextConfig)) {
+        if (affected.length && !writeJsonFile(MENU_FILE,currentMenu)) console.error('[Categories] Không thể hoàn tác file menu sau lỗi lưu cấu hình.');
+        throw new Error('Không lưu được thay đổi danh mục. Vui lòng thử lại.');
+      }
+      menuCache=nextMenu;configCache=nextConfig;
+      broadcastRealtime('MENU_UPDATE',menuCache);
+      broadcastRealtime('CONFIG_UPDATE',configCache);
+      sendJson(res,200,{success:true,menu:menuCache,config:configCache,movedCount:affected.length,menuVersion,configVersion,backup:backupService.status()});
+    } catch(error) {sendJson(res,error.status || 500,{error:error.message});}
+    return;
+  }
+
   // Small, fresh payment snapshot: checkout does not download banner assets.
   if (pathname === '/api/payment-config' && req.method === 'GET') {
     configCache = bannerImagesOnlyConfig(readJsonFile(CONFIG_FILE, configCache));
@@ -1057,6 +1104,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const body = await parseRequestBody(req);
         if (Array.isArray(body)) {
+          assertMenuCategories(body);
           for (const item of body) if (item.options !== undefined) validateOptions(item.options);
           menuCache = body;
           menuVersion = Date.now();
@@ -1068,7 +1116,7 @@ const server = http.createServer(async (req, res) => {
           sendJson(res, 400, { error: 'Menu phải là một mảng JSON' });
         }
       } catch (err) {
-        sendJson(res, 500, { error: err.message });
+        sendJson(res, err.status || 500, { error: err.message });
       }
       return;
     }

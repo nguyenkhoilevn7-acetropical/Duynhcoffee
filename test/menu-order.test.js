@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 function client(){
  const elements=new Map();const writes=[];
- const s={window:{},console,menu:[{id:1,name:'Tea',category:'tea',price:45000},{id:2,name:'Coffee',category:'coffee',price:39000},{id:3,name:'Cake',category:'bakery',price:35000}],
+ const s={window:{},console,currentCategory:'all',menu:[{id:1,name:'Tea',category:'tea',price:45000},{id:2,name:'Coffee',category:'coffee',price:39000},{id:3,name:'Cake',category:'bakery',price:35000}],
  storeConfig:{bankConfig:{accountHolder:'DAO KHOI NGUYEN'}},localStorage:{getItem(){return null;},setItem(){}},
  document:{getElementById:id=>elements.get(id)||null},isUserAdmin:()=>true,isAdminViewActive:()=>false,
  saveLocalData(){},renderAdminMenuTable(){},renderCustomerProducts(){},showSmsToast(){},
@@ -96,9 +96,49 @@ test('real server broadcasts edits and display order to two live clients, HTTP f
   for(const s of [a,b]){assert.deepEqual(JSON.parse(JSON.stringify(s.menu)),menu);const grid=s._elements.get('customer-products-grid').innerHTML;assert.ok(grid.indexOf('Edited coffee')<grid.indexOf('Tea'));assert.match(grid,/Updated/);assert.match(grid,/41000/);}
   const fallback=connectedClient();fallback.handleIncomingMeshPayload({type:'FULL_SYNC',...await(await fetch(base+'/api/sync')).json()},'render_http');
   assert.deepEqual(ids(fallback.menu),[2,1,3]);assert.deepEqual(ids(fallback.getCategoriesList()),config.categoryOrder);
+  // Deletion is authorized, uses current server state, and preserves every product field.
+  let r=await fetch(base+'/api/menu/categories/coffee',{method:'DELETE'});assert.equal(r.status,401);
+  const session=await(await fetch(base+'/api/admin-push/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'admin',password:'duynh2026'})})).json();
+  const headers={'Content-Type':'application/json',Authorization:'Bearer '+session.token};
+  r=await fetch(base+'/api/menu/categories/coffee',{method:'DELETE',headers,body:'{}'});assert.equal(r.status,409);
+  r=await fetch(base+'/api/menu/categories/coffee',{method:'DELETE',headers,body:JSON.stringify({replacementId:'coffee'})});assert.equal(r.status,409);
+  const oldConfig=JSON.parse(JSON.stringify(config)),oldMenu=JSON.parse(JSON.stringify(menu));
+  fs.writeFileSync(path.join(dir,'orders.json'),JSON.stringify([{id:'OLD-ORDER',status:'done',items:[{name:'Edited coffee',qty:1}]}]));
+  fs.writeFileSync(path.join(dir,'drink-recipes.json'),JSON.stringify({2:{ingredients:[{name:'Coffee',quantity:30,unit:'ml'}],steps:['Brew']}}));
+  const ordersBefore=fs.readFileSync(path.join(dir,'orders.json'),'utf8'),recipesBefore=fs.readFileSync(path.join(dir,'drink-recipes.json'),'utf8');
+  ready=Promise.all([waitMessage(wa,'CONFIG_UPDATE'),waitMessage(wb,'CONFIG_UPDATE')]);
+  r=await fetch(base+'/api/menu/categories/coffee',{method:'DELETE',headers,body:JSON.stringify({replacementId:'juice'})});assert.equal(r.status,200);
+  const removed=await r.json();await ready;assert.equal(removed.movedCount,1);assert.equal(removed.backup.pending,true);
+  menu[0].category='juice';config.categoryOrder=config.categoryOrder.filter(id=>id!=='coffee');
+  assert.deepEqual(removed.menu,menu);assert.deepEqual(removed.config.deletedCategoryIds,['coffee']);
+  for(const s of [a,b]){assert.deepEqual(ids(s.getCategoriesList()),config.categoryOrder);assert.equal(s.menu[0].category,'juice');}
+  assert.equal(fs.readFileSync(path.join(dir,'orders.json'),'utf8'),ordersBefore);assert.equal(fs.readFileSync(path.join(dir,'drink-recipes.json'),'utf8'),recipesBefore);
+  // A stale device cannot recreate deleted categories or move products back into them.
+  await post('/api/config',{...oldConfig,deletedCategoryIds:[]});
+  assert.deepEqual((await(await fetch(base+'/api/config')).json()).deletedCategoryIds,['coffee']);
+  r=await fetch(base+'/api/menu',{method:'POST',headers,body:JSON.stringify(oldMenu)});assert.equal(r.status,409);
+  wa.send(JSON.stringify({type:'MENU_UPDATE',menu:oldMenu}));
+  assert.deepEqual(await(await fetch(base+'/api/menu')).json(),menu);
+  ready=Promise.all([waitMessage(wa,'CONFIG_UPDATE'),waitMessage(wb,'CONFIG_UPDATE')]);
+  r=await fetch(base+'/api/menu/categories/bakery',{method:'DELETE',headers,body:'{}'});assert.equal(r.status,200);await ready;
+  config.categoryOrder=config.categoryOrder.filter(id=>id!=='bakery');
+  r=await fetch(base+'/api/menu/categories/bakery',{method:'DELETE',headers,body:'{}'});assert.equal(r.status,404);
   await stop();await start();const late=connectedClient();await connect(late);
   assert.deepEqual(JSON.parse(JSON.stringify(late.menu)),menu);assert.deepEqual(ids(late.getCategoriesList()),config.categoryOrder);
  } finally {await stop();fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+test('delete waits for server acknowledgement, updates filters on both clients and leaves state intact on failure',async()=>{
+ const a=client(),b=client();a.s.currentCategory='coffee';
+ const draft=a.s.menu.map(m=>m.category==='coffee'?{...m,category:'tea'}:m);
+ let release; a.s.fetch=async(p,o)=>{assert.equal(o.method,'DELETE');assert.equal(p,'/api/menu/categories/coffee');return new Promise(resolve=>{release=()=>resolve({ok:true,json:async()=>({success:true,menu:draft,config:{deletedCategoryIds:['coffee']},menuVersion:4,configVersion:4})});});};
+ const job=a.s.deleteMenuCategory('coffee','tea');assert.equal(a.s.menu[1].category,'coffee');
+ assert.equal(await a.s.deleteMenuCategory('coffee','tea'),false);release();assert.equal(await job,true);
+ assert.equal(a.s.currentCategory,'all');assert.equal(a.s.menu[1].category,'tea');assert.equal(ids(a.s.getCategoriesList()).includes('coffee'),false);
+ b.s.applyServerConfig({deletedCategoryIds:['coffee']},4);assert.equal(ids(b.s.getCategoriesList()).includes('coffee'),false);
+ const failed=client(),before=JSON.stringify(failed.s.menu),error={textContent:''};
+ failed.s.fetch=async()=>({ok:false,json:async()=>({error:'Server did not save'})});
+ assert.equal(await failed.s.deleteMenuCategory('tea','coffee',error),false);assert.equal(error.textContent,'Server did not save');assert.equal(JSON.stringify(failed.s.menu),before);
 });
 
 test('editing a product saves all fields and selected position only on server acknowledgement',async()=>{

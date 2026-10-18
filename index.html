@@ -3276,6 +3276,17 @@ body {
 @media(max-width:359px){#ios-custom-normal-actions{grid-template-columns:minmax(0,1fr)!important}}
 </style>
 <link rel="stylesheet" href="admin-recipes.css">
+<style>
+.customer-social-links{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin:0 0 16px}
+.customer-social-links .social-button{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:10px 16px;border:1px solid #D5DED6;border-radius:12px;font:inherit;font-size:.9rem;font-weight:700;line-height:1.35;text-decoration:none;white-space:normal}
+.customer-social-links .social-facebook{background:#1877F2;color:#fff;border-color:#1877F2}
+.customer-social-links .social-tiktok{background:#111827;color:#fff}
+.customer-social-links .social-button:disabled{background:#F1F5F9;color:#64748B;cursor:not-allowed;border-color:#CBD5E1}
+.customer-social-links .social-button:focus-visible{outline:3px solid #F59E0B;outline-offset:3px}
+.customer-social-links [hidden]{display:none!important}
+.social-coming-soon{font-size:.75em;font-weight:500}
+@media(max-width:480px){.customer-social-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.customer-social-links .social-button{width:100%;min-width:0;padding:10px 8px}}
+</style>
 <script src="admin-recipes.js" defer></script>
 <script src="menu-options.js" defer></script>
 <script src="site-i18n.js" defer></script>
@@ -3320,6 +3331,11 @@ body {
 
     <!-- VIEW 1: TRANG KHÁCH HÀNG ĐẶT MÓN -->
     <section id="view-customer" class="view-section active">
+      <nav class="customer-social-links" aria-label="Liên hệ với quán">
+        <a id="customer-facebook-link" class="social-button social-facebook" href="https://www.facebook.com/share/1MRVZsTv4i/" target="_blank" rel="noopener noreferrer" aria-label="Liên hệ qua Facebook"><span aria-hidden="true">f</span> Facebook</a>
+        <a id="customer-tiktok-link" class="social-button social-tiktok" target="_blank" rel="noopener noreferrer" hidden><span aria-hidden="true">♪</span> TikTok</a>
+        <button id="customer-tiktok-pending" class="social-button social-tiktok" type="button" disabled aria-label="TikTok — Sắp có"><span aria-hidden="true">♪</span> TikTok <span class="social-coming-soon">Sắp có</span></button>
+      </nav>
       <!-- HERO BANNER Mom (ĐỒNG BỘ ĐỘNG THEO CẤU HÌNH BACKEND) -->
       <div class="duynh-hero-banner" id="frontend-hero-banner">
         <div class="duynh-hero-content" id="frontend-hero-content">
@@ -3544,7 +3560,7 @@ body {
           </div>
         </div>
         <div style="padding:12px; margin-bottom:12px; border:1px solid var(--border); border-radius:12px;">
-          <b>Thứ tự danh mục trên trang bán hàng</b>
+          <b>Quản lý danh mục trên trang bán hàng</b>
           <div id="admin-category-order" style="display:flex; flex-direction:column; gap:8px; margin-top:10px;"></div>
           <p id="menu-order-status" role="status" aria-live="polite" style="font-size:0.85rem; margin-top:8px;">Dùng Trước / Sau để đổi thứ tự. Thứ tự món áp dụng cho cả Tất Cả Món và từng danh mục.</p>
         </div>
@@ -3800,6 +3816,14 @@ body {
           <div class="form-group">
             <label>Hotline quán:</label>
             <input type="text" id="setting-store-phone" class="form-control" value="0988 776 655">
+          </div>
+          <div class="form-group">
+            <label for="setting-facebook-url">Link Fanpage Facebook:</label>
+            <input type="url" id="setting-facebook-url" class="form-control" value="https://www.facebook.com/share/1MRVZsTv4i/" inputmode="url">
+          </div>
+          <div class="form-group">
+            <label for="setting-tiktok-url">Link TikTok:</label>
+            <input type="url" id="setting-tiktok-url" class="form-control" placeholder="Để trống khi chưa có TikTok" inputmode="url">
           </div>
           <div class="form-group" style="margin-top: 14px; border-top: 1px dashed var(--border); padding-top: 14px;">
             <label>Ngân hàng nhận tiền nước (VietQR):</label>
@@ -5584,7 +5608,7 @@ body {
         bankConfig: { ...(storeConfig.bankConfig || {}), ...(config.bankConfig || {}) } };
       lastConfigVersion = version || lastConfigVersion;
       if (JSON.stringify(nextConfig) === JSON.stringify(storeConfig)) return false;
-      const categoriesChanged = JSON.stringify([storeConfig.categories, storeConfig.categoryOrder]) !== JSON.stringify([nextConfig.categories, nextConfig.categoryOrder]);
+      const categoriesChanged = JSON.stringify([storeConfig.categories, storeConfig.categoryOrder, storeConfig.deletedCategoryIds]) !== JSON.stringify([nextConfig.categories, nextConfig.categoryOrder, nextConfig.deletedCategoryIds]);
       storeConfig = nextConfig;
       if (categoriesChanged && typeof refreshCategoryViews === 'function') refreshCategoryViews();
       if (config.banner) {
@@ -5593,6 +5617,7 @@ body {
       }
       renderPaymentBankInfo();
       if (document.getElementById('checkout-modal')?.style.display === 'flex') updateCheckoutFinancials();
+      if (typeof renderCustomerFooterInfo === 'function') renderCustomerFooterInfo();
       return true;
     }
 
@@ -5607,6 +5632,8 @@ body {
       setVal('setting-store-slogan', storeConfig.storeSlogan);
       setVal('setting-store-address', storeConfig.storeAddress);
       setVal('setting-store-phone', storeConfig.storePhone);
+      setVal('setting-facebook-url', storeConfig.facebookUrl || 'https://www.facebook.com/share/1MRVZsTv4i/');
+      setVal('setting-tiktok-url', storeConfig.tiktokUrl || '');
       if (storeConfig.bankConfig) {
         setVal('setting-bank-name', storeConfig.bankConfig.bankName);
         setVal('setting-bank-account', storeConfig.bankConfig.accountNumber);
@@ -5615,7 +5642,15 @@ body {
     }
 
     function renderCustomerFooterInfo() {
-      // Cập nhật thông tin quán ở chân trang nếu cần
+      const safeLink = (value, domain) => {
+        try {const url=new URL(value);return url.protocol==='https:' && !url.username && !url.password && !url.port && (url.hostname===domain || url.hostname.endsWith('.'+domain)) ? url.href : '';} catch {return '';}
+      };
+      const facebook=document.getElementById('customer-facebook-link');
+      if(facebook)facebook.href=safeLink(storeConfig.facebookUrl,'facebook.com') || 'https://www.facebook.com/share/1MRVZsTv4i/';
+      const tiktok=document.getElementById('customer-tiktok-link'),pending=document.getElementById('customer-tiktok-pending');
+      const url=safeLink(storeConfig.tiktokUrl,'tiktok.com');
+      if(tiktok){tiktok.hidden=!url;if(url)tiktok.href=url;else tiktok.removeAttribute('href');}
+      if(pending)pending.hidden=Boolean(url);
     }
 
     // ==================== WEBSOCKET CLIENT KẾT NỐI MÁY CHỦ RENDER ====================
@@ -6691,8 +6726,9 @@ function toggleKitchenSoundAlert() {
         });
       }
       const order = Array.isArray(storeConfig?.categoryOrder) ? storeConfig.categoryOrder : [];
+      const deleted = new Set(storeConfig?.deletedCategoryIds || []);
       const rank = new Map(order.map((id, i) => [String(id), i]));
-      return Array.from(map.values()).sort((a, b) => (rank.get(String(a.id)) ?? order.length) - (rank.get(String(b.id)) ?? order.length));
+      return Array.from(map.values()).filter(c => !deleted.has(c.id)).sort((a, b) => (rank.get(String(a.id)) ?? order.length) - (rank.get(String(b.id)) ?? order.length));
     }
 
     function getCategoryDisplayName(catId) {
@@ -6764,6 +6800,7 @@ function toggleKitchenSoundAlert() {
 
       let id = removeVietnameseDiacritics(name).toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
       if (!id) id = 'cat_' + Date.now();
+      if ((storeConfig.deletedCategoryIds || []).includes(id)) id += '_' + Date.now();
 
       const nameEn = document.getElementById(`new-cat-name-en-${context}`)?.value.trim();
       const newCat = { id, name, icon, name_en: nameEn || translateFnbText(name) };
@@ -6840,13 +6877,65 @@ function toggleKitchenSoundAlert() {
         <span style="flex:1; min-width:150px;">${i + 1}. ${orderText(c.icon || '🏷️')} ${orderText(c.name)}</span>
         <button type="button" class="nav-btn" ${i === 0 ? 'disabled' : ''} onclick="moveMenuCategoryAt(${i}, -1)">↑ Trước</button>
         <button type="button" class="nav-btn" ${i === cats.length - 1 ? 'disabled' : ''} onclick="moveMenuCategoryAt(${i}, 1)">↓ Sau</button>
+        <button type="button" class="nav-btn" style="color:#B91C1C;background:#FEF2F2;border-color:#FECACA" onclick="openDeleteMenuCategoryAt(${i})">🗑️ Xóa danh mục</button>
       </div>`).join('');
     }
     function refreshCategoryViews() {
+      if (currentCategory !== 'all' && !getCategoriesList().some(c => c.id === currentCategory)) currentCategory = 'all';
       renderCategoryFilterPills();
       populateCategorySelectDropdowns();
       renderAdminCategoryOrder();
       if (typeof isAdminViewActive === 'function' && isAdminViewActive()) renderAdminMenuTable();
+      renderCustomerProducts();
+    }
+    function openDeleteMenuCategoryAt(index) {
+      if (!isUserAdmin() || categoryOrderSaving || menuOrderSaving) return;
+      const cats = getCategoriesList(), category = cats[index];
+      if (!category) return;
+      const count = menu.filter(m => m.category === category.id).length;
+      const targets = cats.filter(c => c.id !== category.id);
+      if (count && !targets.length) { showSmsToast('Chưa thể xóa danh mục', 'Hãy tạo một danh mục khác để nhận các món hiện có.'); return; }
+      document.getElementById('delete-menu-category-dialog')?.remove();
+      const dialog = document.createElement('dialog');
+      dialog.id = 'delete-menu-category-dialog';
+      dialog.setAttribute('aria-labelledby','delete-category-title');
+      dialog.style.cssText = 'width:min(480px,calc(100vw - 32px));max-height:85vh;overflow:auto;box-sizing:border-box;border:1px solid #E2E8F0;border-radius:18px;padding:24px;color:var(--text-main,#18372d);';
+      dialog.innerHTML = `<h3 id="delete-category-title" style="margin:0 0 12px"><span>Xóa danh mục</span> “<span>${orderText(category.name)}</span>”?</h3>
+        <p>${count ? `<strong>${count}</strong> <span>món trong danh mục.</span> <span>Chọn danh mục để chuyển các món sang. Món, tồn kho và công thức được giữ nguyên.</span>` : 'Danh mục đang trống. Thao tác này được lưu và đồng bộ đến các thiết bị.'}</p>
+        ${count ? `<label for="delete-category-target">Chuyển món sang</label><select id="delete-category-target" class="form-control" style="width:100%;margin:8px 0 16px">${targets.map(c=>`<option value="${orderText(c.id)}">${orderText(c.icon || '🏷️')} ${orderText(c.name)}</option>`).join('')}</select>` : ''}
+        <p id="delete-category-error" role="alert" style="color:#B91C1C"></p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap"><button type="button" class="nav-btn" data-cancel>Hủy</button><button type="button" class="nav-btn" data-confirm style="background:#B91C1C;color:white">Xóa danh mục</button></div>`;
+      document.body.appendChild(dialog);
+      dialog.querySelector('[data-cancel]').onclick = () => {dialog.close();dialog.remove();};
+      dialog.querySelector('[data-confirm]').onclick = async event => {
+        const button = event.currentTarget;button.disabled=true;button.textContent='Đang lưu…';
+        const error = dialog.querySelector('#delete-category-error');error.textContent='';
+        const ok = await deleteMenuCategory(category.id,dialog.querySelector('#delete-category-target')?.value || '',error);
+        if (ok) {dialog.close();dialog.remove();}
+        else {button.disabled=false;button.textContent='Xóa danh mục';}
+      };
+      dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+      dialog.showModal();
+    }
+    async function deleteMenuCategory(id, replacementId, errorElement) {
+      if (!isUserAdmin() || categoryOrderSaving || menuOrderSaving) return false;
+      categoryOrderSaving=true;menuOrderStatus('Đang xóa và lưu danh mục…');
+      try {
+        const token=localStorage.getItem('duynh_admin_api_token') || localStorage.getItem('duynh_admin_push_token') || '';
+        const response=await fetch(getCloudApiUrl('/api/menu/categories/'+encodeURIComponent(id)),{
+          method:'DELETE',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},cache:'no-store',body:JSON.stringify({replacementId})});
+        const result=await response.json();
+        if (!response.ok || !result.success || !result.config || !Array.isArray(result.menu)) throw new Error(result.error || 'Chưa lưu được thay đổi.');
+        menu=result.menu;lastMenuVersion=result.menuVersion || lastMenuVersion;
+        applyServerConfig(result.config,result.configVersion);
+        saveLocalData();refreshCategoryViews();renderAdminMenuTable();
+        menuOrderStatus('Đã xóa danh mục, lưu trên máy chủ và gửi đồng bộ đến các thiết bị.');
+        return true;
+      } catch(error) {
+        menuOrderStatus('Chưa xóa được danh mục. Vui lòng thử lại.');
+        if(errorElement)errorElement.textContent=error.message;
+        showSmsToast('Chưa xóa được danh mục',error.message);return false;
+      } finally {categoryOrderSaving=false;}
     }
     async function saveCategoryPatch(patch) {
       if (!isUserAdmin() || categoryOrderSaving) return false;
@@ -10629,6 +10718,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         storeAddress: getSettingValue('setting-store-address'), storePhone: getSettingValue('setting-store-phone'),
         bankConfig: { accountNumber: getSettingValue('setting-bank-account'), accountHolder: getSettingValue('setting-bank-holder') }
       };
+      if(document.getElementById('setting-facebook-url'))draft.facebookUrl=getSettingValue('setting-facebook-url');
+      if(document.getElementById('setting-tiktok-url'))draft.tiktokUrl=getSettingValue('setting-tiktok-url');
       try {
         const response = await fetch(getCloudApiUrl('/api/config'), {
           method: 'POST',
@@ -10675,6 +10766,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
 
     function renderCustomerProducts() {
+      if (typeof renderCustomerFooterInfo === 'function') renderCustomerFooterInfo();
       if (typeof registerSiteTranslationData === 'function') registerSiteTranslationData();
       const grid = document.getElementById('customer-products-grid');
       if (!grid) return;
