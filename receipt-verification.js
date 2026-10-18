@@ -189,8 +189,20 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
     const activeWorker = worker;
     progress(8,'preparing');
     const textOnly = { text:true, blocks:false, hocr:false, tsv:false, box:false, unlv:false, osd:false, pdf:false };
-    // Derive triage from the uploaded source; client previews add a second OCR
-    // pass to ordinary receipts and are never authoritative payment evidence.
+    // A bounded preview can only reject, never supply payment evidence. Decode
+    // the large JPEG only after screening; jpeg-js work blocks the main server.
+    if (typeof screeningImage === 'string' && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(screeningImage) && screeningImage.length < 1024 * 1024) {
+      const small=Buffer.from(screeningImage.split(',')[1],'base64');
+      const signature=Buffer.from([137,80,78,71,13,10,26,10]);
+      if(small.length>=24 && small.subarray(0,8).equals(signature) && small.readUInt32BE(16)>0 && small.readUInt32BE(20)>0 && Math.max(small.readUInt32BE(16),small.readUInt32BE(20))<=600) {
+        await activeWorker.setParameters({tessedit_pageseg_mode:'6'});
+        progressBase=10;progressSpan=20;
+        const preview=await activeWorker.recognize(small,{},textOnly);
+        const kind=classifyReceiptText(preview.data.text);
+        if(kind!=='possible_receipt') return {text:preview.data.text,passes:1,nonReceipt:kind==='unrelated',unreadable:kind!=='unrelated'};
+      }
+    }
+    // Always approve against the original upload, never the client preview.
     const { prepareReceipt } = require('./receipt-image');
     const prepared = prepareReceipt(Buffer.from(image.split(',')[1], 'base64'), image.match(/^data:image\/(\w+)/)[1]);
     await activeWorker.setParameters({ tessedit_pageseg_mode: '6' });

@@ -7187,8 +7187,8 @@ function toggleKitchenSoundAlert() {
       try {
         if (onProgressCallback) onProgressCallback(5, 'Đang gửi ảnh biên lai...');
         const items = order ? order.items.map(i => ({ id: i.id, qty: i.qty, toppings: i.toppings || [] })) : cart.map(c => ({ id: c.item.id, qty: c.qty, toppings: c.toppings || [] }));
-        // Server derives screening from the source image; avoid a second preview upload.
-        const screeningImage=undefined;
+        // Small preview is rejection-only: full source remains required for approval.
+        const screeningImage=typeof createReceiptScreeningImage === 'function' ? await createReceiptScreeningImage(base64Str) : undefined;
         const upload = {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ image: base64Str, screeningImage, items, payableAmount: expAmt, discountCode: order ? order.discount?.code : activeDiscount?.code })

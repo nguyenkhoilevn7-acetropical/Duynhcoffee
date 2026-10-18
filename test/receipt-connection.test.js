@@ -73,3 +73,10 @@ test('client forwards actual OCR progress and returns non-receipt outcome withou
  const f=setup(({index})=>index===1?response({jobId:'p',status:'pending',progress:{percent:12,phase:'preparing'}},202):index===2?response({jobId:'p',status:'pending',progress:{percent:48,phase:'recognizing'}}):response({jobId:'p',status:'complete',result:{isValid:false,nonReceipt:true,reason:'Not a bank receipt'}}));
  const r=await f.run();assert.equal(r.nonReceipt,true);assert.equal(r.isValid,false);assert.ok(f.progress.some(x=>x[0]===12));assert.ok(f.progress.some(x=>x[0]===48));assert.equal(f.calls.filter(x=>x.options.method==='POST').length,1);
 });
+
+
+test('client sends bounded screening preview while retaining original image for authoritative scan',async()=>{
+ const f=setup(({options})=>{const b=JSON.parse(options.body);assert.equal(b.image,'data:image/jpeg;base64,YWJj');assert.equal(b.screeningImage,'preview-only');return response(complete('screened'));});
+ f.s.createReceiptScreeningImage=async image=>{assert.equal(image,'data:image/jpeg;base64,YWJj');return 'preview-only';};
+ assert.equal((await f.run()).isValid,true);
+});
