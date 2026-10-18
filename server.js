@@ -525,11 +525,15 @@ function setupFileWatchers() {
   jsonFiles.forEach(item => {
     if (fs.existsSync(item.file)) {
       let lastMtime = fs.statSync(item.file).mtimeMs;
+      let lastContent = JSON.stringify(item.reload());
       fs.watchFile(item.file, { interval: 500 }, (curr) => {
         if (curr.mtimeMs !== lastMtime) {
           lastMtime = curr.mtimeMs;
-          console.log(`[FileWatcher] 🔄 Phát hiện thay đổi ${item.name} trên máy chủ! Đang đồng bộ tới tất cả điện thoại...`);
           const freshData = item.reload();
+          const content = JSON.stringify(freshData);
+          if (content === lastContent) return;
+          lastContent = content;
+          console.log(`[FileWatcher] 🔄 Phát hiện thay đổi ${item.name} trên máy chủ! Đang đồng bộ tới tất cả điện thoại...`);
           broadcastRealtime(item.type, freshData);
         }
       });
@@ -1159,6 +1163,11 @@ const server = http.createServer(async (req, res) => {
       try {
         const body = await parseRequestBody(req);
         if (Array.isArray(body)) {
+          discountsCache = readJsonFile(DISCOUNTS_FILE, discountsCache);
+          if (JSON.stringify(discountsCache) === JSON.stringify(body)) {
+            sendJson(res, 200, {success:true, unchanged:true, count:discountsCache.length});
+            return;
+          }
           discountsCache = body;
           writeJsonFile(DISCOUNTS_FILE, discountsCache);
           broadcastRealtime('DISCOUNTS_UPDATE', discountsCache);

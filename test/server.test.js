@@ -24,6 +24,15 @@ test('HTTP menu/config save succeeds, empty values survive restart, private sour
  assert.equal((await fetch(base+'/api/menu-ai/generate',{method:'POST',headers:aiHeaders,body:JSON.stringify({name:'Trà xoài'})})).status,503);
  const pushStatus=await(await fetch(base+'/api/admin-push/status',{headers:{Authorization:'Bearer '+signed.token}})).json();assert.equal(pushStatus.enabled,false);
  assert.equal((await fetch(base+'/api/admin-push/session',{method:'POST',headers:{Origin:'https://other.test','Content-Type':'application/json'},body:'{}'})).status,403);
+
+ const discounts=[{code:'SAFE',percent:10,active:true}];
+ const postDiscounts=()=>fetch(base+'/api/discounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(discounts)});
+ assert.equal((await postDiscounts()).status,200);
+ const discountMtime=fs.statSync(path.join(dir,'discounts.json')).mtimeMs;
+ const version=(await(await fetch(base+'/api/sync')).json()).discountsVersion;
+ for(let i=0;i<10;i++) assert.equal((await(await postDiscounts()).json()).unchanged,true);
+ assert.equal(fs.statSync(path.join(dir,'discounts.json')).mtimeMs,discountMtime);
+ assert.equal((await(await fetch(base+'/api/sync')).json()).discountsVersion,version);
  const menu=[{id:91,name:'Regression tea',price:23000,image:'x'.repeat(60)}];
  let r=await fetch(base+'/api/menu',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(menu)});
  assert.equal(r.status,200);assert.equal((await r.json()).success,true);assert.deepEqual(await(await fetch(base+'/api/menu')).json(),menu);

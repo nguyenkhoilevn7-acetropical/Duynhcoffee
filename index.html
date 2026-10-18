@@ -4395,7 +4395,7 @@ body {
       </form>
     </div>
   </div>
-  <div id="admin-login-modal" class="modal-overlay" style="display: none;">
+  <div id="admin-login-modal" class="modal-overlay" style="display: none; z-index: 100001;">
     <div class="modal-card" style="max-width: 380px;">
       <div class="modal-header">
         <h3 style="color: var(--primary-dark); font-size: 1.1rem;">🔐 Đăng Nhập Quản Trị</h3>
@@ -5956,9 +5956,10 @@ body {
         case 'DISCOUNTS_UPDATE': {
           const freshDiscounts = payload.discounts || payload.data;
           if (Array.isArray(freshDiscounts)) {
+            if (JSON.stringify(discounts) === JSON.stringify(freshDiscounts)) break;
             discounts = freshDiscounts;
-            lastDiscountsVersion = Date.now();
-            saveLocalDiscounts();
+            lastDiscountsVersion = payload.discountsVersion || lastDiscountsVersion;
+            saveLocalDiscounts(false);
             if (isAdminDevice) {
               renderAdminDiscountsTable();
             }
@@ -6010,7 +6011,7 @@ body {
           if (Array.isArray(pData.discounts)) {
             if (!lastDiscountsVersion || (pData.discountsVersion && pData.discountsVersion !== lastDiscountsVersion) || !isInitialLoadDone) {
               discountsChanged = JSON.stringify(discounts) !== JSON.stringify(pData.discounts);
-              if (discountsChanged) { discounts = pData.discounts; saveLocalDiscounts(); }
+              if (discountsChanged) { discounts = pData.discounts; saveLocalDiscounts(false); }
               lastDiscountsVersion = pData.discountsVersion || lastDiscountsVersion;
             }
           }
@@ -8106,10 +8107,11 @@ function openProductCustomModal(itemId) {
     ];
     let activeDiscount = null;
 
-    function saveLocalDiscounts() {
+    function saveLocalDiscounts(syncToServer = true) {
       try {
         localStorage.setItem('duynh_discounts', JSON.stringify(discounts));
       } catch(e) {}
+      if (!syncToServer) return;
       fetch('/api/discounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -9412,15 +9414,17 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     // DUYỆT ĐƠN (NEW -> PREP)
     async function approveOrder(orderId) {
       const order = findOrderById(orderId);
-      if (!order || order.status !== 'new') return;
+      if (!order) { showSmsToast('Chưa tìm thấy đơn', 'Vui lòng tải lại danh sách đơn.'); return false; }
+      if (order.status !== 'new') { showSmsToast('Trạng thái đơn đã thay đổi', 'Vui lòng kiểm tra mục Đang pha chế.'); return false; }
       window.pendingOrderActions ||= new Set();
       if (window.pendingOrderActions.has(order.id)) return;
       window.pendingOrderActions.add(order.id);
       try {
         await deliveryAdminRequest('/api/orders/' + encodeURIComponent(order.id) + '/status', {status:'prep'});
-        playKitchenPrepAlertSound();
+        try { playKitchenPrepAlertSound(); } catch (_) {}
         showSmsToast('☕ ĐÃ DUYỆT ĐƠN VÀO BẾP!', `Đơn ${order.id} đã được máy chủ lưu vào mục Đang Pha Chế.`);
-      } catch (error) { showSmsToast('Chưa duyệt được đơn', error.message); }
+        return true;
+      } catch (error) { showSmsToast('Chưa duyệt được đơn', error.message); return false; }
       finally { window.pendingOrderActions.delete(order.id); }
     }
 
@@ -9855,11 +9859,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
     window.cancelFromReceiptModal = cancelFromReceiptModal;
 
-    function approveOrderFromModal() {
-      if (viewingReceiptOrderId) {
-        approveOrder(viewingReceiptOrderId);
-        closeReceiptViewerModal();
-      }
+    async function approveOrderFromModal() {
+      if (viewingReceiptOrderId && await approveOrder(viewingReceiptOrderId)) closeReceiptViewerModal();
     }
 
     // TAB SWITCHING BACKEND

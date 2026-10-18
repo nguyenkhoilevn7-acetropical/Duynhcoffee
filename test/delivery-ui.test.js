@@ -51,3 +51,11 @@ test('expired handover session clears both stale tokens and remembers the intend
  fetch:async()=>({ok:false,status:401,json:async()=>({error:'Please sign in'})})};vm.createContext(s);vm.runInContext(section('    async function deliveryAdminRequest(', '    async function dispatchOrderToPartner('),s);
  await assert.rejects(s.deliveryAdminRequest('/api/orders/ORD-1/status',{status:'shipping'}),/sign in/);assert.deepEqual(removed,['duynh_admin_api_token','duynh_admin_push_token']);assert.equal(s.window.pendingDeliveryAction.body.status,'shipping');
 });
+
+test('receipt viewer stays open on failed approval and closes only after acknowledged success',async()=>{
+ let closed=0,succeed=false,resolve;
+ const s={viewingReceiptOrderId:'ORD-1',approveOrder:()=>new Promise(r=>resolve=r),closeReceiptViewerModal:()=>closed++};
+ vm.createContext(s);vm.runInContext(section('    async function approveOrderFromModal()', '    // TAB SWITCHING BACKEND'),s);
+ const first=s.approveOrderFromModal();assert.equal(closed,0);resolve(false);await first;assert.equal(closed,0);
+ const second=s.approveOrderFromModal();assert.equal(closed,0);resolve(true);await second;assert.equal(closed,1);
+});

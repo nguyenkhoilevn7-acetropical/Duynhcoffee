@@ -105,3 +105,16 @@ test('admin receives an alert exactly once when fallback polling recovers a miss
  s.handleIncomingMeshPayload(update,'render_http');assert.equal(alerts,1);assert.equal(calls.backend,1);
  s.handleIncomingMeshPayload(update,'render_http');assert.equal(alerts,1);assert.equal(calls.backend,1);
 });
+
+test('server discount updates never echo HTTP writes or redraw unchanged discounts',()=>{
+ const {s}=setup();let requests=0,draws=0;
+ s.fetch=()=>{requests++;return Promise.resolve({ok:true});};
+ s.renderAdminDiscountsTable=()=>draws++;s.isUserAdmin=()=>true;
+ vm.runInContext(html.slice(html.indexOf('    function saveLocalDiscounts('),html.indexOf('    // MUA NGAY TRỰC TIẾP')),s);
+ const update={type:'DISCOUNTS_UPDATE',data:[{code:'SALE',percent:20}]};
+ for(let i=0;i<20;i++)s.handleIncomingMeshPayload(update);
+ assert.equal(requests,0);assert.equal(draws,1);
+ s.handleIncomingMeshPayload({type:'FULL_SYNC',discounts:[{code:'SALE',percent:10}],discountsVersion:2});
+ assert.equal(requests,0);
+ s.saveLocalDiscounts();assert.equal(requests,1);
+});
