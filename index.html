@@ -3378,6 +3378,7 @@ body {
 
     <!-- VIEW 2: TRANG QUẢN TRỊ VIÊN (BACKEND) -->
     <section id="view-backend" class="view-section">
+      <div id="admin-order-action-notice" role="alert" hidden style="padding:14px;margin-bottom:12px;border:2px solid #DC2626;border-radius:10px;background:#FEF2F2;color:#991B1B;font-weight:700;"></div>
       <!-- ADMIN HEADER -->
       <div class="backend-header">
         <div>
@@ -6205,7 +6206,24 @@ body {
     ensureHealthyMenuImages();
 
     let storeConfig = JSON.parse(localStorage.getItem('duynh_config') || 'null') || {"storeName": "Mom’s Tea & Coffee", "storeSlogan": "Mom — Ngon đến giọt cuối cùng", "storeAddress": "Tòa Babylon 2, Chung Cư Thủ Thiêm, Phường An Khánh, TP. Thủ Đức, TP. Hồ Chí Minh", "storePhone": "0988 776 655", "vatRate": 8, "footerGreeting": "Mom’s Tea & Coffee — Ngon đến giọt cuối cùng!", "bankConfig": {"bankId": "Vietcombank", "bankName": "Ngân Hàng TMCP Ngoại Thương Việt Nam (Vietcombank)", "bin": "970436", "accountNumber": "9911989890", "accountHolder": "ĐÀO KHÔI NGUYÊN"}, "momoConfig": {"phone": "0988776655", "name": "ĐÀO KHÔI NGUYÊN"}, "deliveryPartners": {"ahamove": {"name": "Ahamove Siêu Tốc", "baseDistance": 4, "baseFee": 18000, "stepFeePerKm": 5000, "status": "connected", "serviceType": "Xe máy siêu tốc"}, "lalamove": {"name": "Lalamove Giao Nhanh", "baseDistance": 3, "baseFee": 16000, "stepFeePerKm": 5500, "status": "connected", "serviceType": "Xe máy giao nhanh"}}, "adminAccount": {"username": "admin", "password": "duynh2026", "name": "Đào Khôi Nguyên (Chủ quán Mom)"}};
-    let orders = JSON.parse(localStorage.getItem('duynh_orders') || 'null') || [{"id": "ORD-1001", "time": "09:30", "createdAtIso": "2026-10-11T09:30:00.000Z", "orderType": "delivery", "customerName": "Nguyễn Văn An", "phone": "0912 345 678", "deliveryAddress": "Tòa nhà Bitexco Financial, 2 Hải Triều, P. Bến Nghé, Quận 1, TP. Hồ Chí Minh", "distanceKm": 1.2, "deliveryPartner": "ahamove", "deliveryPartnerName": "Ahamove Siêu Tốc", "shippingFee": 18000, "beverageTotal": 90000, "total": 90000, "subtotal": 90000, "vat": 7200, "note": "Giao lên lễ tân tầng trệt, gọi trước khi đến 5 phút", "paymentMethod": "vietqr", "paymentMethodName": "Chuyển khoản VietQR (Vietcombank)", "paymentStatus": "receipt_submitted", "status": "new", "mapUrl": "https://www.google.com/maps/search/?api=1&query=Tòa+nhà+Bitexco+Financial,+2+Hải+Triều,+Quận+1,+TP.+Hồ+Chí+Minh", "receiptImage": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='600' viewBox='0 0 400 600'><rect width='400' height='600' fill='%23f0fdf4'/><rect x='20' y='20' width='360' height='560' rx='16' fill='%23ffffff' stroke='%2316a34a' stroke-width='2'/><circle cx='200' cy='90' r='36' fill='%23dcfce7'/><path d='M185 90l10 10 20-20' stroke='%2316a34a' stroke-width='4' fill='none'/><text x='200' y='160' font-family='sans-serif' font-size='18' font-weight='bold' fill='%23166534' text-anchor='middle'>CHUYỂN KHOẢN THÀNH CÔNG</text><text x='200' y='210' font-family='sans-serif' font-size='28' font-weight='bold' fill='%23111827' text-anchor='middle'>90.000 đ</text><text x='50' y='270' font-family='sans-serif' font-size='13' fill='%236b7280'>Tài khoản thụ hưởng:</text><text x='350' y='270' font-family='sans-serif' font-size='13' font-weight='bold' fill='%23111827' text-anchor='end'>9911989890</text><text x='50' y='310' font-family='sans-serif' font-size='13' fill='%236b7280'>Người thụ hưởng:</text><text x='350' y='310' font-family='sans-serif' font-size='13' font-weight='bold' fill='%23111827' text-anchor='end'>DAO KHOI NGUYEN</text><text x='50' y='350' font-family='sans-serif' font-size='13' fill='%236b7280'>Ngân hàng:</text><text x='350' y='350' font-family='sans-serif' font-size='13' font-weight='bold' fill='%23111827' text-anchor='end'>Vietcombank</text><text x='50' y='390' font-family='sans-serif' font-size='13' fill='%236b7280'>Nội dung chuyển khoản:</text><text x='350' y='390' font-family='sans-serif' font-size='14' font-weight='bold' fill='%23dc2626' text-anchor='end'>ORD-1001</text><text x='50' y='430' font-family='sans-serif' font-size='13' fill='%236b7280'>Mã giao dịch:</text><text x='350' y='430' font-family='sans-serif' font-size='12' fill='%234b5563' text-anchor='end'>VCB.20261011.88412</text><line x1='40' y1='460' x2='360' y2='460' stroke='%23e5e7eb' stroke-dasharray='4'/><text x='200' y='500' font-family='sans-serif' font-size='12' fill='%23059669' text-anchor='middle'>Hóa đơn điện tử VCB Digibank • Mom’s Tea & Coffee</text></svg>", "items": [{"id": 1, "name": "Trà Mãng Cầu Mom (Signature)", "qty": 2, "price": 45000, "total": 90000, "custom": "Ít ngọt, nhiều đá"}], "deliveryStatus": "assigned", "trackingCode": "AHA-SG-19361", "driver": {"name": "Nguyễn Văn Hùng", "phone": "0903 124 556", "vehicle": "Honda Wave Alpha 59P1-123.45"}, "dispatchedAtIso": "2026-10-11T12:43:05.003Z"}, {"id": "ORD-1002", "time": "09:42", "createdAtIso": "2026-10-11T09:42:00.000Z", "orderType": "delivery", "customerName": "Trần Mai Linh", "phone": "0988 123 456", "deliveryAddress": "65 Lê Lợi, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh", "distanceKm": 0.8, "deliveryPartner": "lalamove", "deliveryPartnerName": "Lalamove Giao Nhanh", "shippingFee": 16000, "beverageTotal": 74000, "total": 74000, "subtotal": 74000, "vat": 5920, "note": "Giao lên tầng 3 phòng nhân sự", "paymentMethod": "vietqr", "paymentMethodName": "Chuyển khoản VietQR (Vietcombank)", "paymentStatus": "receipt_submitted", "status": "new", "mapUrl": "https://www.google.com/maps/search/?api=1&query=65+Lê+Lợi,+Quận+1,+TP.+Hồ+Chí+Minh", "receiptImage": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='600' viewBox='0 0 400 600'><rect width='400' height='600' fill='%23f0fdf4'/><rect x='20' y='20' width='360' height='560' rx='16' fill='%23ffffff' stroke='%2316a34a' stroke-width='2'/><circle cx='200' cy='90' r='36' fill='%23dcfce7'/><path d='M185 90l10 10 20-20' stroke='%2316a34a' stroke-width='4' fill='none'/><text x='200' y='160' font-family='sans-serif' font-size='18' font-weight='bold' fill='%23166534' text-anchor='middle'>CHUYỂN KHOẢN THÀNH CÔNG</text><text x='200' y='210' font-family='sans-serif' font-size='28' font-weight='bold' fill='%23111827' text-anchor='middle'>74.000 đ</text><text x='50' y='270' font-family='sans-serif' font-size='13' fill='%236b7280'>Tài khoản thụ hưởng:</text><text x='350' y='270' font-family='sans-serif' font-size='13' font-weight='bold' fill='%23111827' text-anchor='end'>9911989890</text><text x='50' y='310' font-family='sans-serif' font-size='13' fill='%236b7280'>Người thụ hưởng:</text><text x='350' y='310' font-family='sans-serif' font-size='13' font-weight='bold' fill='%23111827' text-anchor='end'>DAO KHOI NGUYEN</text><text x='50' y='350' font-family='sans-serif' font-size='13' fill='%236b7280'>Ngân hàng:</text><text x='350' y='350' font-family='sans-serif' font-size='13' font-weight='bold' fill='%23111827' text-anchor='end'>Vietcombank</text><text x='50' y='390' font-family='sans-serif' font-size='13' fill='%236b7280'>Nội dung chuyển khoản:</text><text x='350' y='390' font-family='sans-serif' font-size='14' font-weight='bold' fill='%23dc2626' text-anchor='end'>ORD-1002</text><text x='50' y='430' font-family='sans-serif' font-size='13' fill='%236b7280'>Mã giao dịch:</text><text x='350' y='430' font-family='sans-serif' font-size='12' fill='%234b5563' text-anchor='end'>VCB.20261011.89015</text><line x1='40' y1='460' x2='360' y2='460' stroke='%23e5e7eb' stroke-dasharray='4'/><text x='200' y='500' font-family='sans-serif' font-size='12' fill='%23059669' text-anchor='middle'>Hóa đơn điện tử VCB Digibank • Mom’s Tea & Coffee</text></svg>", "items": [{"id": 5, "name": "Cà Phê Muối Biển Mom", "qty": 1, "price": 39000, "total": 39000, "custom": "Bình thường"}, {"id": 9, "name": "Bánh Croissant Bơ Tỏi Phô Mai", "qty": 1, "price": 35000, "total": 35000}]}, {"id": "ORD-1000", "time": "09:15", "createdAtIso": "2026-10-11T09:15:00.000Z", "orderType": "delivery", "customerName": "Lê Hoàng Nam", "phone": "0933 555 777", "deliveryAddress": "280 Nguyễn Thị Minh Khai, Phường 5, Quận 3, TP. Hồ Chí Minh", "distanceKm": 2.8, "deliveryPartner": "ahamove", "deliveryPartnerName": "Ahamove Siêu Tốc", "shippingFee": 18000, "beverageTotal": 87000, "total": 87000, "subtotal": 87000, "vat": 6960, "note": "Nhiều đá, mang túi giữ nhiệt giúp em", "paymentMethod": "vietqr", "paymentMethodName": "Chuyển khoản VietQR (Vietcombank)", "paymentStatus": "receipt_submitted", "status": "prep", "deliveryStatus": "assigned", "trackingCode": "AHA-SG-88912", "driver": {"name": "Nguyễn Văn Hùng", "phone": "0903 124 556", "vehicle": "Honda Wave Alpha 59P1-123.45"}, "mapUrl": "https://www.google.com/maps/search/?api=1&query=280+Nguyễn+Thị+Minh+Khai,+Quận+3,+TP.+Hồ+Chí+Minh", "items": [{"id": 2, "name": "Trà Dâu Tằm Macchiato Mom", "qty": 1, "price": 49000, "total": 49000, "custom": "Macchiato để riêng"}, {"id": 7, "name": "Bạc Xỉu Sữa Tươi 3 Tầng", "qty": 1, "price": 38000, "total": 38000}]}, {"id": "ORD-0999", "time": "08:50", "createdAtIso": "2026-10-11T08:50:00.000Z", "completedAtIso": "2026-10-11T09:10:00.000Z", "orderType": "delivery", "customerName": "Phạm Thu Trang", "phone": "0909 888 999", "deliveryAddress": "Tòa Landmark 81, 720A Điện Biên Phủ, P. 22, Bình Thạnh, TP. Hồ Chí Minh", "distanceKm": 3.8, "deliveryPartner": "lalamove", "deliveryPartnerName": "Lalamove Giao Nhanh", "shippingFee": 21500, "beverageTotal": 129000, "total": 129000, "subtotal": 129000, "vat": 10320, "note": "Giao sảnh L2, đã nhắn bảo vệ", "paymentMethod": "vietqr", "paymentMethodName": "Chuyển khoản VietQR (Vietcombank)", "paymentStatus": "receipt_submitted", "status": "done", "deliveryStatus": "delivered", "trackingCode": "LALA-SG-44120", "driver": {"name": "Trần Minh Quân", "phone": "0918 890 221", "vehicle": "Yamaha Sirius 59L2-678.90"}, "mapUrl": "https://www.google.com/maps/search/?api=1&query=Landmark+81,+Bình+Thạnh,+TP.+Hồ+Chí+Minh", "items": [{"id": 3, "name": "Trà Đào Cam Sả Tươi", "qty": 2, "price": 42000, "total": 84000}, {"id": 10, "name": "Bánh Tiramisu Hộp Thiếc Mom", "qty": 1, "price": 45000, "total": 45000}]}];
+    let localTestOrders = [];
+    try { localTestOrders = JSON.parse(localStorage.getItem('duynh_test_orders') || '[]').filter(o => o.isLocalTest === true && String(o.id).startsWith('TEST-')); } catch (_) {}
+    window.getLocalTestOrder = id => localTestOrders.find(o => String(o.id) === String(id));
+    let orders = [];
+    try { orders = JSON.parse(localStorage.getItem('duynh_orders') || '[]') || []; } catch (_) {}
+    if (!Array.isArray(orders)) orders = [];
+    // Earlier versions inserted generated SVG receipts as real customer orders.
+    // Move only this exact built-in fixture to the local test area.
+    orders = orders.filter(order => {
+      if (typeof order.receiptImage !== 'string' || !order.receiptImage.startsWith("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='600'") || !order.receiptImage.includes('Hóa đơn điện tử VCB Digibank • Mom’s Tea & Coffee')) return true;
+      const migrated = {...order, id:'TEST-'+order.id, isLocalTest:true};
+      if (!localTestOrders.some(o => o.id === migrated.id)) localTestOrders.push(migrated);
+      return false;
+    });
+    try {
+      localStorage.setItem('duynh_test_orders', JSON.stringify(localTestOrders));
+      localStorage.setItem('duynh_orders', JSON.stringify(orders));
+    } catch (_) {}
     sanitizeOrdersData();
 
     let cart = [];
@@ -8176,6 +8194,7 @@ function openProductCustomModal(itemId) {
         localStorage.setItem('duynh_menu', JSON.stringify(menu));
         localStorage.setItem('duynh_config', JSON.stringify(storeConfig));
         localStorage.setItem('duynh_orders', JSON.stringify(orders));
+        localStorage.setItem('duynh_test_orders', JSON.stringify(localTestOrders));
         if (localStorage.getItem('duynh_menu_customized') === 'true' && Array.isArray(menu) && menu.length > 0) {
           localStorage.setItem('duynh_custom_menu_backup', JSON.stringify(menu));
         }
@@ -9009,6 +9028,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     // =========================================================================
     function cancelOrderDirectly(orderId, reason = 'Khách yêu cầu hủy') {
       if (!orderId) return false;
+      const testOrder = window.getLocalTestOrder?.(orderId);
+      if (testOrder && isUserAdmin()) { testOrder.status='cancelled';testOrder.cancelReason=reason;saveLocalData();renderAllBackendTabs();return true; }
       const clean = String(orderId).trim().toUpperCase();
       const digits = clean.replace(/\D/g, '');
 
@@ -9114,7 +9135,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
             <div style="display: flex; align-items: center; justify-content: space-between; background: linear-gradient(135deg, #FEF3C7, #FDE68A); color: #92400E; padding: 8px 12px; border-radius: 10px; font-size: 0.84rem; font-weight: 800; margin-bottom: 10px; border: 1px solid #FCD34D;">
               <div style="display: flex; align-items: center; gap: 8px;">
                 <span class="new-order-live-dot"></span>
-                <span>🔔 ĐƠN MỚI CHỜ DUYỆT</span>
+                <span>${o.isLocalTest ? '🧪 ĐƠN THỬ — CHỈ TRÊN THIẾT BỊ NÀY' : '🔔 ĐƠN MỚI CHỜ DUYỆT'}</span>
               </div>
               <button type="button" class="btn-isolated-cancel" onclick="openCancelConfirmModal('${o.id}')" title="Hủy đơn">
                 🗑️ Hủy Đơn
@@ -9201,7 +9222,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       }).join('');
 
       let dispatchSection = '';
-      if (o.deliveryCarrierOrderId) {
+      if (o.isLocalTest) { dispatchSection = '<p>🧪 Đơn thử trên thiết bị này; không tạo vận đơn thật.</p>'; }
+      else if (o.deliveryCarrierOrderId) {
         dispatchSection = `
           <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 10px; padding: 8px 12px; margin-top: 10px;">
             <div style="font-size: 0.82rem; font-weight: 700; color: #166534;">📦 ${o.deliveryPartnerName || 'Ahamove'} • Mã: <b>${o.trackingCode}</b></div>
@@ -9229,7 +9251,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
           <div>
             <div style="display: flex; align-items: center; justify-content: space-between; background: #ECFDF5; color: #065F46; padding: 8px 12px; border-radius: 10px; font-size: 0.85rem; font-weight: 800; margin-bottom: 12px;">
               <div style="display: flex; align-items: center; gap: 6px;">
-                <span>👨‍🍳</span> <span>ĐANG PHA CHẾ</span>
+                <span>👨‍🍳</span> <span>${o.isLocalTest ? '🧪 ĐƠN THỬ — ĐANG PHA CHẾ' : 'ĐANG PHA CHẾ'}</span>
               </div>
               <div style="display: flex; gap: 8px; align-items: center;">
                 <span style="font-size: 0.8rem; color: #047857; background: #D1FAE5; padding: 2px 8px; border-radius: 6px;">⏰ ${o.time || '--:--'}</span>
@@ -9336,6 +9358,10 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       `;
     }
 
+    window.showOrderActionError = function(orderId, message) {
+      const notice = document.getElementById('admin-order-action-notice');
+      if (notice) { notice.hidden = !message; notice.textContent = message ? 'Đơn '+orderId+': '+message : ''; }
+    };
     window.setOrderActionPending = function(orderId, pending) {
       const buttons = [...document.querySelectorAll('[data-order-status-action]')].filter(button => button.dataset.orderStatusAction === String(orderId));
       if (viewingReceiptOrderId === orderId) buttons.push(document.getElementById('btn-approve-from-receipt-modal'));
@@ -9348,6 +9374,15 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     };
 
     async function deliveryAdminRequest(path, body = {}) {
+      const testId = path.match(/^\/api\/orders\/([^/]+)\/status$/)?.[1];
+      const testOrder = testId && window.getLocalTestOrder?.(decodeURIComponent(testId));
+      if (testOrder && isUserAdmin()) {
+        const allowed = {new:['prep','cancelled'],prep:['shipping','cancelled'],shipping:[],cancelled:['new']};
+        if (!allowed[testOrder.status]?.includes(body.status)) throw new Error('Trạng thái đơn thử đã thay đổi.');
+        testOrder.status = body.status;
+        if (body.status === 'shipping') testOrder.deliveryStatus = 'in_transit';
+        saveLocalData(); renderAllBackendTabs(); return {success:true,order:testOrder,localOnly:true};
+      }
       const token = localStorage.getItem('duynh_admin_api_token') || localStorage.getItem('duynh_admin_push_token');
       if (!isUserAdmin() || !token) {
         window.pendingDeliveryAction = {path, body};
@@ -9366,7 +9401,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
           window.pendingDeliveryAction = {path, body};
           document.getElementById('admin-login-modal').style.display = 'flex';
         }
-        throw new Error(result.error || 'Chưa lưu được trạng thái đơn. Vui lòng thử lại.');
+        throw new Error(response.status === 404 ? 'Đơn này chưa có trên máy chủ nên chưa thể duyệt. Bấm đồng bộ để kiểm tra danh sách mới nhất; đơn thử cũ cần tạo lại bằng nút Giả lập đơn test.' : (result.error || 'Chưa lưu được trạng thái đơn. Vui lòng thử lại.'));
       }
       const order = findOrderById(result.order?.id);
       if (order && result.order) { for (const key of Object.keys(order)) delete order[key]; Object.assign(order, result.order); }
@@ -9411,7 +9446,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       const id = escapeDeliveryText(order.id);
       const items = (order.items || []).map(item => '<div>' + escapeDeliveryText(item.qty) + ' × ' + escapeDeliveryText(item.name) + ' — ' + formatMoney(item.total ?? item.price * item.qty) + '</div>').join('');
       const linked = !!order.deliveryCarrierOrderId;
-      const label = order.deliveryStatus === 'failed' ? 'GIAO HÀNG GẶP SỰ CỐ' : 'SHIPPER ĐANG GIAO HÀNG';
+      const label = order.isLocalTest ? '🧪 ĐƠN THỬ — GIAO SHIPPER GIẢ LẬP' : order.deliveryStatus === 'failed' ? 'GIAO HÀNG GẶP SỰ CỐ' : 'SHIPPER ĐANG GIAO HÀNG';
       const linkButtons = linked ? '<button type="button" class="nav-btn" onclick="syncDeliveryOrder(' + escapeDeliveryText(JSON.stringify(order.id)) + ')">Kiểm tra với hãng</button>' :
         '<button type="button" class="nav-btn" onclick="dispatchOrderToPartner(' + escapeDeliveryText(JSON.stringify(order.id)) + ', &quot;ahamove&quot;)">Liên kết Ahamove</button>' +
         '<button type="button" class="nav-btn" onclick="dispatchOrderToPartner(' + escapeDeliveryText(JSON.stringify(order.id)) + ', &quot;lalamove&quot;)">Liên kết Lalamove</button>';
@@ -9419,7 +9454,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         '<b>' + label + '</b><h3>' + id + '</h3><p>' + escapeDeliveryText(order.customerName) + '</p>' + items +
         '<p>' + escapeDeliveryText(order.deliveryPartnerName || '') + ' • ' + escapeDeliveryText(order.trackingCode || 'Chưa liên kết vận đơn thật') + '</p>' +
         '<p>Đã bàn giao cho shipper; chưa xác nhận khách đã nhận.</p>' +
-        (order.deliverySyncError ? '<p>' + escapeDeliveryText(order.deliverySyncError) + '</p>' : '') + linkButtons + '</article>';
+        (order.deliverySyncError ? '<p>' + escapeDeliveryText(order.deliverySyncError) + '</p>' : '') + (order.isLocalTest ? '' : linkButtons) + '</article>';
     }
 
     // DUYỆT ĐƠN (NEW -> PREP)
@@ -9429,15 +9464,17 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       if (order.status !== 'new') { showSmsToast('Trạng thái đơn đã thay đổi', 'Vui lòng kiểm tra mục Đang pha chế.'); return false; }
       window.pendingOrderActions ||= new Set();
       if (window.pendingOrderActions.has(order.id)) return;
-      window.pendingOrderActions.add(order.id);
-      window.setOrderActionPending?.(order.id, true);
+      const actionId = order.id;
+      window.pendingOrderActions.add(actionId);
       try {
-        await deliveryAdminRequest('/api/orders/' + encodeURIComponent(order.id) + '/status', {status:'prep'});
+        window.setOrderActionPending?.(actionId, true);
+        const result = await deliveryAdminRequest('/api/orders/' + encodeURIComponent(order.id) + '/status', {status:'prep'});
+        window.showOrderActionError?.(actionId,'');
         try { playKitchenPrepAlertSound(); } catch (_) {}
-        showSmsToast('☕ ĐÃ DUYỆT ĐƠN VÀO BẾP!', `Đơn ${order.id} đã được máy chủ lưu vào mục Đang Pha Chế.`);
+        showSmsToast('☕ ĐÃ DUYỆT ĐƠN VÀO BẾP!', result.localOnly ? 'Đơn thử đã chuyển vào bếp trên thiết bị này.' : `Đơn ${order.id} đã được máy chủ lưu vào mục Đang Pha Chế.`);
         return true;
-      } catch (error) { showSmsToast('Chưa duyệt được đơn', error.message); return false; }
-      finally { window.pendingOrderActions.delete(orderId); window.setOrderActionPending?.(orderId, false); }
+      } catch (error) { window.showOrderActionError?.(order.id,error.message); showSmsToast('Chưa duyệt được đơn', error.message); return false; }
+      finally { window.pendingOrderActions.delete(actionId); window.setOrderActionPending?.(actionId, false); }
     }
 
     // Bàn giao cho shipper chưa phải là giao thành công đến khách.
@@ -9448,19 +9485,22 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       if (order.status !== 'prep') { showSmsToast('Đơn chưa vào bếp', 'Duyệt đơn vào bếp thành công trước khi bàn giao shipper.'); return; }
       window.pendingOrderActions ||= new Set();
       if (window.pendingOrderActions.has(order.id)) return;
-      window.pendingOrderActions.add(order.id);
-      window.setOrderActionPending?.(order.id, true);
+      const actionId = order.id;
+      window.pendingOrderActions.add(actionId);
       try {
-        await deliveryAdminRequest('/api/orders/' + encodeURIComponent(orderId) + '/status', { status: 'shipping' });
-        playSuccessChime();
-        showSmsToast('🛵 ĐÃ GIAO CHO SHIPPER', 'Đơn đang giao; chờ hãng xác nhận khách đã nhận.');
-      } catch (error) { showSmsToast('Chưa bàn giao được đơn', error.message); }
-      finally { window.pendingOrderActions.delete(orderId); window.setOrderActionPending?.(orderId, false); }
+        window.setOrderActionPending?.(actionId, true);
+        const result = await deliveryAdminRequest('/api/orders/' + encodeURIComponent(orderId) + '/status', { status: 'shipping' });
+        window.showOrderActionError?.(actionId,'');
+        try { playSuccessChime(); } catch (_) {}
+        showSmsToast('🛵 ĐÃ GIAO CHO SHIPPER', result.localOnly ? 'Đơn thử đã chuyển sang giao shipper trên thiết bị này.' : 'Đơn đang giao; chờ hãng xác nhận khách đã nhận.');
+      } catch (error) { window.showOrderActionError?.(order.id,error.message); showSmsToast('Chưa bàn giao được đơn', error.message); }
+      finally { window.pendingOrderActions.delete(actionId); window.setOrderActionPending?.(actionId, false); }
     }
 
     function restoreOrder(orderId) {
       const order = findOrderById(orderId);
       if (!order) return;
+      if (order.isLocalTest) { order.status='new';saveLocalData();renderAllBackendTabs();return; }
       order.status = 'new';
       saveLocalData();
 
@@ -9485,6 +9525,9 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       if (!searchId) return null;
       const clean = String(searchId).trim().toUpperCase();
       const digits = clean.replace(/\D/g, '');
+      const exact = [...orders, ...localTestOrders].find(o => o && String(o.id).trim().toUpperCase() === clean);
+      if (exact) return exact;
+      if (clean.startsWith('TEST-')) return null;
       return orders.find(o => {
         if (!o || !o.id) return false;
         const oId = String(o.id).trim().toUpperCase();
@@ -10121,18 +10164,19 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     // RENDER TẤT CẢ TABS BACKEND
     function renderAllBackendTabs() {
       startLiveWaitTimerTicker();
-      const newOrders = orders
+      const adminOrders = [...orders, ...localTestOrders];
+      const newOrders = adminOrders
         .filter(o => o.status === 'new')
         .sort((a, b) => new Date(a.createdAtIso || a.createdAt || 0) - new Date(b.createdAtIso || b.createdAt || 0));
 
-      const prepOrders = orders.filter(o => o.status === 'prep');
-      const doneOrders = orders.filter(o => o.status === 'done');
-      const shippingOrders = orders.filter(o => o.status === 'shipping');
+      const prepOrders = adminOrders.filter(o => o.status === 'prep');
+      const doneOrders = adminOrders.filter(o => o.status === 'done');
+      const shippingOrders = adminOrders.filter(o => o.status === 'shipping');
       document.getElementById('badge-count-shipping').textContent = shippingOrders.length;
       const shippingGrid = document.getElementById('grid-orders-shipping');
       shippingGrid.innerHTML = shippingOrders.length ? shippingOrders.map(createAdminShippingOrderCard).join('') : '<p>Chưa có đơn đang giao.</p>';
       updateDeliveryConnectionStatus();
-      const cancelledOrders = orders.filter(o => o.status === 'cancelled');
+      const cancelledOrders = adminOrders.filter(o => o.status === 'cancelled');
 
       const badgeNew = document.getElementById('badge-count-new');
       badgeNew.textContent = newOrders.length;
@@ -11596,6 +11640,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
     // MÔ PHỎNG ĐƠN MỚI CÓ BILL
     function simulateCustomerOrderWithBill() {
+      if (!isUserAdmin()) return;
+      if (!menu.length) { showSmsToast('Chưa có món để thử', 'Thêm ít nhất một món trước khi tạo đơn thử.'); return; }
       const customerNames = ["Trần Thu Thảo", "Lê Gia Huy", "Võ Hoàng Yến", "Phạm Quốc Tuấn", "Đỗ Minh Khang"];
       const randName = customerNames[Math.floor(Math.random() * customerNames.length)];
       const randStreet = HCM_STREETS_WITHIN_10KM[Math.floor(Math.random() * HCM_STREETS_WITHIN_10KM.length)];
@@ -11605,8 +11651,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       };
 
       const randomItems = [];
-      const item1 = menu[Math.floor(Math.random() * 4)];
-      const item2 = menu[4 + Math.floor(Math.random() * 4)];
+      const item1 = menu[Math.floor(Math.random() * menu.length)];
+      const item2 = menu[Math.floor(Math.random() * menu.length)];
       randomItems.push({ id: item1.id, name: item1.name, qty: 1, price: item1.price, total: item1.price, custom: '50% (Ít đá) • 50% (Ít ngọt)' });
       if (Math.random() > 0.4) {
         randomItems.push({ id: item2.id, name: item2.name, qty: 1, price: item2.price, total: item2.price, custom: '70% Ngọt • Thêm Macchiato' });
@@ -11618,7 +11664,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       const fees = calculateShippingFees(randAddrObj.dist);
       const shipFee = (partner === 'ahamove') ? fees.feeAhamove : fees.feeLalamove;
 
-      const orderId = `ORD-${1000 + orders.length + 1}`;
+      const orderId = 'TEST-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,6);
       const now = new Date();
       const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
@@ -11626,6 +11672,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
       const simOrder = {
         id: orderId,
+        isLocalTest: true,
         time: timeStr,
         createdAtIso: new Date().toISOString(),
         orderType: 'delivery',
@@ -11650,17 +11697,12 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         items: randomItems
       };
 
-      orders.unshift(simOrder);
+      localTestOrders.unshift(simOrder);
+      localTestOrders = localTestOrders.slice(0,30);
       saveLocalData();
 
-      fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(simOrder)
-      }).catch(() => {});
-
       playNewOrderAlertSound();
-      showSmsToast("🔔 CÓ ĐƠN HÀNG MỚI KÈM HÓA ĐƠN!", `${simOrder.id} - ${simOrder.customerName} (${formatMoney(bevTotal)})`);
+      showSmsToast("🧪 ĐƠN THỬ TRÊN THIẾT BỊ", 'Có thể thử duyệt vào bếp và giao shipper. Đơn thử không gửi lên máy chủ, không tính doanh thu.');
       renderAllBackendTabs();
     }
 
@@ -11668,7 +11710,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       fetch(getCloudApiUrl('/api/orders'),{cache:'no-store'})
         .then(r => r.json())
         .then(data => {
-          if (Array.isArray(data) && data.length > 0) {
+          if (Array.isArray(data)) {
             orders = data;
             saveLocalData();
             renderAllBackendTabs();
@@ -12103,5 +12145,6 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 <div style="text-align:center;padding:12px;font-size:13px"><a href="/privacy.html">Chính sách bảo mật</a> · <a href="/terms.html">Điều khoản</a> · <a href="/backup.html">Quản trị backup</a></div>
 </body>
 </html>
+
 
 
