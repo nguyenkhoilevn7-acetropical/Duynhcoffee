@@ -7162,7 +7162,7 @@ function toggleKitchenSoundAlert() {
     async function runClientVerifyData(base64Str, expAmt, onProgressCallback, order = null) {
       // A slow upload or lost response must not abandon an accepted OCR job.
       // Retrying this same image/cart is deduplicated by the server.
-      const started = Date.now(); let deadline = started + 180000;
+      const started = Date.now(); let deadline = started + 90000;
       const pause = ms => new Promise(resolve => setTimeout(resolve, Math.min(ms, Math.max(0, deadline - Date.now()))));
       const retryable = error => error.retryable || error.name === 'AbortError' || error instanceof TypeError;
       async function request(path, options = {}) {
@@ -7208,7 +7208,7 @@ function toggleKitchenSoundAlert() {
         function reportJobProgress(job) {
           if (job.status!=='pending' || !onProgressCallback) return;
           if (job.queuePosition > 0) {
-            deadline=Math.max(deadline,Math.min(started+15*60000,Date.now()+180000));
+            deadline=Math.min(deadline,started+90000);
             onProgressCallback(5,'Đang chờ lượt quét · vị trí số '+job.queuePosition+'. Vui lòng giữ trang mở.'); return;
           }
           const labels={starting:'Đang chuẩn bị bộ đọc...',preparing:'Đang sàng lọc ảnh...',recognizing:'Đang nhận dạng chữ trong ảnh...',rereading:'Đang đọc kỹ vùng chưa rõ...',comparing:'Đang đối chiếu tên và số tiền...'};
@@ -9155,7 +9155,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
                 🔍 Xem Bill Chuyển Khoản
               </button>
             ` : ''}
-            <button type="button" class="btn-checkout-now" style="flex: 1.2; justify-content: center; height: 42px; font-size: 0.9rem; font-weight: 800;" onclick="approveOrder('${o.id}')">
+            <button type="button" class="btn-checkout-now" style="flex: 1.2; justify-content: center; height: 42px; font-size: 0.9rem; font-weight: 800;" data-order-status-action="${orderText(String(o.id))}" onclick="approveOrder('${o.id}')">
               ☕ DUYỆT VÀO BẾP ➔
             </button>
           </div>
@@ -9266,7 +9266,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
           </div>
 
           <div style="display: flex; gap: 8px; margin-top: 12px;">
-            <button type="button" class="btn-checkout-now" style="width: 100%; justify-content: center; height: 44px; font-size: 0.95rem; font-weight: 800; background: var(--accent);" onclick="completeOrder('${o.id}')">
+            <button type="button" class="btn-checkout-now" style="width: 100%; justify-content: center; height: 44px; font-size: 0.95rem; font-weight: 800; background: var(--accent);" data-order-status-action="${orderText(String(o.id))}" onclick="completeOrder('${o.id}')">
               🛵 GIAO CHO SHIPPER ➔
             </button>
           </div>
@@ -9336,6 +9336,17 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       `;
     }
 
+    window.setOrderActionPending = function(orderId, pending) {
+      const buttons = [...document.querySelectorAll('[data-order-status-action]')].filter(button => button.dataset.orderStatusAction === String(orderId));
+      if (viewingReceiptOrderId === orderId) buttons.push(document.getElementById('btn-approve-from-receipt-modal'));
+      for (const button of buttons) {
+        if (!button) continue;
+        if (pending) { button.dataset.idleLabel ||= button.textContent; button.textContent = '⏳ Đang lưu trạng thái...'; }
+        else if (button.dataset.idleLabel) { button.textContent = button.dataset.idleLabel; delete button.dataset.idleLabel; }
+        button.disabled = pending; button.setAttribute('aria-busy', String(pending));
+      }
+    };
+
     async function deliveryAdminRequest(path, body = {}) {
       const token = localStorage.getItem('duynh_admin_api_token') || localStorage.getItem('duynh_admin_push_token');
       if (!isUserAdmin() || !token) {
@@ -9355,7 +9366,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
           window.pendingDeliveryAction = {path, body};
           document.getElementById('admin-login-modal').style.display = 'flex';
         }
-        throw new Error(result.error || 'Chưa đồng bộ được hãng giao hàng.');
+        throw new Error(result.error || 'Chưa lưu được trạng thái đơn. Vui lòng thử lại.');
       }
       const order = findOrderById(result.order?.id);
       if (order && result.order) { for (const key of Object.keys(order)) delete order[key]; Object.assign(order, result.order); }
@@ -9419,13 +9430,14 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       window.pendingOrderActions ||= new Set();
       if (window.pendingOrderActions.has(order.id)) return;
       window.pendingOrderActions.add(order.id);
+      window.setOrderActionPending?.(order.id, true);
       try {
         await deliveryAdminRequest('/api/orders/' + encodeURIComponent(order.id) + '/status', {status:'prep'});
         try { playKitchenPrepAlertSound(); } catch (_) {}
         showSmsToast('☕ ĐÃ DUYỆT ĐƠN VÀO BẾP!', `Đơn ${order.id} đã được máy chủ lưu vào mục Đang Pha Chế.`);
         return true;
       } catch (error) { showSmsToast('Chưa duyệt được đơn', error.message); return false; }
-      finally { window.pendingOrderActions.delete(order.id); }
+      finally { window.pendingOrderActions.delete(orderId); window.setOrderActionPending?.(orderId, false); }
     }
 
     // Bàn giao cho shipper chưa phải là giao thành công đến khách.
@@ -9437,12 +9449,13 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       window.pendingOrderActions ||= new Set();
       if (window.pendingOrderActions.has(order.id)) return;
       window.pendingOrderActions.add(order.id);
+      window.setOrderActionPending?.(order.id, true);
       try {
         await deliveryAdminRequest('/api/orders/' + encodeURIComponent(orderId) + '/status', { status: 'shipping' });
         playSuccessChime();
         showSmsToast('🛵 ĐÃ GIAO CHO SHIPPER', 'Đơn đang giao; chờ hãng xác nhận khách đã nhận.');
       } catch (error) { showSmsToast('Chưa bàn giao được đơn', error.message); }
-      finally { window.pendingOrderActions.delete(order.id); }
+      finally { window.pendingOrderActions.delete(orderId); window.setOrderActionPending?.(orderId, false); }
     }
 
     function restoreOrder(orderId) {

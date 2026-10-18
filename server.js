@@ -175,7 +175,7 @@ if (imageOnlyConfig !== configCache) { configCache = imageOnlyConfig; writeJsonF
 
 const receiptVerifier = createReceiptVerifier({ readState: () => ({ menu: menuCache, config: configCache, discounts: discountsCache }) });
 let receiptUploadReaders = 0;
-const receiptJobs = createReceiptJobs({ dir:ROOT_DIR, maxPending:100, verify: (body, onProgress) => receiptVerifier.verify(body, onProgress) });
+const receiptJobs = createReceiptJobs({ dir:ROOT_DIR, maxPending:8, maxQueuedBytes:32*1024*1024, verify: (body, onProgress) => receiptVerifier.verify(body, onProgress) });
 const adminPush = createAdminPush({ dir: ROOT_DIR, readConfig: () => configCache, backup: backupService });
 await adminPush.initialize();
 const notifiedOrderIds = new Set(ordersCache.map(order => String(order.id)));

@@ -107,4 +107,41 @@ function prepareReceipt(buffer, mime) {
     get photo() { if(!photoPrepared){photoPrepared=true;const crop=screenCrop();photoPng=crop?PNG.sync.write(crop,options):null;}return photoPng; }
   };
 }
-module.exports = { prepareReceipt };
+// Keep JPEG/PNG decoding and pixel loops off the HTTP event loop. Values are
+// requested lazily so ordinary receipts do not allocate every fallback image.
+const { Worker, isMainThread, parentPort, workerData } = require('node:worker_threads');
+function prepareReceiptAsync(buffer, mime) {
+  const worker = new Worker(__filename, {workerData:{receiptImage:true,buffer,mime}});
+  let sequence=0, stopped=false, failure=null;
+  const pending=new Map(), cache=new Map();
+  function fail(error) { failure=error; for(const task of pending.values())task.reject(error);pending.clear(); }
+  worker.on('error',fail);
+  worker.on('exit',code=>{if(!stopped)fail(new Error('Image preparation stopped ('+code+')'));});
+  worker.on('message',message=>{
+    const task=pending.get(message.id);if(!task)return;pending.delete(message.id);
+    if(message.error)task.reject(new Error(message.error));
+    else task.resolve(message.value===null?null:Buffer.from(message.value));
+  });
+  return {
+    get(name) {
+      if(stopped || failure)return Promise.reject(failure || new Error('Image preparation closed'));
+      if(!cache.has(name))cache.set(name,new Promise((resolve,reject)=>{
+        const id=++sequence;pending.set(id,{resolve,reject});worker.postMessage({id,name});
+      }));
+      return cache.get(name);
+    },
+    async close() {stopped=true;fail(new Error('Image preparation closed'));await worker.terminate();}
+  };
+}
+if(!isMainThread && workerData?.receiptImage) {
+  let prepared;
+  try {prepared=prepareReceipt(Buffer.from(workerData.buffer),workerData.mime);}
+  catch(error){throw error;}
+  parentPort.on('message',({id,name})=>{
+    try {
+      if(!['cleaned','screening','photo','original'].includes(name))throw new Error('Invalid image variant');
+      parentPort.postMessage({id,value:prepared[name] || null});
+    } catch(error){parentPort.postMessage({id,error:error.message});}
+  });
+}
+module.exports = { prepareReceipt, prepareReceiptAsync };

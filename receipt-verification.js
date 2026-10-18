@@ -149,10 +149,11 @@ function calculateAmount(items, menu, discounts, code) {
   if (!Number.isSafeInteger(total) || total <= 0) throw new Error('Số tiền không hợp lệ');
   return total;
 }
-function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineMs = 45000, cacheOcr = !recognize }) {
+function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineMs = 20000, cacheOcr = !recognize }) {
   const secret = crypto.randomBytes(32);
   const readings = new Map(); // Text only, bounded and short-lived; never cache approval or payment totals.
-  let worker, workerReady, resetReady, busy = false, workerGeneration = 0;
+  let worker, workerReady, busy = false, workerGeneration = 0;
+  let imagePreparation = null;
   let activeProgress = null, progressBase = 5, progressSpan = 0;
   const progress = (percent,phase) => { if(activeProgress) activeProgress({percent,phase}); };
   const hash = image => crypto.createHash('sha256').update(image).digest('hex');
@@ -184,7 +185,6 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
   }
   async function ocr(image, amount, holder, screeningImage) {
     if (recognize) return { text: await recognize(image), passes: 1 };
-    if (resetReady) await resetReady;
     await warmup();
     const activeWorker = worker;
     progress(8,'preparing');
@@ -203,12 +203,12 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
       }
     }
     // Always approve against the original upload, never the client preview.
-    const { prepareReceipt } = require('./receipt-image');
-    const prepared = prepareReceipt(Buffer.from(image.split(',')[1], 'base64'), image.match(/^data:image\/(\w+)/)[1]);
+    const { prepareReceiptAsync } = require('./receipt-image');
+    const prepared = imagePreparation = prepareReceiptAsync(Buffer.from(image.split(',')[1], 'base64'), image.match(/^data:image\/(\w+)/)[1]);
     await activeWorker.setParameters({ tessedit_pageseg_mode: '6' });
     // A small first look can identify a menu/page without decoding it three times.
     // Never use this low-resolution screening result to approve a receipt.
-    const screening = prepared.screening;
+    const screening = await prepared.get('screening');
     if (screening) {
       progressBase=10; progressSpan=20;
       const peek=await activeWorker.recognize(screening,{},textOnly);
@@ -216,43 +216,39 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
     }
     progressBase=screening ? 30 : 10; progressSpan=screening ? 40 : 60;
     // Keep full-resolution field rows on screenshots; normalize shadows on photos.
-    const first = await activeWorker.recognize(prepared.cleaned, {}, textOnly);
+    const first = await activeWorker.recognize(await prepared.get('cleaned'), {}, textOnly);
     const comparison = compareReceipt(first.data.text, amount, holder);
     const kind = classifyReceiptText(first.data.text);
     if (kind==='unrelated') return {text:first.data.text,passes:1,nonReceipt:true};
     // No payment cues after a complete first read: stop rather than spend two
     // more passes on photos/blank images. An enclosed photographed screen keeps
     // its original crop fallback for glare and low light.
-    if (!comparison.isValid && kind==='unclear' && !comparison.recipientReadable && !prepared.photo) return {text:first.data.text,passes:1,unreadable:true};
+    if (!comparison.isValid && kind==='unclear' && !comparison.recipientReadable && !(await prepared.get('photo'))) return {text:first.data.text,passes:1,unreadable:true};
     if (!shouldRetryOcr(comparison, first.data.confidence)) return { text: first.data.text, passes: 1 };
     // Sparse-text mode tolerates photographed screens and separated bank fields.
     // Each pass is compared as one complete receipt; never join matching fields
     // from different passes or infer missing text from the expected recipient.
     progress(72,'rereading');
-    await activeWorker.reinitialize('eng+vie', 1);
+    // Reuse the resident Vietnamese model for sparse text; it also reads
+    // unaccented Latin names. Reinitializing languages per bad photo inflated
+    // memory and made the next customer's scan wait for another reload.
     progressBase=72; progressSpan=13;
     try {
       await activeWorker.setParameters({ tessedit_pageseg_mode: '11' });
-      const fallback = await activeWorker.recognize(prepared.photo || prepared.original, {}, textOnly);
+      const fallback = await activeWorker.recognize((await prepared.get('photo')) || (await prepared.get('original')), {}, textOnly);
       const next=compareReceipt(fallback.data.text,amount,holder);
       if(next.isValid || !shouldRetryOcr(next,fallback.data.confidence))return {text:fallback.data.text,passes:2};
       // Retain unfiltered color text when glare/lighting normalization is unhelpful.
       await activeWorker.setParameters({ tessedit_pageseg_mode: '6' });
       progressBase=85; progressSpan=10;
-      const last=await activeWorker.recognize(prepared.original, {}, textOnly);
+      const last=await activeWorker.recognize(await prepared.get('original'), {}, textOnly);
       const candidates=[{text:first.data.text,passes:1,result:comparison},{text:fallback.data.text,passes:2,result:next},
         {text:last.data.text,passes:3,result:compareReceipt(last.data.text,amount,holder)}];
       const score=x=>Number(x.result.recipientReadable)+Number(x.result.amountReadable);
       candidates.sort((a,b)=>score(b)-score(a));
       return {text:candidates[0].text,passes:3};
     } finally {
-      // Restore the exact first-pass model in the background. Next OCR waits for
-      // it; the current result does not wait for model initialization again.
-      const generation = workerGeneration;
-      resetReady = activeWorker.reinitialize('vie', 1).catch(() => {
-        if (generation === workerGeneration && worker === activeWorker) { worker = null; workerReady = null; }
-        activeWorker.terminate().catch(() => {});
-      });
+      await activeWorker.setParameters({ tessedit_pageseg_mode: '6' }).catch(() => {});
     }
   }
   async function verify(body, onProgress) {
@@ -299,7 +295,11 @@ function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineM
       workerReady = null;
       if (worker) { const oldWorker = worker; worker = null; oldWorker.terminate().catch(() => {}); }
       throw new Error(recognize || error.message.includes('chưa đọc xong') ? error.message : 'Không đọc được biên lai trên máy chủ. Vui lòng thử ảnh rõ nét hơn');
-    } finally { clearTimeout(timer); activeProgress = null; busy = false; }
+    } finally {
+      clearTimeout(timer); activeProgress = null;
+      if(imagePreparation){const prepared=imagePreparation;imagePreparation=null;await prepared.close().catch(()=>{});}
+      busy = false;
+    }
   }
   function assertVerified(order) {
     const parts = String(order.verificationToken || '').split('.');

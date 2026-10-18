@@ -3,6 +3,18 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {JSDOM}=require('jsdom');
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 const section=(a,b)=>html.slice(html.indexOf(a),html.indexOf(b,html.indexOf(a)));
+test('kitchen and shipper buttons visibly acknowledge pending work and recover after failure',()=>{
+ const dom=new JSDOM('<button data-order-status-action="ORD-1">Duyệt vào bếp</button><button data-order-status-action="ORD-2">Giao cho shipper</button>',{runScripts:'outside-only'}),w=dom.window;
+ try{
+  w.viewingReceiptOrderId=null;
+  w.eval(section('    window.setOrderActionPending = function(', '    async function deliveryAdminRequest('));
+  const [first,second]=w.document.querySelectorAll('button');
+  w.setOrderActionPending('ORD-1',true);assert.equal(first.disabled,true);assert.match(first.textContent,/Đang lưu/);assert.equal(second.disabled,false);
+  w.setOrderActionPending('ORD-1',false);assert.equal(first.disabled,false);assert.equal(first.textContent,'Duyệt vào bếp');
+  w.setOrderActionPending('ORD-2',true);assert.equal(second.getAttribute('aria-busy'),'true');
+  w.setOrderActionPending('ORD-2',false);assert.equal(second.textContent,'Giao cho shipper');
+ }finally{w.close();}
+});
 test('tracking displays each real milestone: handover activates delivery, only confirmed delivery finishes it',()=>{
  const dom=new JSDOM(html,{url:'https://shop.test',runScripts:'outside-only'}),w=dom.window,order={id:'ORD-1',status:'new',items:[]};
  w.findOrderById=()=>order;w.menu=[];w.formatMoney=String;
