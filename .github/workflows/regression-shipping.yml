@@ -22,5 +22,5 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Backend syntax
         run: node --check server.js && node --check receipt-jobs.js && node --check receipt-verification.js && node --check delivery.js
-      - name: Regression suites
-        run: node --test test/shipping-card.test.js test/delivery-ui.test.js test/receipt-jobs.test.js
+      - name: Full Node regression suite
+        run: node --test test/*.test.js
