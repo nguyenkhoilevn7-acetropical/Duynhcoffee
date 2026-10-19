@@ -144,6 +144,7 @@ function createBackup({ dir, snapshot, apply, ordersSnapshot, fetchImpl = global
     if (!enabled()) return false;
     const data = await latest();
     if (data) { writeLocal(data); startupRestored = true; }
+    if (ordersSnapshot) await restoreOrders();
     return startupRestored;
   }
   async function upload() {
@@ -247,16 +248,49 @@ function createBackup({ dir, snapshot, apply, ordersSnapshot, fetchImpl = global
     return true;
   }
   function stop() { clearTimeout(timer); clearTimeout(retryTimer); clearTimeout(orderTimer); clearTimeout(orderRetry); }
-  async function findOrderFile(kind, name, mimeType, parent) {
+  async function findOrderFile(kind, name, mimeType, parent, create = true) {
     const params = new URLSearchParams({q:"trashed = false and appProperties has { key='duynhOrders' and value='" + kind + "' }" +
+      " and name = '" + name.replace(/['\\]/g, '\\$&') + "'" +
       (parent ? " and '" + parent.replace(/['\\]/g, '\\$&') + "' in parents" : ''),fields:'files(id)',pageSize:'1'});
     const files = await (await request('https://www.googleapis.com/drive/v3/files?' + params,{headers:await auth()})).json();
     if (files.files?.[0]?.id) return {id:files.files[0].id,existing:true};
+    if (!create) return null;
     const file = await (await request('https://www.googleapis.com/drive/v3/files?fields=id', {
       method:'POST',headers:{...await auth(),'Content-Type':'application/json'},
       body:JSON.stringify({name,mimeType,appProperties:{duynhOrders:kind},...(parent ? {parents:[parent]} : {})})})).json();
     if (!file.id) throw new Error('Drive chưa tạo được file đơn hàng');
     return {id:file.id,existing:false};
+  }
+  async function restoreOrders() {
+    // Read only until a complete, validated archive is available. Never create an
+    // empty mirror during recovery or select a renamed pre-deploy safety copy.
+    const folder = await findOrderFile('folder-v1','Mom - Đơn hàng dự phòng','application/vnd.google-apps.folder',null,false);
+    if (!folder) return;
+    const file = await findOrderFile('data-v1','Don-hang-du-phong.json','application/json',folder.id,false);
+    if (!file) return;
+    const response = await request('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.id) + '?alt=media',{headers:await auth()});
+    let size=0; const chunks=[];
+    for await (const chunk of response.body) {size+=chunk.length;if(size>MAX_BYTES)throw new Error('Lịch sử đơn vượt giới hạn 25 MB');chunks.push(Buffer.from(chunk));}
+    const bytes=Buffer.concat(chunks);
+    if (!bytes.length) return; // Interrupted first-time mirror creation.
+    const previous=JSON.parse(bytes.toString('utf8'));
+    const validOrders = orders => Array.isArray(orders) && orders.every(o=>o && typeof o.id==='string' && o.id.trim() && Array.isArray(o.items)) && new Set(orders.map(o=>o.id)).size===orders.length;
+    if (previous.schema!=='mom-orders-v1' || !Number.isFinite(Date.parse(previous.updatedAt)) || !validOrders(previous.orders))
+      throw new Error('Lịch sử Drive không hợp lệ; dừng khôi phục để bảo vệ đơn cũ');
+    const dest=path.join(dir,'orders.json'), temp=dest+'.restore.tmp';
+    const local=fs.existsSync(dest) ? JSON.parse(fs.readFileSync(dest,'utf8')) : [];
+    if (!validOrders(local)) throw new Error('Đơn hàng trên máy không hợp lệ; dừng khôi phục');
+    const merged=new Map(previous.orders.map(o=>[o.id,o]));
+    for (const order of local) merged.set(order.id,order); // Preserve newer local state and receipt pictures.
+    try {
+      fs.writeFileSync(temp,JSON.stringify([...merged.values()],null,2),{mode:0o600});
+      fs.renameSync(temp,dest);
+    } finally { if (fs.existsSync(temp)) fs.unlinkSync(temp); }
+    orderFolder=folder.id; orderJson=file.id; archive=previous.orders;
+    orderState.folderUrl='https://drive.google.com/drive/folders/'+encodeURIComponent(orderFolder);
+    orderState.restoredAt=new Date().toISOString(); orderState.backupUpdatedAt=previous.updatedAt;
+    orderState.restoredCount=previous.orders.filter(o=>!local.some(l=>l.id===o.id)).length;
+    orderState.count=merged.size;
   }
   async function uploadOrders() {
     if (!ordersSnapshot) throw new Error('Chưa cấu hình sao lưu đơn hàng');
@@ -345,4 +379,5 @@ function createBackup({ dir, snapshot, apply, ordersSnapshot, fetchImpl = global
   return { initialize, changed, flush, handle, status, stop, loadPushState, savePushState, ordersChanged, flushOrders };
 }
 module.exports = { createBackup, sanitize, validate, TAG, orderArchiveView, archiveOrder };
+
 
