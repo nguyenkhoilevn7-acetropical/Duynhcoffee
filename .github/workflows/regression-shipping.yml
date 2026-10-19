@@ -1,0 +1,26 @@
+name: Regression tests - shipping UI and receipt
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Backend syntax
+        run: node --check server.js && node --check receipt-jobs.js && node --check receipt-verification.js && node --check delivery.js
+      - name: Regression suites
+        run: node --test test/shipping-card.test.js test/delivery-ui.test.js test/receipt-jobs.test.js
