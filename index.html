@@ -3265,6 +3265,24 @@ body {
 @media(min-width:1200px){#category-filter-pills.category-scroll-nav{grid-template-columns:repeat(4,minmax(0,1fr))}}
 #ios-custom-normal-actions{grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-auto-rows:1fr;align-items:stretch!important;gap:10px!important}
 #ios-custom-normal-actions>button{box-sizing:border-box;min-width:0;width:100%;height:100%!important;min-height:76px;margin:0!important;padding:12px 8px!important;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;line-height:1.35;text-align:center;font-size:1rem}
+/* Keep Buy Now and the amount on two visually centered lines. */
+#ios-custom-normal-actions .ios-instant-checkout-btn{
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  justify-content:center;
+  text-align:center;
+  gap:4px;
+}
+#ios-custom-normal-actions .ios-instant-checkout-btn .ios-buy-label,
+#ios-custom-normal-actions .ios-instant-checkout-btn #ios-custom-total-btn-price{
+  display:block;
+  width:100%;
+  margin:0;
+  padding:0;
+  text-align:center;
+  align-self:stretch;
+}
 #ios-custom-normal-actions .ios-buy-label{display:block;white-space:normal}
 #ios-custom-total-btn-price,#ios-custom-total-btn-price-edit,.money-amount,.product-price,.ios-topping-price{white-space:nowrap!important;word-break:normal;overflow-wrap:normal;font-variant-numeric:tabular-nums;flex-shrink:0}
 #ios-custom-total-btn-price{display:block;font-size:.95rem;line-height:1.4}
