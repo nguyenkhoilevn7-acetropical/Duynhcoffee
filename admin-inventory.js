@@ -5,6 +5,12 @@ const byId=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const en=()=>document.documentElement.lang==='en';
 const t=(vi,english)=>en()?english:vi;
+const money=n=>new Intl.NumberFormat(en()?'en-US':'vi-VN',{maximumFractionDigits:0}).format(n)+' đ';
+function estimatedCost(item){
+  if(item?.purchaseUnitPrice===null||item?.purchaseUnitPrice===undefined||item.purchaseUnitPrice==='')return null;
+  const value=Math.round(Number(item.buyQuantity||0)*Number(item.purchaseUnitPrice));
+  return Number.isSafeInteger(value)&&value>=0?value:null;
+}
 const statusText={
   need:['Cần mua','To buy'],planned:['Lên kế hoạch','Planned'],
   ordered:['Đã đặt mua','Ordered'],received:['Đã mua / nhận','Purchased / received']
@@ -15,6 +21,7 @@ const labels={
   name:['Tên sản phẩm *','Product name *'],category:['Nhóm hàng','Category'],unit:['Đơn vị','Unit'],
   stock:['Tồn hiện tại','On hand'],minimum:['Báo gần hết khi ≤','Low-stock threshold'],
   buyQuantity:['Số lượng cần mua','Quantity to purchase'],
+  purchaseUnitPrice:['Đơn giá mua (VNĐ / đơn vị)','Purchase unit price (VND / unit)'],
   purchaseDate:['Ngày dự kiến mua','Planned purchase date'],lastPurchasedDate:['Ngày mua gần nhất','Last purchased'],
   supplier:['Nhà cung cấp (supplier)','Supplier'],supplierPhone:['SĐT / liên hệ','Supplier contact'],
   purchaseLocation:['Mua tại đâu?','Purchase location'],
@@ -58,6 +65,8 @@ function init(){
  ${field('minimum','number','min="0" max="1000000" step="0.001" required')}
  ${field('buyQuantity','number','min="0" max="1000000" step="0.001" required')}
  ${field('unit','text','maxlength="30" placeholder="kg, lít, hộp, chai…"')}
+ ${field('purchaseUnitPrice','number','min="0" max="1000000000" step="1" placeholder="25000"')}
+ <div class="inv-field inv-cost"><span>${t('Tổng tiền mua dự kiến','Estimated purchase total')}</span><output id="inv-estimated-total" aria-live="polite">—</output></div>
  ${field('purchaseDate','date')}
  ${field('lastPurchasedDate','date')}
  ${field('supplier','text','maxlength="120"')}
@@ -74,7 +83,7 @@ function init(){
  byId('inv-add').onclick=()=>{if(!confirmLeave())return;activeId='';fill(null);drawList();};
  byId('inv-search').oninput=e=>{query=e.target.value.trim().toLocaleLowerCase();drawList();};
  byId('inv-filter').onchange=e=>{filter=e.target.value;drawList();};
- byId('inv-form').addEventListener('input',()=>dirty=true);
+ byId('inv-form').addEventListener('input',()=>{dirty=true;updateCostPreview();});
  byId('inv-form').onsubmit=save;
  byId('inv-file').onchange=uploadPhoto;
  byId('inv-remove-photo').onclick=()=>{photo='';renderPhoto();dirty=true;};
@@ -91,8 +100,18 @@ function fill(row){
    input.value=String(value);
  }
  photo=row?.image||'';renderPhoto();byId('inv-file').value='';
+ updateCostPreview();
  byId('inv-form-title').textContent=row?t('Sửa thông tin sản phẩm','Edit inventory item'):t('Thêm sản phẩm cần quản lý','Add inventory item');
  byId('inv-delete').hidden=!row;dirty=false;
+}
+function updateCostPreview(){
+ const raw=byId('inv-purchaseUnitPrice')?.value;
+ const qty=byId('inv-buyQuantity')?.value;
+ const output=byId('inv-estimated-total');
+ if(!output)return;
+ if(raw===''||raw===undefined||qty===''||qty===undefined){output.textContent='—';return;}
+ const total=estimatedCost({purchaseUnitPrice:Number(raw),buyQuantity:Number(qty)});
+ output.textContent=total===null?'—':money(total);
 }
 function renderPhoto(){
  const preview=byId('inv-photo');preview.hidden=!photo;
@@ -108,7 +127,8 @@ function summary(){
  [t('Tổng mặt hàng','Total items'),items.length],
  [t('Gần hết / hết hàng','Low stock'),items.filter(low).length],
  [t('Cần mua','To buy'),items.filter(x=>x.status==='need').length],
- [t('Đến hạn mua','Purchase due'),items.filter(due).length]
+ [t('Đến hạn mua','Purchase due'),items.filter(due).length],
+ [t('Dự toán mua (đã có giá)','Priced purchase budget'),money(items.filter(item=>item.status!=='received').reduce((sum,item)=>sum+(estimatedCost(item)??0),0))]
  ];
  byId('inv-summary').innerHTML=counts.map(([name,value])=>`<div><span>${esc(name)}</span><strong>${value}</strong></div>`).join('');
 }
@@ -125,6 +145,7 @@ function drawList(){
  <span class="inv-thumb">${item.image?`<img src="${item.image}" alt="">`:'📦'}</span>
  <span class="inv-item-info"><strong>${esc(item.name)}</strong><small>${esc(item.supplier||t('Chưa có nhà cung cấp','No supplier'))}</small>
  <small>${esc(t('Tồn: ','Stock: '))}${esc(item.stock)} ${esc(item.unit)} · ${esc(t('Mua: ','Buy: '))}${esc(item.buyQuantity)} ${esc(item.unit)}</small>
+ <small>${esc(t('Đơn giá mua: ','Unit cost: '))}${estimatedCost(item)===null?'—':esc(money(item.purchaseUnitPrice))} · ${esc(t('Thành tiền: ','Purchase total: '))}${estimatedCost(item)===null?'—':esc(money(estimatedCost(item)))}</small>
  <span class="inv-flags"><em class="inv-pill">${esc(t(...statusText[item.status]))}</em>${low(item)?`<em class="inv-pill inv-alert">${esc(t('⚠ Gần hết hàng','⚠ Low stock'))}</em>`:''}${due(item)?`<em class="inv-pill inv-due">${esc(t('📅 Đến hạn mua','📅 Due'))}</em>`:''}</span>
  ${item.purchaseDate?`<small>${esc(t('Dự kiến: ','Planned: '))}${esc(item.purchaseDate)}</small>`:''}
  </span></button>`).join(''):`<p class="inv-empty">${t('Chưa có sản phẩm phù hợp. Nhấn “Thêm sản phẩm” để bắt đầu.','No matching items. Select “Add item” to get started.')}</p>`;
@@ -143,6 +164,7 @@ async function reload(forced=false){
 function dataFromForm(){
  const data=Object.fromEntries(new FormData(byId('inv-form')).entries());
  for(const key of ['stock','minimum','buyQuantity'])data[key]=Number(data[key]);
+ data.purchaseUnitPrice=data.purchaseUnitPrice===''?null:Number(data.purchaseUnitPrice);
  data.image=photo;return data;
 }
 async function save(event){
