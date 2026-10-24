@@ -175,7 +175,7 @@ async function uploadPhoto(event){
    canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));
    const ctx=canvas.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
    const result=canvas.toDataURL('image/jpeg',0.76);
-   if(result.length<460000){photo=result;dirty=true;renderPhoto();message(t('Đã chuẩn bị ảnh. Nhấn Lưu sản phẩm để cập nhật.','Photo ready. Save item to upload.'));return;}
+   if(result.length<160000){photo=result;dirty=true;renderPhoto();message(t('Đã chuẩn bị ảnh. Nhấn Lưu sản phẩm để cập nhật.','Photo ready. Save item to upload.'));return;}
    scale*=0.7;
   }
   throw Error(t('Ảnh quá lớn, vui lòng chọn ảnh khác.','Image too large. Choose another.'));
