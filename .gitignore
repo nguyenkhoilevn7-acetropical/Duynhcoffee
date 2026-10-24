@@ -1,2 +1,6 @@
 .admin-push.json
 .admin-push.json.tmp
+
+inventory.json
+inventory.json.tmp
+inventory.json.restore.tmp

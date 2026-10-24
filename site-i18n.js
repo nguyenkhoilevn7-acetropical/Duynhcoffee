@@ -6,6 +6,7 @@
 })(function () {
   'use strict';
   const catalog = {
+  "📦 Inventory / Mua hàng": "📦 Inventory / Purchasing",
   "📊 Doanh Thu & Lợi Nhuận": "📊 Sales & Profit",
   "AI Gemini: tạo mô tả và dịch Việt–Anh bằng kết nối API của quán.": "Gemini AI: generate descriptions and translate Vietnamese–English using the store's API connection.",
   "Bản tiếng Anh chưa dịch đầy đủ. Nội dung cũ vẫn được giữ; vui lòng thử lại.": "The English translation is incomplete. Your existing content is preserved; please try again.",

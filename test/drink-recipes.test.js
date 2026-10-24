@@ -11,7 +11,7 @@ test('recipe validation rejects incomplete quantities, unknown structure and uns
 });
 test('private recipe HTTP CRUD, stale edit protection, persistence and public-data isolation',async()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'drink-recipes-'));
- for(const name of ['server.js','profit-report.js','profit-excel.js','menu-options.js','menu-ai.js','delivery.js','admin-push.js','drive-backup.js','receipt-verification.js','receipt-jobs.js','receipt-image.js','drink-recipes.js'])fs.copyFileSync(path.join(__dirname,'..',name),path.join(dir,name));
+ for(const name of ['server.js','inventory.js','profit-report.js','profit-excel.js','menu-options.js','menu-ai.js','delivery.js','admin-push.js','drive-backup.js','receipt-verification.js','receipt-jobs.js','receipt-image.js','drink-recipes.js'])fs.copyFileSync(path.join(__dirname,'..',name),path.join(dir,name));
  fs.writeFileSync(path.join(dir,'menu.json'),JSON.stringify([{id:1,name:'Tea',price:45000}]));
  const port=await new Promise(resolve=>{const server=net.createServer();server.listen(0,'127.0.0.1',()=>{const p=server.address().port;server.close(()=>resolve(p));});});
  let child;const base='http://127.0.0.1:'+port;
