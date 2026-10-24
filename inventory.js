@@ -52,11 +52,15 @@ function validateItem(input){
   const name=text(input.name,120,'Tên sản phẩm');if(!name)fail('Vui lòng nhập tên sản phẩm');
   const status=text(input.status||'need',12,'Trạng thái');
   if(!STATUSES.has(status))fail('Trạng thái mua hàng không hợp lệ');
+  const costQuantity=input.costQuantity===undefined||input.costQuantity===null||input.costQuantity===''?null:count(input.costQuantity,'Lượng quy đổi');
+  const costUnit=text(input.costUnit,30,'Đơn vị quy đổi');
+  if((costQuantity===null)!==(!costUnit) || (costQuantity!==null && costQuantity<=0))
+    fail('Nhập đủ lượng và đơn vị quy đổi, lượng phải lớn hơn 0');
   const result={
     name,category:text(input.category,80,'Nhóm hàng'),unit:text(input.unit,30,'Đơn vị')||'cái',
     stock:count(input.stock,'Tồn kho'),minimum:count(input.minimum,'Mức cảnh báo'),
     buyQuantity:count(input.buyQuantity,'Số lượng cần mua'),
-    purchaseUnitPrice:purchaseUnitPrice(input.purchaseUnitPrice),
+    purchaseUnitPrice:purchaseUnitPrice(input.purchaseUnitPrice),costQuantity,costUnit,
     purchaseDate:date(input.purchaseDate,'Ngày dự kiến mua'),
     lastPurchasedDate:date(input.lastPurchasedDate,'Ngày mua gần nhất'),
     supplier:text(input.supplier,120,'Nhà cung cấp'),
