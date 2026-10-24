@@ -20,11 +20,11 @@ let query='',filter='all';
 const labels={
   name:['Tên sản phẩm *','Product name *'],category:['Nhóm hàng','Category'],unit:['Đơn vị','Unit'],
   stock:['Tồn hiện tại','On hand'],minimum:['Báo gần hết khi ≤','Low-stock threshold'],
-  buyQuantity:['Số lượng cần mua','Quantity to purchase'],
-  purchaseUnitPrice:['Đơn giá mua (VNĐ / đơn vị)','Purchase unit price (VND / unit)'],
+  buyQuantity:['Số lượng mua','Purchase quantity'],
+  purchaseUnitPrice:['Giá mua mỗi đơn vị (VNĐ)','Unit purchase price (VND)'],
   purchaseDate:['Ngày dự kiến mua','Planned purchase date'],lastPurchasedDate:['Ngày mua gần nhất','Last purchased'],
-  supplier:['Nhà cung cấp (supplier)','Supplier'],supplierPhone:['SĐT / liên hệ','Supplier contact'],
-  purchaseLocation:['Mua tại đâu?','Purchase location'],
+  supplier:['Nhà cung cấp (supplier)','Supplier'],supplierPhone:['Số điện thoại','Phone number'],
+  purchaseLocation:['Mua ở đâu / nhà cung cấp','Where to buy / supplier'],
   status:['Trạng thái mua','Purchase status'],notes:['Ghi chú','Notes']
 };
 function visible(){return byId('tab-inventory')?.classList.contains('active') && (typeof isUserAdmin!=='function'||isUserAdmin());}
@@ -47,7 +47,7 @@ function init(){
  const root=byId('tab-inventory');if(!root)return;
  root.setAttribute('translate','no');root.setAttribute('data-i18n-preserve','');
  root.innerHTML=`<section class="inv-root" aria-label="Inventory">
- <div class="inv-heading"><div><p>MOM’S TEA & COFFEE · ADMIN</p><h2>📦 ${t('Inventory & Mua hàng','Inventory & Purchasing')}</h2><small>${t('Nguyên liệu, vật tư, bao bì và kế hoạch mua. Không tự động trừ tồn theo đơn bán.','Ingredients, supplies and purchasing plans. Sales do not automatically deduct stock.')}</small></div><button id="inv-refresh" type="button" class="inv-secondary">↻ ${t('Làm mới','Refresh')}</button></div>
+ <div class="inv-heading"><div><p>MOM’S TEA & COFFEE · ADMIN</p><h2>📦 ${t('Inventory & Mua hàng','Inventory & Purchasing')}</h2><small>${t('Ghi lại nơi mua, giá và lịch sử mua hàng — nhanh, rõ ràng.','Track purchases, prices and suppliers — simply and clearly.')}</small></div><button id="inv-refresh" type="button" class="inv-secondary">↻ ${t('Làm mới','Refresh')}</button></div>
  <div class="inv-summary" id="inv-summary"></div>
  <div class="inv-toolbar"><input id="inv-search" type="search" placeholder="${t('Tìm sản phẩm, nhà cung cấp, nơi mua…','Search items, suppliers, stores…')}" aria-label="${t('Tìm trong kho','Search inventory')}"><select id="inv-filter" aria-label="${t('Lọc tình trạng','Filter status')}">
  <option value="all">${t('Tất cả sản phẩm','All items')}</option>
@@ -57,30 +57,34 @@ function init(){
  <option value="ordered">${t('Đã đặt mua','Ordered')}</option>
  </select><button id="inv-add" type="button" class="inv-primary">+ ${t('Thêm sản phẩm','Add item')}</button></div>
  <div class="inv-grid"><div class="inv-list" id="inv-list" aria-live="polite"></div>
- <section class="inv-editor" aria-labelledby="inv-form-title"><h3 id="inv-form-title">${t('Thêm sản phẩm cần quản lý','Add inventory item')}</h3>
+ <section class="inv-editor" id="inv-editor" aria-labelledby="inv-form-title"><h3 id="inv-form-title">${t('Thêm sản phẩm cần quản lý','Add inventory item')}</h3>
  <form id="inv-form" autocomplete="off"><div class="inv-fields">
  ${field('name','text','required maxlength="120"')}
- ${field('category','text','maxlength="80" placeholder="Trà, sữa, topping, bao bì…"')}
+ ${field('purchaseLocation','text','maxlength="220" placeholder="Cửa hàng, chợ, nhà cung cấp…"')}
+ ${field('supplierPhone','tel','maxlength="40" autocomplete="tel" placeholder="Số điện thoại liên hệ"')}
+ ${field('purchaseUnitPrice','number','min="0" max="1000000000" step="1" inputmode="numeric" placeholder="Ví dụ: 35000"')}
+ ${field('lastPurchasedDate','date')}
+ <div class="inv-purchase-line inv-span">
+ ${field('buyQuantity','number','min="0" max="1000000" step="0.001" inputmode="decimal" required')}
+ <div class="inv-field inv-cost"><span>${t('Tổng tiền mua','Total purchase cost')}</span><output id="inv-estimated-total" aria-live="polite">—</output></div>
+ </div>
+ </div>
+ <div class="inv-field inv-photo-field"><span>${t('Ảnh sản phẩm (không bắt buộc)','Product photo (optional)')}</span><div class="inv-photo-line"><img id="inv-photo" alt="" hidden><div><input type="file" id="inv-file" accept="image/jpeg,image/png,image/webp" aria-label="${t('Chọn ảnh sản phẩm','Choose product photo')}"><button id="inv-remove-photo" type="button" class="inv-secondary">${t('Gỡ ảnh','Remove photo')}</button></div></div></div>
+ <details class="inv-advanced" id="inv-advanced"><summary>${t('Thông tin nâng cao (không bắt buộc)','More details (optional)')}</summary><div class="inv-fields inv-advanced-grid">
+ ${field('supplier','text','maxlength="120"')}
+ ${field('category','text','maxlength="80" placeholder="Trà, sữa, topping…"')}
  ${field('stock','number','min="0" max="1000000" step="0.001" required')}
  ${field('minimum','number','min="0" max="1000000" step="0.001" required')}
- ${field('buyQuantity','number','min="0" max="1000000" step="0.001" required')}
- ${field('unit','text','maxlength="30" placeholder="kg, lít, hộp, chai…"')}
- ${field('purchaseUnitPrice','number','min="0" max="1000000000" step="1" placeholder="25000"')}
- <div class="inv-field inv-cost"><span>${t('Tổng tiền mua dự kiến','Estimated purchase total')}</span><output id="inv-estimated-total" aria-live="polite">—</output></div>
+ ${field('unit','text','maxlength="30" placeholder="kg, thùng, hộp…"')}
  ${field('purchaseDate','date')}
- ${field('lastPurchasedDate','date')}
- ${field('supplier','text','maxlength="120"')}
- ${field('supplierPhone','tel','maxlength="40"')}
- ${field('purchaseLocation','text','maxlength="220" placeholder="Cửa hàng, chợ, địa chỉ, website…"')}
  <label class="inv-field"><span>${t(...labels.status)}</span><select name="status" id="inv-status">${Object.entries(statusText).map(([key,value])=>`<option value="${key}">${t(...value)}</option>`).join('')}</select></label>
  <label class="inv-field inv-span"><span>${t(...labels.notes)}</span><textarea name="notes" id="inv-notes" rows="2" maxlength="1200"></textarea></label>
- <div class="inv-field inv-span"><span>${t('Ảnh sản phẩm','Product photo')}</span><div class="inv-photo-line"><img id="inv-photo" alt="" hidden><div><input type="file" id="inv-file" accept="image/jpeg,image/png,image/webp"><small>${t('Ảnh tự giảm kích thước để lưu và đồng bộ.','Image is resized before saving and syncing.')}</small><button id="inv-remove-photo" type="button" class="inv-secondary">${t('Gỡ ảnh','Remove photo')}</button></div></div></div>
- </div><div class="inv-actions"><button id="inv-save" type="submit" class="inv-primary">${t('Lưu sản phẩm','Save item')}</button><button id="inv-delete" type="button" class="inv-danger" hidden>${t('Xóa sản phẩm','Delete item')}</button></div>
- </form><p class="inv-hint">${t('Tồn kho và ngày mua được nhập thủ công. Đánh dấu “Đã mua” không tự cộng tồn để tránh tính hai lần.','Stock counts and purchase dates are manual. Marking received does not change quantities automatically.')}</p></section></div>
+ </div></details><div class="inv-actions"><button id="inv-save" type="submit" class="inv-primary">${t('Lưu sản phẩm','Save item')}</button><button id="inv-delete" type="button" class="inv-danger" hidden>${t('Xóa sản phẩm','Delete item')}</button></div>
+ </form><p class="inv-hint">${t('Tổng tiền = giá mua × số lượng. Các trường tồn kho, trạng thái và ghi chú vẫn có trong Thông tin nâng cao.','Total = unit price × quantity. Stock, status and notes remain available under More details.')}</p></section></div>
  <p id="inventory-message" class="inv-message" role="status" aria-live="polite"></p>
  </section>`;
  byId('inv-refresh').onclick=()=>reload(true);
- byId('inv-add').onclick=()=>{if(!confirmLeave())return;activeId='';fill(null);drawList();};
+ byId('inv-add').onclick=()=>{if(!confirmLeave())return;activeId='';fill(null);drawList();byId('inv-editor')?.scrollIntoView?.({behavior:'smooth',block:'start'});};
  byId('inv-search').oninput=e=>{query=e.target.value.trim().toLocaleLowerCase();drawList();};
  byId('inv-filter').onchange=e=>{filter=e.target.value;drawList();};
  byId('inv-form').addEventListener('input',()=>{dirty=true;updateCostPreview();});
@@ -96,7 +100,8 @@ function fill(row){
  const form=byId('inv-form');if(!form)return;
  for(const input of form.elements){
    if(!input.name)continue;
-   let value=formValue(row,input.name,['stock','minimum','buyQuantity'].includes(input.name)?0:(input.name==='unit'?'cái':input.name==='status'?'need':''));
+   let value=formValue(row,input.name,['stock','minimum'].includes(input.name)?0:(input.name==='buyQuantity'?1:input.name==='unit'?'cái':input.name==='status'?'need':''));
+   if(input.name==='purchaseLocation'&&row&&!row.purchaseLocation&&row.supplier)value=row.supplier;
    input.value=String(value);
  }
  photo=row?.image||'';renderPhoto();byId('inv-file').value='';
@@ -117,18 +122,16 @@ function renderPhoto(){
  const preview=byId('inv-photo');preview.hidden=!photo;
  if(photo)preview.src=photo;else preview.removeAttribute('src');
 }
-function low(item){return Number(item.stock)<=Number(item.minimum);}
+function low(item){return Number(item.minimum)>0&&Number(item.stock)<=Number(item.minimum);}
 function due(item){
  if(!item.purchaseDate||item.status==='received')return false;
  return item.purchaseDate<=new Date(Date.now()+7*3600000).toISOString().slice(0,10);
 }
 function summary(){
  const counts=[
- [t('Tổng mặt hàng','Total items'),items.length],
- [t('Gần hết / hết hàng','Low stock'),items.filter(low).length],
- [t('Cần mua','To buy'),items.filter(x=>x.status==='need').length],
- [t('Đến hạn mua','Purchase due'),items.filter(due).length],
- [t('Dự toán mua (đã có giá)','Priced purchase budget'),money(items.filter(item=>item.status!=='received').reduce((sum,item)=>sum+(estimatedCost(item)??0),0))]
+ [t('Tổng sản phẩm','Items'),items.length],
+ [t('Gần hết hàng','Low stock'),items.filter(low).length],
+ [t('Tổng tiền mua','Total purchase cost'),money(items.reduce((sum,item)=>sum+(estimatedCost(item)??0),0))]
  ];
  byId('inv-summary').innerHTML=counts.map(([name,value])=>`<div><span>${esc(name)}</span><strong>${value}</strong></div>`).join('');
 }
@@ -143,13 +146,18 @@ function drawList(){
  }).sort((a,b)=>Number(low(b))-Number(low(a))||String(a.name).localeCompare(String(b.name),'vi'));
  byId('inv-list').innerHTML=filtered.length?filtered.map(item=>`<button class="inv-item ${item.id===activeId?'selected':''}" data-id="${esc(item.id)}" type="button">
  <span class="inv-thumb">${item.image?`<img src="${item.image}" alt="">`:'📦'}</span>
- <span class="inv-item-info"><strong>${esc(item.name)}</strong><small>${esc(item.supplier||t('Chưa có nhà cung cấp','No supplier'))}</small>
- <small>${esc(t('Tồn: ','Stock: '))}${esc(item.stock)} ${esc(item.unit)} · ${esc(t('Mua: ','Buy: '))}${esc(item.buyQuantity)} ${esc(item.unit)}</small>
- <small>${esc(t('Đơn giá mua: ','Unit cost: '))}${estimatedCost(item)===null?'—':esc(money(item.purchaseUnitPrice))} · ${esc(t('Thành tiền: ','Purchase total: '))}${estimatedCost(item)===null?'—':esc(money(estimatedCost(item)))}</small>
- <span class="inv-flags"><em class="inv-pill">${esc(t(...statusText[item.status]))}</em>${low(item)?`<em class="inv-pill inv-alert">${esc(t('⚠ Gần hết hàng','⚠ Low stock'))}</em>`:''}${due(item)?`<em class="inv-pill inv-due">${esc(t('📅 Đến hạn mua','📅 Due'))}</em>`:''}</span>
- ${item.purchaseDate?`<small>${esc(t('Dự kiến: ','Planned: '))}${esc(item.purchaseDate)}</small>`:''}
- </span></button>`).join(''):`<p class="inv-empty">${t('Chưa có sản phẩm phù hợp. Nhấn “Thêm sản phẩm” để bắt đầu.','No matching items. Select “Add item” to get started.')}</p>`;
- byId('inv-list').querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{if(!confirmLeave())return;activeId=b.dataset.id;fill(items.find(x=>x.id===activeId));drawList();});
+ <span class="inv-item-info">
+ <strong>${esc(item.name)}</strong>
+ <span class="inv-item-place">${esc(item.purchaseLocation||item.supplier||t('Chưa nhập nơi mua','Purchase location not set'))}</span>
+ ${item.supplierPhone?`<span class="inv-item-phone">☎ ${esc(item.supplierPhone)}</span>`:''}
+ <span class="inv-item-money"><b>${estimatedCost(item)===null?'—':esc(money(estimatedCost(item)))}</b><span>${estimatedCost(item)===null?esc(t('Chưa nhập giá','No price')):`${esc(money(item.purchaseUnitPrice))} × ${esc(item.buyQuantity)} ${esc(item.unit)}`}</span></span>
+ <span class="inv-flags"><em class="inv-pill">${esc(t(...statusText[item.status]))}</em>
+ ${low(item)?`<em class="inv-pill inv-alert">${esc(t('⚠ Gần hết hàng','⚠ Low stock'))}</em>`:''}
+ ${due(item)?`<em class="inv-pill inv-due">${esc(t('📅 Đến hạn mua','📅 Due'))}</em>`:''}
+ <em class="inv-pill inv-stock">${esc(t('Tồn: ','Stock: '))}${esc(item.stock)} ${esc(item.unit)}</em></span>
+ ${item.lastPurchasedDate?`<span class="inv-item-date">${esc(t('Mua gần nhất: ','Last purchased: '))}${esc(item.lastPurchasedDate)}</span>`:''}
+ </span></button>`).join(''):`<p class="inv-empty">${t('Chưa có sản phẩm. Chọn “Thêm sản phẩm” để bắt đầu.','No items yet. Select “Add item” to get started.')}</p>`;
+ byId('inv-list').querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{if(!confirmLeave())return;activeId=b.dataset.id;fill(items.find(x=>x.id===activeId));drawList();if(window.innerWidth<=920)byId('inv-editor')?.scrollIntoView?.({behavior:'smooth',block:'start'});});
 }
 async function reload(forced=false){
  if(!ready)return;if(busy)return;
