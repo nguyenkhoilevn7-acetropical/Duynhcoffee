@@ -6,13 +6,15 @@ const os=require('node:os');
 const path=require('node:path');
 const net=require('node:net');
 const {spawn}=require('node:child_process');
-const {emptyInventory,validateInventory,mutateInventory,validateItem}=require('../inventory');
+const {emptyInventory,validateInventory,mutateInventory,validateItem,purchaseTotal}=require('../inventory');
 const {validate:validateBackup,TAG}=require('../drive-backup');
-const baseItem={name:'Trà lài',category:'Nguyên liệu',unit:'kg',stock:2,minimum:3,buyQuantity:8,purchaseDate:'2026-10-26',supplier:'Nhà cung cấp A',supplierPhone:'0900 000 000',purchaseLocation:'Chợ đầu mối',status:'need',notes:'Gọi trước',image:''};
+const baseItem={name:'Trà lài',category:'Nguyên liệu',unit:'kg',stock:2,minimum:3,buyQuantity:8,purchaseDate:'2026-10-26',supplier:'Nhà cung cấp A',supplierPhone:'0900 000 000',purchaseLocation:'Chợ đầu mối',purchaseUnitPrice:25000,status:'need',notes:'Gọi trước',image:''};
 test('private purchasing records support optimistic updates and deletion',()=>{
  const empty=emptyInventory();assert.deepEqual(empty,{version:'',items:[]});
  const first=mutateInventory(empty,{version:'',action:'save',item:baseItem});
  assert.equal(first.items.length,1);assert.equal(first.items[0].supplier,'Nhà cung cấp A');
+ assert.equal(first.items[0].purchaseUnitPrice,25000);
+ assert.equal(purchaseTotal(first.items[0]),200000);
  const edited=mutateInventory(first,{version:first.version,action:'save',item:{...baseItem,id:first.items[0].id,status:'ordered',stock:4}});
  assert.equal(edited.items[0].stock,4);
  assert.equal(edited.items[0].createdAt,first.items[0].createdAt);
@@ -20,6 +22,18 @@ test('private purchasing records support optimistic updates and deletion',()=>{
  const removed=mutateInventory(edited,{version:edited.version,action:'delete',id:edited.items[0].id});
  assert.equal(removed.items.length,0);
  assert.notEqual(removed.version,edited.version);
+});
+test('purchase price is optional for older records, validates integer VND, and calculates totals',()=>{
+  const legacy={...baseItem};delete legacy.purchaseUnitPrice;
+  assert.equal(validateItem(legacy).purchaseUnitPrice,null);
+  assert.equal(purchaseTotal(validateItem(legacy)),null);
+  assert.equal(purchaseTotal(validateItem({...baseItem,purchaseUnitPrice:0})),0);
+  assert.equal(purchaseTotal(validateItem({...baseItem,buyQuantity:2.5,purchaseUnitPrice:24000})),60000);
+  assert.throws(()=>validateItem({...baseItem,purchaseUnitPrice:-1}),/Đơn giá mua/);
+  assert.throws(()=>validateItem({...baseItem,purchaseUnitPrice:2500.5}),/Đơn giá mua/);
+  assert.throws(()=>validateItem({...baseItem,purchaseUnitPrice:Infinity}),/Đơn giá mua/);
+  assert.throws(()=>validateItem({...baseItem,purchaseUnitPrice:'25000'}),/Đơn giá mua/);
+  assert.throws(()=>validateItem({...baseItem,purchaseUnitPrice:1000000001}),/Đơn giá mua/);
 });
 test('invalid image, impossible date, negative stock, oversized names are rejected',()=>{
  assert.throws(()=>validateItem({...baseItem,stock:-1}),/Tồn kho/);
@@ -81,5 +95,7 @@ test('authenticated inventory API persists, blocks public access and survives re
    const token=(await(await fetch(base+'/api/admin-push/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'test-inventory',password:'inventory-test-password'})})).json()).token;
    const saved=await(await fetch(endpoint,{headers:{Authorization:'Bearer '+token}})).json();
    assert.equal(saved.items[0].supplier,'Nhà cung cấp A');
+   assert.equal(saved.items[0].purchaseUnitPrice,25000);
+   assert.equal(purchaseTotal(saved.items[0]),200000);
  }finally{await stop();fs.rmSync(dir,{recursive:true,force:true});}
 });
