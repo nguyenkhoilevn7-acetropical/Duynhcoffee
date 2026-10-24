@@ -1,7 +1,7 @@
 'use strict';
 // Stock purchasing is private admin data; no public menu or order side effects.
 const crypto=require('node:crypto');
-const MAX_ITEMS=300;
+const MAX_ITEMS=150;
 const STATUSES=new Set(['need','planned','ordered','received']);
 const photoPattern=/^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/;
 function fail(message,status=422){const e=new Error(message);e.status=status;throw e;}
@@ -25,9 +25,9 @@ function date(value,label){
 }
 function image(value){
   if(value===undefined||value===null||value==='')return '';
-  if(typeof value!=='string'||value.length>480000)fail('Ảnh phải là JPEG, PNG hoặc WebP, tối đa 350 KB');
+  if(typeof value!=='string'||value.length>175000)fail('Ảnh phải là JPEG, PNG hoặc WebP, tối đa 120 KB');
   const m=photoPattern.exec(value);
-  if(!m||m[2].length%4!==0||Buffer.byteLength(m[2],'base64')>350*1024)fail('Ảnh không hợp lệ hoặc quá 350 KB');
+  if(!m||m[2].length%4!==0||Buffer.byteLength(m[2],'base64')>120*1024)fail('Ảnh không hợp lệ hoặc quá 350 KB');
   const b=Buffer.from(m[2],'base64');
   const sig={jpeg:b[0]===0xff&&b[1]===0xd8,png:b.slice(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])),webp:b.slice(0,4).toString()==='RIFF'&&b.slice(8,12).toString()==='WEBP'};
   if(!sig[m[1]])fail('Nội dung ảnh không khớp định dạng');
