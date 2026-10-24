@@ -3299,6 +3299,7 @@ body {
 @media(max-width:359px){#ios-custom-normal-actions{grid-template-columns:minmax(0,1fr)!important}}
 </style>
 <link rel="stylesheet" href="admin-recipes.css">
+<link rel="stylesheet" href="admin-inventory.css">
 <style>
 .customer-social-links{display:flex;align-items:center;justify-content:flex-start;gap:8px;flex-wrap:wrap;margin:12px 0 0}
 .customer-social-links .social-button{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;min-width:44px;height:44px;min-height:44px;padding:0;border:0;border-radius:50%;text-decoration:none;overflow:hidden}
@@ -3311,6 +3312,7 @@ body {
 .customer-social-links [hidden]{display:none!important}
 </style>
 <script src="admin-recipes.js" defer></script>
+<script src="admin-inventory.js" defer></script>
 <link rel="stylesheet" href="admin-profits.css">
 <script src="admin-profits.js" defer></script>
 <script src="menu-options.js" defer></script>
@@ -3470,6 +3472,7 @@ body {
         <button type="button" class="backend-tab-btn" id="btn-tab-menu" onclick="switchBackendTab('tab-menu', this)">
           🍵 Thực Đơn & Kho
         </button>
+        <button type="button" class="backend-tab-btn" id="btn-tab-inventory" onclick="switchBackendTab('tab-inventory', this)">📦 Inventory / Mua hàng</button>
         <button type="button" class="backend-tab-btn" id="btn-tab-discounts" onclick="switchBackendTab('tab-discounts', this)">
           🎟️ Khuyến Mãi <span class="tab-badge" id="badge-count-discounts">0</span>
         </button>
@@ -3821,6 +3824,7 @@ body {
       </div>
 
       <div id="tab-profits" class="backend-tab-content"></div>
+      <div id="tab-inventory" class="backend-tab-content"></div>
       <div id="tab-settings" class="backend-tab-content">
         <div style="max-width: 600px; background: #FFF; border: 1px solid var(--border); border-radius: 14px; padding: 24px;">
           <h3 style="color: var(--primary-dark); margin-bottom: 16px;">Cài Đặt Quán & Tài Khoản Ngân Hàng</h3>
@@ -10198,6 +10202,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
       if (tabId === 'tab-profits') {
         window.DuynhProfits?.open();
+      } else if (tabId === 'tab-inventory') {
+        window.MomInventory?.open();
       } else if (tabId === 'tab-banner') {
         loadBannerSettingsToAdmin();
       } else if (tabId === 'tab-all') {
