@@ -149,6 +149,7 @@ function drawList(){
  <span class="inv-item-info">
  <strong>${esc(item.name)}</strong>
  <span class="inv-item-place">${esc(item.purchaseLocation||item.supplier||t('Chưa nhập nơi mua','Purchase location not set'))}</span>
+ ${item.supplier&&item.supplier!==item.purchaseLocation?`<span class="inv-item-phone">${esc(t('Nhà cung cấp: ','Supplier: '))}${esc(item.supplier)}</span>`:''}
  ${item.supplierPhone?`<span class="inv-item-phone">☎ ${esc(item.supplierPhone)}</span>`:''}
  <span class="inv-item-money"><b>${estimatedCost(item)===null?'—':esc(money(estimatedCost(item)))}</b><span>${estimatedCost(item)===null?esc(t('Chưa nhập giá','No price')):`${esc(money(item.purchaseUnitPrice))} × ${esc(item.buyQuantity)} ${esc(item.unit)}`}</span></span>
  <span class="inv-flags"><em class="inv-pill">${esc(t(...statusText[item.status]))}</em>
