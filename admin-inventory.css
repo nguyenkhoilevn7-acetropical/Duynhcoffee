@@ -49,3 +49,51 @@
 @media(min-width:921px) and (max-width:1250px){.inv-summary{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:920px){.inv-grid{grid-template-columns:minmax(0,1fr)}.inv-list{max-height:430px}.inv-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.inv-fields{grid-template-columns:minmax(0,1fr)}.inv-heading h2{font-size:20px}.inv-summary{gap:8px}.inv-summary strong{font-size:21px}.inv-editor{padding:13px}.inv-toolbar>*{flex:1 1 100%}.inv-thumb{flex-basis:63px;width:63px;height:63px}}
+
+/* Quick edit: preserve optional stock fields without burdening everyday purchases. */
+.inv-root{font-size:16px;line-height:1.55;color:#173c2a}
+.inv-heading h2{font-size:27px;font-weight:800;line-height:1.2}
+.inv-heading p{font-size:12px}
+.inv-heading small{font-size:15px;line-height:1.5;color:#52685d}
+.inv-summary{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.inv-summary>div{padding:17px 16px;border-radius:14px;gap:8px}
+.inv-summary span{font-size:15px;color:#496253;font-weight:600}
+.inv-summary strong{font-size:25px;line-height:1.25;word-break:break-word}
+.inv-root input,.inv-root select,.inv-root textarea{font-size:16px;min-height:48px;padding:11px 13px;border-radius:10px}
+.inv-root button{min-height:48px;font-size:15px}
+.inv-grid{grid-template-columns:minmax(0,1fr) minmax(350px,1.12fr);gap:16px}
+.inv-editor{padding:20px;border-radius:16px}
+.inv-editor h3{font-size:21px;margin-bottom:17px}
+.inv-fields{gap:14px}
+.inv-field{gap:7px;font-size:15px;font-weight:700}
+.inv-field>span{color:#264c38}
+.inv-purchase-line{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:14px}
+.inv-cost output{min-height:48px;font-size:20px;padding:10px 13px;border-radius:10px}
+.inv-photo-field{margin-top:17px}
+.inv-photo-line{align-items:center;padding:12px;margin-top:7px;border-radius:12px}
+.inv-photo-line>img{width:76px;height:76px}
+.inv-photo-line input[type=file]{min-height:46px;padding:9px;font-size:14px;max-width:100%}
+.inv-photo-line button{align-self:flex-start}
+.inv-advanced{margin-top:15px;border:1px solid #d5e4d9;border-radius:11px;overflow:hidden;background:#fcfefd}
+.inv-advanced summary{cursor:pointer;list-style-position:inside;padding:14px 15px;color:#26583d;font-size:15px;font-weight:750}
+.inv-advanced summary:hover{background:#edf7ef}
+.inv-advanced[open] summary{border-bottom:1px solid #d5e4d9}
+.inv-advanced-grid{padding:15px}
+.inv-root .inv-item{min-height:115px;border-radius:14px;padding:15px;gap:14px}
+.inv-item-info{flex:1;gap:7px}
+.inv-item-info strong{font-size:18px;line-height:1.3;color:#194c35;font-weight:800}
+.inv-item-place{font-size:16px;color:#365d46;font-weight:600}
+.inv-item-phone,.inv-item-date{font-size:15px;color:#475f50}
+.inv-item-money{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin-top:3px}
+.inv-item-money b{font-size:21px;color:#145b36;font-variant-numeric:tabular-nums}
+.inv-item-money>span{font-size:15px;color:#496657}
+.inv-flags{gap:7px;margin:4px 0}
+.inv-pill{font-size:14px;padding:5px 10px;line-height:1.35;font-weight:650}
+.inv-pill.inv-stock{background:#eff3f0;color:#365a46}
+.inv-thumb{flex:0 0 78px;width:78px;height:78px}
+.inv-hint{font-size:14px;line-height:1.5}
+.inv-message{font-size:15px}
+.inv-toolbar{gap:10px}
+@media(max-width:920px){.inv-grid{grid-template-columns:minmax(0,1fr)}.inv-editor{order:-1}.inv-list{max-height:none;overflow:visible}.inv-summary{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:620px){.inv-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.inv-summary>div:last-child{grid-column:1/-1}.inv-summary>div{padding:13px}.inv-summary span{font-size:14px}.inv-summary strong{font-size:22px}.inv-heading h2{font-size:24px}.inv-editor{padding:15px}.inv-fields{grid-template-columns:minmax(0,1fr)}.inv-purchase-line{grid-template-columns:repeat(2,minmax(0,1fr))}.inv-item-money b{font-size:20px}.inv-root .inv-item{padding:12px}.inv-thumb{flex-basis:68px;width:68px;height:68px}.inv-advanced-grid{padding:12px}}
+@media(max-width:365px){.inv-purchase-line{grid-template-columns:minmax(0,1fr)}}
