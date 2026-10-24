@@ -29,6 +29,9 @@ test('purchase price is optional for older records, validates integer VND, and c
   assert.equal(purchaseTotal(validateItem(legacy)),null);
   assert.equal(purchaseTotal(validateItem({...baseItem,purchaseUnitPrice:0})),0);
   assert.equal(purchaseTotal(validateItem({...baseItem,buyQuantity:2.5,purchaseUnitPrice:24000})),60000);
+ assert.equal(validateItem({...baseItem,costQuantity:1000,costUnit:'g'}).costQuantity,1000);
+ assert.throws(()=>validateItem({...baseItem,costQuantity:1000,costUnit:''}),/quy đổi/);
+ assert.throws(()=>validateItem({...baseItem,costQuantity:0,costUnit:'ml'}),/quy đổi/);
   assert.throws(()=>validateItem({...baseItem,purchaseUnitPrice:-1}),/Đơn giá mua/);
   assert.throws(()=>validateItem({...baseItem,purchaseUnitPrice:2500.5}),/Đơn giá mua/);
   assert.throws(()=>validateItem({...baseItem,purchaseUnitPrice:Infinity}),/Đơn giá mua/);
@@ -55,7 +58,7 @@ test('Drive backup validates optional inventory while retaining old backup compa
 test('authenticated inventory API persists, blocks public access and survives restart',async()=>{
  const root=path.resolve(__dirname,'..');
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'mom-inventory-'));
- for(const name of ['server.js','inventory.js','profit-report.js','profit-excel.js','drink-recipes.js','menu-options.js','menu-ai.js','delivery.js','admin-push.js','drive-backup.js','receipt-verification.js','receipt-jobs.js','receipt-image.js']){
+ for(const name of ['server.js','inventory.js','inventory-cost.js','profit-report.js','profit-excel.js','drink-recipes.js','menu-options.js','menu-ai.js','delivery.js','admin-push.js','drive-backup.js','receipt-verification.js','receipt-jobs.js','receipt-image.js']){
    fs.copyFileSync(path.join(root,name),path.join(dir,name));
  }
  fs.writeFileSync(path.join(dir,'store_config.json'),JSON.stringify({adminAccount:{username:'test-inventory',password:'inventory-test-password'},banner:{images:[]}}));
@@ -80,6 +83,7 @@ test('authenticated inventory API persists, blocks public access and survives re
    assert.equal((await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,401);
    assert.equal((await fetch(base+'/inventory.json')).status,404);
    assert.equal((await fetch(base+'/inventory.js')).status,404);
+   assert.equal((await fetch(base+'/inventory-cost.js')).status,404);
    const session=await(await fetch(base+'/api/admin-push/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'test-inventory',password:'inventory-test-password'})})).json();
    assert.ok(session.token);
    const headers={'Content-Type':'application/json',Authorization:'Bearer '+session.token};
