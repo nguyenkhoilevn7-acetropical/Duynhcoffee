@@ -28,11 +28,17 @@ test('Inventory uses the existing admin tab; shows supplier, low stock and edits
   root.querySelector('#inv-minimum').value='4';
   root.querySelector('#inv-buyQuantity').value='10';
   root.querySelector('#inv-purchaseDate').value='2026-10-25';
+  root.querySelector('#inv-purchaseUnitPrice').value='25000';
+  root.querySelector('#inv-buyQuantity').dispatchEvent(new w.Event('input',{bubbles:true}));
+  assert.match(root.querySelector('#inv-estimated-total').textContent,/250.000 đ/);
   root.querySelector('#inv-purchaseLocation').value='Chợ đầu mối';
   root.querySelector('#inv-status').value='need';
   root.querySelector('#inv-form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
   await tick();
   assert.equal(state.items.length,1);assert.equal(state.items[0].purchaseLocation,'Chợ đầu mối');
+  assert.equal(state.items[0].purchaseUnitPrice,25000);
+  assert.match(root.querySelector('#inv-list').textContent,/250.000 đ/);
+  assert.match(root.querySelector('#inv-summary').textContent,/250.000 đ/);
   assert.match(root.querySelector('#inv-list').textContent,/Supply ABC/);
   assert.match(root.querySelector('#inv-list').textContent,/Gần hết hàng/);
   assert.equal(root.querySelectorAll('.inv-summary strong')[1].textContent,'1');
@@ -41,6 +47,8 @@ test('Inventory uses the existing admin tab; shows supplier, low stock and edits
   root.querySelector('#inv-form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
   await tick();
   assert.equal(state.items[0].status,'ordered');assert.equal(state.items[0].stock,5);
+  assert.equal(state.items[0].purchaseUnitPrice,25000);
+  assert.equal(root.querySelector('#inv-purchaseUnitPrice').value,'25000');
   root.querySelector('#inv-filter').value='ordered';
   root.querySelector('#inv-filter').dispatchEvent(new w.Event('change'));
   assert.equal(root.querySelectorAll('.inv-item').length,1);
