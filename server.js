@@ -22,6 +22,7 @@ const menuAI = createMenuAI();
 const profitReport = require('./profit-report');
 const { exportReport } = require('./profit-excel');
 const {validateOptions}=require('./menu-options');
+const {emptyInventory,validateInventory,mutateInventory}=require('./inventory');
 const {validateRecipe,createRecipeScanner,createRecipeTranslator,recipeSourceHash}=require('./drink-recipes');
 const recipeScanner=createRecipeScanner();
 const recipeTranslator=createRecipeTranslator();
@@ -35,6 +36,7 @@ const MENU_FILE = path.join(ROOT_DIR, 'menu.json');
 const PROFIT_FILE = path.join(ROOT_DIR, 'profit-settings.json');
 const RECIPES_FILE = path.join(ROOT_DIR, 'drink-recipes.json');
 const DISCOUNTS_FILE = path.join(ROOT_DIR, 'discounts.json');
+const INVENTORY_FILE = path.join(ROOT_DIR, 'inventory.json');
 
 // Lấy địa chỉ IP mạng nội bộ (Wi-Fi / LAN)
 function getLocalNetworkIp() {
@@ -78,7 +80,7 @@ function writeJsonFile(filePath, data) {
     fs.writeFileSync(temporary, JSON.stringify(data, null, 2), 'utf8');
     fs.renameSync(temporary, filePath);
     if (backupService && filePath === ORDERS_FILE) backupService.ordersChanged();
-    if (backupService && [CONFIG_FILE, MENU_FILE, DISCOUNTS_FILE, RECIPES_FILE, PROFIT_FILE].includes(filePath)) backupService.changed();
+    if (backupService && [CONFIG_FILE, MENU_FILE, DISCOUNTS_FILE, RECIPES_FILE, PROFIT_FILE, INVENTORY_FILE].includes(filePath)) backupService.changed();
     return true;
   } catch (err) {
     console.error(`Lỗi ghi file ${filePath}:`, err.message);
@@ -94,7 +96,7 @@ async function startApplication() {
 backupService = createBackup({
   dir: ROOT_DIR,
   ordersSnapshot: () => readJsonFile(ORDERS_FILE, []),
-  snapshot: () => ({ menu: menuCache, config: configCache, discounts: discountsCache, recipes: readJsonFile(RECIPES_FILE, {}), profitSettings: readJsonFile(PROFIT_FILE, profitReport.emptySettings()) }),
+  snapshot: () => ({ menu: menuCache, config: configCache, discounts: discountsCache, recipes: readJsonFile(RECIPES_FILE, {}), profitSettings: readJsonFile(PROFIT_FILE, profitReport.emptySettings()), inventory: readJsonFile(INVENTORY_FILE, emptyInventory()) }),
   apply: data => {
     menuCache = data.menu;
     // Secrets remain local and are never restored from Drive.
@@ -1077,6 +1079,23 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Owner-only inventory and purchasing plans. Never exposed via the menu or WebSocket.
+  if (pathname === '/api/admin/inventory') {
+    res.setHeader('Cache-Control', 'no-store');
+    if (!adminPush.verify((req.headers.authorization || '').replace(/^Bearer /, ''))) {
+      sendJson(res, 401, {error:'Vui lòng đăng nhập quản trị để xem kho hàng.'}); return;
+    }
+    try {
+      if (!['GET','POST'].includes(req.method)) {sendJson(res,405,{error:'Phương thức không được hỗ trợ.'});return;}
+      const current=validateInventory(readJsonFile(INVENTORY_FILE,emptyInventory()));
+      if (req.method==='GET') {sendJson(res,200,current);return;}
+      const next=mutateInventory(current,await parseRequestBody(req));
+      writeJsonFile(INVENTORY_FILE,next);
+      sendJson(res,200,{success:true,...next,backup:backupService.status()});
+    } catch(error) {sendJson(res,error.status||500,{error:error.message});}
+    return;
+  }
+
   // Finance uses private, authenticated endpoints and a separate persisted rate history.
   if (pathname === '/api/admin/profits' || pathname === '/api/admin/profits/settings' || pathname === '/api/admin/profits/export') {
     if (!adminPush.verify((req.headers.authorization || '').replace(/^Bearer /, ''))) {sendJson(res,401,{error:'Vui lòng đăng nhập lại quản trị để xem doanh thu và lợi nhuận.'});return;}
@@ -1234,7 +1253,7 @@ const server = http.createServer(async (req, res) => {
   // Source code and local data are not static assets.
   let normalized;
   try { normalized = path.posix.normalize(decodeURIComponent(cleanPath)); } catch { sendJson(res, 400, { error: 'Đường dẫn không hợp lệ' }); return; }
-  if (normalized.split('/').some(part => part.startsWith('.')) || ['profit-report.js', 'profit-excel.js', 'profit-settings.json', 'server.js', 'drink-recipes.js', 'drink-recipes.json', 'menu-ai.js', 'delivery.js', 'admin-push.js', 'drive-backup.js', 'receipt-verification.js', 'receipt-jobs.js', 'receipt-image.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || (normalized.startsWith('/test/') || normalized.startsWith('/scripts/')) || /\.(tmp|md)$/.test(normalized)) {
+  if (normalized.split('/').some(part => part.startsWith('.')) || ['inventory.js', 'inventory.json', 'profit-report.js', 'profit-excel.js', 'profit-settings.json', 'server.js', 'drink-recipes.js', 'drink-recipes.json', 'menu-ai.js', 'delivery.js', 'admin-push.js', 'drive-backup.js', 'receipt-verification.js', 'receipt-jobs.js', 'receipt-image.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || (normalized.startsWith('/test/') || normalized.startsWith('/scripts/')) || /\.(tmp|md)$/.test(normalized)) {
     sendJson(res, 404, { error: 'Không tìm thấy' }); return;
   }
   if (cleanPath === '/' || cleanPath === '/admin' || cleanPath === '/pos') {
