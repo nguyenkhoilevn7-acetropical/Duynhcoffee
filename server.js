@@ -23,6 +23,7 @@ const profitReport = require('./profit-report');
 const { exportReport } = require('./profit-excel');
 const {validateOptions}=require('./menu-options');
 const {emptyInventory,validateInventory,mutateInventory}=require('./inventory');
+const {recipeUnitCost}=require('./inventory-cost');
 const {validateRecipe,createRecipeScanner,createRecipeTranslator,recipeSourceHash}=require('./drink-recipes');
 const recipeScanner=createRecipeScanner();
 const recipeTranslator=createRecipeTranslator();
@@ -1108,12 +1109,19 @@ const server = http.createServer(async (req, res) => {
         sendJson(res,200,{success:true,version:updated.version});return;
       }
       if(req.method!=='GET' || pathname.endsWith('/settings')){sendJson(res,405,{error:'Phương thức không hỗ trợ.'});return;}
-      const report=profitReport.buildReport(readJsonFile(ORDERS_FILE,[]),settings,parsedUrl.query.date || profitReport.vnDay(new Date()));
+      const recipes=readJsonFile(RECIPES_FILE,{});
+      const inventory=validateInventory(readJsonFile(INVENTORY_FILE,emptyInventory()));
+      const report=profitReport.buildReport(readJsonFile(ORDERS_FILE,[]),settings,parsedUrl.query.date || profitReport.vnDay(new Date()),recipes,inventory);
       if(pathname.endsWith('/export')) {
         const bytes=exportReport(report);
         res.writeHead(200,{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':'attachment; filename="Mom-Profit-'+report.date+'.xlsx"','Content-Length':bytes.length,'Cache-Control':'no-store'});res.end(bytes);return;
       }
-      sendJson(res,200,{report,version:settings.version,menu:currentMenu.map(m=>({id:String(m.id),name:m.name,name_en:m.name_en,price:m.price,percent:settings.rates[String(m.id)]?.at(-1)?.percent??null}))});
+      sendJson(res,200,{report,version:settings.version,menu:currentMenu.map(m=>{
+        const valuation=recipeUnitCost(recipes[String(m.id)],inventory);
+        return {id:String(m.id),name:m.name,name_en:m.name_en,price:m.price,
+          percent:settings.rates[String(m.id)]?.at(-1)?.percent??null,
+          recipeUnitCost:valuation.cost,costIssues:valuation.missing.slice(0,12)};
+      })});
     } catch(error){sendJson(res,error.status||500,{error:error.message});}
     return;
   }
@@ -1253,7 +1261,7 @@ const server = http.createServer(async (req, res) => {
   // Source code and local data are not static assets.
   let normalized;
   try { normalized = path.posix.normalize(decodeURIComponent(cleanPath)); } catch { sendJson(res, 400, { error: 'Đường dẫn không hợp lệ' }); return; }
-  if (normalized.split('/').some(part => part.startsWith('.')) || ['inventory.js', 'inventory.json', 'profit-report.js', 'profit-excel.js', 'profit-settings.json', 'server.js', 'drink-recipes.js', 'drink-recipes.json', 'menu-ai.js', 'delivery.js', 'admin-push.js', 'drive-backup.js', 'receipt-verification.js', 'receipt-jobs.js', 'receipt-image.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || (normalized.startsWith('/test/') || normalized.startsWith('/scripts/')) || /\.(tmp|md)$/.test(normalized)) {
+  if (normalized.split('/').some(part => part.startsWith('.')) || ['inventory.js', 'inventory.json', 'inventory-cost.js', 'profit-report.js', 'profit-excel.js', 'profit-settings.json', 'server.js', 'drink-recipes.js', 'drink-recipes.json', 'menu-ai.js', 'delivery.js', 'admin-push.js', 'drive-backup.js', 'receipt-verification.js', 'receipt-jobs.js', 'receipt-image.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || (normalized.startsWith('/test/') || normalized.startsWith('/scripts/')) || /\.(tmp|md)$/.test(normalized)) {
     sendJson(res, 404, { error: 'Không tìm thấy' }); return;
   }
   if (cleanPath === '/' || cleanPath === '/admin' || cleanPath === '/pos') {

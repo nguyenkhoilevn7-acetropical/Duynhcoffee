@@ -22,6 +22,8 @@ const labels={
   stock:['Tồn hiện tại','On hand'],minimum:['Báo gần hết khi ≤','Low-stock threshold'],
   buyQuantity:['Số lượng mua','Purchase quantity'],
   purchaseUnitPrice:['Giá mua mỗi đơn vị (VNĐ)','Unit purchase price (VND)'],
+  costQuantity:['1 đơn vị mua chứa bao nhiêu (nếu khác đơn vị pha)','Contents per purchased unit (if different from recipe)'],
+  costUnit:['Đơn vị định lượng dùng pha (g, ml, cái…)','Recipe measurement unit (g, ml, each…)'],
   purchaseDate:['Ngày dự kiến mua','Planned purchase date'],lastPurchasedDate:['Ngày mua gần nhất','Last purchased'],
   supplier:['Nhà cung cấp (supplier)','Supplier'],supplierPhone:['Số điện thoại','Phone number'],
   purchaseLocation:['Mua ở đâu / nhà cung cấp','Where to buy / supplier'],
@@ -76,6 +78,9 @@ function init(){
  ${field('stock','number','min="0" max="1000000" step="0.001" required')}
  ${field('minimum','number','min="0" max="1000000" step="0.001" required')}
  ${field('unit','text','maxlength="30" placeholder="kg, thùng, hộp…"')}
+  <p class="inv-span inv-hint">${t('Để tính giá vốn từ công thức: giá mua theo kg/lít tự đổi g/ml. Nếu mua theo thùng/hộp, nhập lượng thực tế trong một thùng/hộp; ví dụ 1 hộp = 1.000 ml.','Recipe costs convert kg/liter to g/ml. For cartons/boxes enter actual usable quantity, e.g. 1 box = 1,000 ml.')}</p>
+  ${field('costQuantity','number','min="0.001" max="1000000" step="0.001" inputmode="decimal" placeholder="1000"')}
+  ${field('costUnit','text','maxlength="30" placeholder="ml, g, cái…"')}
  ${field('purchaseDate','date')}
  <label class="inv-field"><span>${t(...labels.status)}</span><select name="status" id="inv-status">${Object.entries(statusText).map(([key,value])=>`<option value="${key}">${t(...value)}</option>`).join('')}</select></label>
  <label class="inv-field inv-span"><span>${t(...labels.notes)}</span><textarea name="notes" id="inv-notes" rows="2" maxlength="1200"></textarea></label>
@@ -173,6 +178,7 @@ async function reload(forced=false){
 function dataFromForm(){
  const data=Object.fromEntries(new FormData(byId('inv-form')).entries());
  for(const key of ['stock','minimum','buyQuantity'])data[key]=Number(data[key]);
+ data.costQuantity=data.costQuantity===''?null:Number(data.costQuantity);
  data.purchaseUnitPrice=data.purchaseUnitPrice===''?null:Number(data.purchaseUnitPrice);
  data.image=photo;return data;
 }

@@ -1,6 +1,7 @@
 'use strict';
 // Private reporting data never travels through public menu/config/order snapshots.
 const crypto = require('node:crypto');
+const {recipeUnitCost}=require('./inventory-cost');
 const fail = (message,status=400) => Object.assign(new Error(message),{status});
 const forbidden = new Set(['__proto__','constructor','prototype']);
 function validId(id){return typeof id==='string' && /^[a-zA-Z0-9_-]{1,100}$/.test(id) && !forbidden.has(id);}
@@ -43,12 +44,18 @@ function allocate(total,weights){
  for(let i=0;i<remaining;i++)out[sorted[i%sorted.length].i]++;
  return out;
 }
-function orderFinancials(order,settings){
+function orderFinancials(order,settings,recipes={},inventory={items:[]}){
  const created=order.createdAtIso || order.createdAt;
  const source=Array.isArray(order.items)?order.items:[];
  const lines=source.map((item,index)=>{
   const qty=Number(item.qty),price=money(item.price);const gross=item.total!==undefined && item.total!==null?money(item.total):(price!==null&&Number.isFinite(qty)?Math.round(price*qty):null);
-  return {itemId:String(item.id??''),name:String(item.name||'Món không có tên').slice(0,300),qty,unitPrice:price,gross,index,percent:rateAt(settings,item.id,created)};
+  const recipe=recipes[String(item.id)];
+  const estimate=recipeUnitCost(recipe,inventory);
+  // Extras/toppings need their own costs: fall back to configured percentage instead of undercounting.
+  const hasExtras=Array.isArray(item.toppings)&&item.toppings.length>0;
+  return {itemId:String(item.id??''),name:String(item.name||'Món không có tên').slice(0,300),qty,unitPrice:price,gross,index,percent:rateAt(settings,item.id,created),
+    recipeCost:hasExtras?null:estimate.cost,recipeIssues:hasExtras?['Topping cần giá vốn riêng']:estimate.missing};
+  
  });
  let revenue=money(order.beverageTotal)??money(order.total)??money(order.subtotal);
  const gross=lines.reduce((s,l)=>s+(l.gross||0),0);
@@ -56,16 +63,19 @@ function orderFinancials(order,settings){
  if(revenue===null)revenue=0;
  const allocated=allocate(Math.min(revenue,gross),lines.map(l=>l.gross||0));
  for(const [i,line] of lines.entries()){
-  line.revenue=allocated[i];line.cost=invalid||line.percent===null?null:Math.round(line.gross*line.percent/100);
+  line.revenue=allocated[i];
+  line.cost=invalid?null:line.recipeCost!==null?Math.round(line.recipeCost*line.qty):
+    line.percent===null?null:Math.round(line.gross*line.percent/100);
+  line.costSource=line.cost===null?'missing':line.recipeCost!==null?'recipe':'percentage';
   line.profit=line.cost===null?null:line.revenue-line.cost;
  }
  const missing=lines.filter(l=>l.cost===null).length;
  const cost=lines.reduce((s,l)=>s+(l.cost||0),0);
  return {lines,revenue,gross,discount:Math.max(0,gross-revenue),cost:invalid||missing?null:cost,knownCost:cost,profit:invalid||missing?null:revenue-cost,missing,invalid};
 }
-function buildReport(orders,settings,day=vnDay(new Date())){
+function buildReport(orders,settings,day=vnDay(new Date()),recipes={},inventory={items:[]}){
  validDay(day);validateSettings(settings);
- const summary={received:0,completed:0,cancelled:0,pending:0,quantity:0,revenue:0,shipping:0,cost:0,profit:0,missingOrders:0,invalidOrders:0,legacyDateOrders:0};
+ const summary={received:0,completed:0,cancelled:0,pending:0,quantity:0,revenue:0,shipping:0,cost:0,profit:0,missingOrders:0,invalidOrders:0,legacyDateOrders:0,recipeLines:0,percentageLines:0};
  const reportOrders=[],itemMap=new Map();
  for(const order of orders){
   const created=order.createdAtIso||order.createdAt,createdDay=vnDay(created);
@@ -73,7 +83,7 @@ function buildReport(orders,settings,day=vnDay(new Date())){
   const done=order.status==='done',cancelled=order.status==='cancelled';
   const event=done?(order.completedAtIso||created):cancelled?(order.cancelledAtIso||created):created;
   if(vnDay(event)!==day)continue;
-  const f=orderFinancials(order,settings);
+  const f=orderFinancials(order,settings,recipes,inventory);
   const row={id:String(order.id||''),status:String(order.status||'new'),createdAt:created||'',eventAt:event||'',dateFallback:(done&&!order.completedAtIso)||(cancelled&&!order.cancelledAtIso),amount:f.revenue,shipping:money(order.shippingFee)||0,revenue:done?f.revenue:0,cost:done?f.cost:null,profit:done?f.profit:null,discount:f.discount,missing:done?f.missing:0,invalid:done?f.invalid:false,lines:done?f.lines:[]};
   reportOrders.push(row);
   if(row.dateFallback)summary.legacyDateOrders++;
@@ -89,10 +99,12 @@ function buildReport(orders,settings,day=vnDay(new Date())){
    const m=itemMap.get(key);m.qty+=Number.isFinite(line.qty)?line.qty:0;m.gross+=line.gross||0;m.revenue+=line.revenue;
    summary.quantity+=Number.isFinite(line.qty)?line.qty:0;
    if(line.cost===null)m.missing++;else{m.knownCost+=line.cost;m.knownProfit+=line.profit;}
+   if(line.costSource==='recipe')summary.recipeLines++;
+   if(line.costSource==='percentage')summary.percentageLines++;
    if(!m.percents.includes(line.percent))m.percents.push(line.percent);
   }
  }
  const items=[...itemMap.values()].map(m=>({...m,cost:m.missing?null:m.knownCost,profit:m.missing?null:m.knownProfit,unitProfit:m.missing||!m.qty?null:m.knownProfit/m.qty})).sort((a,b)=>b.revenue-a.revenue);
- return {date:day,timeZone:'Asia/Ho_Chi_Minh',summary:{...summary,cost:summary.missingOrders?null:summary.cost,profit:summary.missingOrders?null:summary.profit},orders:reportOrders.sort((a,b)=>String(b.eventAt).localeCompare(String(a.eventAt))),items};
+ return {date:day,timeZone:'Asia/Ho_Chi_Minh',costing:'current_inventory_estimate_with_historical_percentage_fallback',summary:{...summary,cost:summary.missingOrders?null:summary.cost,profit:summary.missingOrders?null:summary.profit},orders:reportOrders.sort((a,b)=>String(b.eventAt).localeCompare(String(a.eventAt))),items};
 }
 module.exports={emptySettings,validateSettings,updateSettings,vnDay,validDay,rateAt,allocate,orderFinancials,buildReport};
