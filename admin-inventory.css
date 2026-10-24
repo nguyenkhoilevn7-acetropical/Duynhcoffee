@@ -8,7 +8,7 @@
 .inv-heading h2{font-size:23px;margin:2px 0 4px;color:#194c35}
 .inv-heading p{font-weight:700;font-size:11px;letter-spacing:1.3px;color:#64748b;margin:0}
 .inv-heading small{display:block;color:#64748b;max-width:780px}
-.inv-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.inv-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:18px}
 .inv-summary>div{border:1px solid #dce7df;background:#fff;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:6px;box-shadow:0 2px 8px #1535200a}
 .inv-summary span{color:#62766b;font-size:12px}.inv-summary strong{font-size:25px;color:#1d5139;font-variant-numeric:tabular-nums}
 .inv-toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
@@ -36,6 +36,7 @@
 .inv-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
 .inv-field{display:flex;flex-direction:column;gap:6px;min-width:0;font-weight:600}
 .inv-field span{color:#3c5748}.inv-field input,.inv-field select,.inv-field textarea{font-weight:400}
+.inv-cost output{display:flex;align-items:center;min-height:43px;padding:8px 11px;border:1px solid #b8d9c4;border-radius:8px;background:#e8f5ea;color:#155734;font-weight:800;font-variant-numeric:tabular-nums}
 .inv-span{grid-column:1/-1}.inv-root textarea{resize:vertical}
 .inv-photo-line{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;border:1px dashed #c6d9cb;background:#f8fbf9;padding:12px;border-radius:10px}
 .inv-photo-line>img{width:112px;height:112px;border-radius:9px;object-fit:contain;background:#fff}
@@ -45,5 +46,6 @@
 .inv-hint{color:#66776a;margin:12px 0 0;font-size:12px}
 .inv-message{margin:14px 0;min-height:20px;color:#17623b;font-weight:600}
 .inv-message.inv-error{color:#b42318}
+@media(min-width:921px) and (max-width:1250px){.inv-summary{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:920px){.inv-grid{grid-template-columns:minmax(0,1fr)}.inv-list{max-height:430px}.inv-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.inv-fields{grid-template-columns:minmax(0,1fr)}.inv-heading h2{font-size:20px}.inv-summary{gap:8px}.inv-summary strong{font-size:21px}.inv-editor{padding:13px}.inv-toolbar>*{flex:1 1 100%}.inv-thumb{flex-basis:63px;width:63px;height:63px}}
