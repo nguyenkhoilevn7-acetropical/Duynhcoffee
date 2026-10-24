@@ -68,3 +68,78 @@ test('Inventory item names are escaped instead of injecting arbitrary HTML',asyn
   assert.match(w.document.querySelector('#inv-list').textContent,/<img/);
  }finally{w.close();}
 });
+
+
+test('Quick-edit layout keeps the essential fields visible and hides advanced inputs by default',async()=>{
+ const dom=new JSDOM('<div id="tab-inventory" class="backend-tab-content active"></div>',{url:'https://mom.example/',runScripts:'outside-only'});
+ const w=dom.window;const d=w.document;
+ try{
+  w.isUserAdmin=()=>true;w.getCloudApiUrl=p=>p;w.AbortSignal.timeout=()=>undefined;
+  w.fetch=async()=>({ok:true,json:async()=>emptyInventory()});
+  w.eval(js);w.MomInventory.open();await tick();
+  const form=d.querySelector('#inv-form'),advanced=d.querySelector('#inv-advanced');
+  assert.ok(form&&advanced);
+  assert.equal(advanced.open,false);
+  for(const key of ['name','purchaseLocation','supplierPhone','purchaseUnitPrice','lastPurchasedDate','buyQuantity']){
+   assert.ok(d.querySelector('#inv-'+key));
+   assert.equal(d.querySelector('#inv-'+key).closest('details'),null,'primary field should be visible: '+key);
+  }
+  for(const key of ['stock','minimum','supplier','category','unit','status','notes','purchaseDate']){
+   assert.equal(d.querySelector('#inv-'+key)?.closest('details'),advanced,'advanced field should stay optional: '+key);
+  }
+  assert.ok(d.querySelector('#inv-file'),'optional product image must remain');
+  assert.equal(d.querySelector('#inv-buyQuantity').value,'1');
+  d.querySelector('#inv-purchaseUnitPrice').value='35000';
+  d.querySelector('#inv-purchaseUnitPrice').dispatchEvent(new w.Event('input',{bubbles:true}));
+  assert.match(d.querySelector('#inv-estimated-total').textContent,/35.000 đ/);
+  assert.equal(d.querySelectorAll('.inv-summary > div').length,3);
+ }finally{w.close();}
+});
+test('Editing a legacy item keeps stock, supplier and notes even when advanced panel stays closed',async()=>{
+ const dom=new JSDOM('<div id="tab-inventory" class="backend-tab-content active"></div>',{url:'https://mom.example/',runScripts:'outside-only'});
+ const w=dom.window;const d=w.document;
+ let state=mutateInventory(emptyInventory(),{version:'',action:'save',item:{
+  name:'Sữa tươi',supplier:'Đại lý A',supplierPhone:'0901234567',category:'Sữa',unit:'thùng',
+  stock:5,minimum:8,buyQuantity:2,purchaseUnitPrice:120000,lastPurchasedDate:'2026-10-01',
+  status:'ordered',notes:'Mua thùng nguyên',purchaseDate:'2026-10-30'
+ }});
+ try{
+  w.isUserAdmin=()=>true;w.getCloudApiUrl=p=>p;w.confirm=()=>true;w.AbortSignal.timeout=()=>undefined;
+  w.localStorage.setItem('duynh_admin_api_token','test-token');
+  w.fetch=async(_path,options={})=>{
+   if(options.method==='POST'){state=mutateInventory(state,JSON.parse(options.body));return {ok:true,json:async()=>state};}
+   return {ok:true,json:async()=>state};
+  };
+  w.eval(js);w.MomInventory.open();await tick();
+  d.querySelector('.inv-item').click();
+  assert.equal(d.querySelector('#inv-advanced').open,false);
+  assert.equal(d.querySelector('#inv-purchaseLocation').value,'Đại lý A');
+  assert.equal(d.querySelector('#inv-buyQuantity').value,'2');
+  d.querySelector('#inv-purchaseUnitPrice').value='125000';
+  d.querySelector('#inv-form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
+  await tick();
+  assert.equal(state.items[0].purchaseUnitPrice,125000);
+  assert.equal(state.items[0].purchaseLocation,'Đại lý A');
+  assert.equal(state.items[0].supplier,'Đại lý A');
+  assert.equal(state.items[0].stock,5);
+  assert.equal(state.items[0].minimum,8);
+  assert.equal(state.items[0].unit,'thùng');
+  assert.equal(state.items[0].notes,'Mua thùng nguyên');
+  assert.equal(state.items[0].status,'ordered');
+  assert.match(d.querySelector('#inv-list').textContent,/250.000 đ/);
+  assert.match(d.querySelector('#inv-list').textContent,/Tồn: 5 thùng/);
+ }finally{w.close();}
+});
+test('Inventory remains bilingual without changing the site translation engine',async()=>{
+ const dom=new JSDOM('<div id="tab-inventory" class="backend-tab-content active"></div>',{url:'https://mom.example/',runScripts:'outside-only'});
+ const w=dom.window;
+ try{
+  w.document.documentElement.lang='en';
+  w.isUserAdmin=()=>true;w.getCloudApiUrl=p=>p;w.AbortSignal.timeout=()=>undefined;
+  w.fetch=async()=>({ok:true,json:async()=>emptyInventory()});
+  w.eval(js);w.MomInventory.open();await tick();
+  assert.match(w.document.querySelector('#inv-form').textContent,/Where to buy \/ supplier/);
+  assert.match(w.document.querySelector('#inv-form').textContent,/Total purchase cost/);
+  assert.match(w.document.querySelector('#inv-advanced summary').textContent,/More details/);
+ }finally{w.close();}
+});
