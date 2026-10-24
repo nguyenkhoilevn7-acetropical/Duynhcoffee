@@ -17,6 +17,20 @@ function count(value,label){
     fail(label+' phải là số từ 0 đến 1.000.000 (tối đa 3 số thập phân)');
   return value;
 }
+// The price is optional; null means not provided, while 0 is a real entered price.
+function purchaseUnitPrice(value){
+  if(value===undefined||value===null||value==='')return null;
+  if(typeof value!=='number'||!Number.isSafeInteger(value)||value<0||value>1000000000)
+    fail('Đơn giá mua phải là số nguyên VNĐ từ 0 đến 1.000.000.000');
+  return value;
+}
+function purchaseTotal(item){
+  const price=item?.purchaseUnitPrice;
+  if(price===undefined||price===null)return null;
+  const total=Math.round(Number(item.buyQuantity||0)*price);
+  if(!Number.isSafeInteger(total)||total<0)fail('Thành tiền mua vượt giới hạn cho phép');
+  return total;
+}
 function date(value,label){
   const s=text(value,10,label);
   if(!s)return '';
@@ -38,10 +52,11 @@ function validateItem(input){
   const name=text(input.name,120,'Tên sản phẩm');if(!name)fail('Vui lòng nhập tên sản phẩm');
   const status=text(input.status||'need',12,'Trạng thái');
   if(!STATUSES.has(status))fail('Trạng thái mua hàng không hợp lệ');
-  return {
+  const result={
     name,category:text(input.category,80,'Nhóm hàng'),unit:text(input.unit,30,'Đơn vị')||'cái',
     stock:count(input.stock,'Tồn kho'),minimum:count(input.minimum,'Mức cảnh báo'),
     buyQuantity:count(input.buyQuantity,'Số lượng cần mua'),
+    purchaseUnitPrice:purchaseUnitPrice(input.purchaseUnitPrice),
     purchaseDate:date(input.purchaseDate,'Ngày dự kiến mua'),
     lastPurchasedDate:date(input.lastPurchasedDate,'Ngày mua gần nhất'),
     supplier:text(input.supplier,120,'Nhà cung cấp'),
@@ -49,6 +64,8 @@ function validateItem(input){
     purchaseLocation:text(input.purchaseLocation,220,'Nơi mua'),
     status,notes:text(input.notes,1200,'Ghi chú'),image:image(input.image)
   };
+  purchaseTotal(result);
+  return result;
 }
 function validateInventory(data){
   if(!data||typeof data!=='object'||Array.isArray(data)||!Array.isArray(data.items)||data.items.length>MAX_ITEMS)fail('Kho hàng không hợp lệ');
@@ -83,4 +100,4 @@ function mutateInventory(source,request){
   }else fail('Hành động không được hỗ trợ',400);
   return {version:crypto.randomUUID(),items};
 }
-module.exports={emptyInventory,validateInventory,validateItem,mutateInventory};
+module.exports={emptyInventory,validateInventory,validateItem,mutateInventory,purchaseTotal};
