@@ -1,0 +1,46 @@
+name: Read-only predeploy order fingerprint (temporary)
+on:
+  push:
+    branches:
+      - 'predeploy/verify-mom-orders-20261025'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Compare live orders to recent Google Drive backup without printing PII
+        env:
+          EXPECTED_HASH: 1670231d20b63ed070587f4dd4d538d6dbafd37c2ec8d137fd171aaf7d07b27a
+        run: |
+          node <<'NODE'
+          const crypto = require('node:crypto');
+          const wanted = process.env.EXPECTED_HASH;
+          const url = 'https://mom-bd4h.onrender.com/api/orders';
+          async function check() {
+            let lastErr;
+            for (let i=0; i<4; i++) {
+              try {
+                const res = await fetch(url, {signal: AbortSignal.timeout(25000)});
+                if (!res.ok) throw new Error('Read-only endpoint HTTP '+res.status);
+                const data = await res.json();
+                if (!Array.isArray(data)) throw new Error('Unexpected order data shape');
+                const list = data.map(o => ({
+                  id: o.id,
+                  status: o.status,
+                  total: o.total,
+                  paymentStatus: o.paymentStatus,
+                  itemCount: Array.isArray(o.items) ? o.items.length : 0
+                })).sort((a,b)=>a.id.localeCompare(b.id));
+                const fingerprint = crypto.createHash('sha256').update(JSON.stringify(list)).digest('hex');
+                console.log('Live count:', data.length, '| Backup count: 1');
+                console.log('Exact order metadata match:', fingerprint === wanted ? 'YES' : 'NO');
+                if (fingerprint !== wanted) throw new Error('Live data has changed since backup; STOP deploy');
+                return;
+              } catch(e) { lastErr=e; if (String(e).includes('STOP deploy')) throw e; }
+            }
+            throw lastErr;
+          }
+          check().catch(e => { console.error(e.message); process.exitCode=1; });
+          NODE
