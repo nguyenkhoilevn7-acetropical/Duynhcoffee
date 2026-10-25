@@ -26,7 +26,7 @@ test('new order cancel stays right and address is emphasized for new, prep and s
  assert.match(newCard,/class="btn-isolated-cancel ios-order-cancel"/);
  assert.match(newCard,/class="ios-order-address"/);
  assert.match(prep,/class="ios-order-address"/);
- assert.match(shipping,/class=\\"ios-order-address\\"/);
+ assert.match(shipping,/class="ios-order-address"/);
  assert.match(iosCss,/#view-backend \.ios-order-cancel\s*{[^}]*margin-left:\s*auto\s*!important/s);
  assert.match(iosCss,/#view-backend \.ios-order-address\s*{[^}]*font-weight:\s*750\s*!important/s);
 });
