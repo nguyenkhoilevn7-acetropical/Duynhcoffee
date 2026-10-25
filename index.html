@@ -3311,7 +3311,7 @@ body {
 .customer-social-links .social-button:focus-visible{outline:3px solid #F59E0B;outline-offset:3px}
 .customer-social-links [hidden]{display:none!important}
 </style>
-<script src="admin-recipes.js" defer></script>
+<script src="admin-recipes.js?v=20261025-2" defer></script>
 <script src="admin-inventory.js" defer></script>
 <link rel="stylesheet" href="admin-profits.css">
 <script src="admin-profits.js" defer></script>
@@ -3319,8 +3319,8 @@ body {
 <script src="site-i18n.js" defer></script>
 <script src="admin-notifications.js" defer></script>
   <!-- Admin-only iOS-inspired layout; operational handlers remain unchanged -->
-  <link rel="stylesheet" href="admin-ios.css?v=20261025-1">
-  <script src="admin-ios.js?v=20261025-1" defer></script>
+  <link rel="stylesheet" href="admin-ios.css?v=20261025-2">
+  <script src="admin-ios.js?v=20261025-2" defer></script>
 </head>
 <body>
 
@@ -9162,29 +9162,27 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         <div class="backend-order-card new-order-card-blinking" id="card-${o.id}">
           <div>
             <!-- HEADER THẺ ĐƠN MỚI CHỜ DUYỆT -->
-            <div style="display: flex; align-items: center; justify-content: space-between; background: linear-gradient(135deg, #FEF3C7, #FDE68A); color: #92400E; padding: 8px 12px; border-radius: 10px; font-size: 0.84rem; font-weight: 800; margin-bottom: 10px; border: 1px solid #FCD34D;">
-              <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="ios-order-alert-header" style="display: flex; align-items: center; justify-content: space-between; background: linear-gradient(135deg, #FEF3C7, #FDE68A); color: #92400E; padding: 8px 12px; border-radius: 10px; font-size: 0.84rem; font-weight: 800; margin-bottom: 10px; border: 1px solid #FCD34D;">
+              <div class="ios-order-alert-label" style="display: flex; align-items: center; gap: 8px;">
                 <span class="new-order-live-dot"></span>
                 <span>${o.isLocalTest ? '🧪 ĐƠN THỬ — CHỈ TRÊN THIẾT BỊ NÀY' : '🔔 ĐƠN MỚI CHỜ DUYỆT'}</span>
               </div>
-              <button type="button" class="btn-isolated-cancel" onclick="openCancelConfirmModal('${o.id}')" title="Hủy đơn">
+              <button type="button" class="btn-isolated-cancel ios-order-cancel" onclick="openCancelConfirmModal('${o.id}')" title="Hủy đơn">
                 🗑️ Hủy Đơn
               </button>
             </div>
 
-            <!-- THÔNG TIN ĐƠN HÀNG VÀ BỘ ĐẾM GIÂY CHẠY LIÊN TỤC -->
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-              <div>
-                <div style="font-size: 1.25rem; font-weight: 900; color: #0F172A; letter-spacing: -0.5px;">${o.id}</div>
-                <div style="font-size: 0.86rem; font-weight: 700; color: #1E293B;">Khách: <b>${cleanCorruptedText(o.customerName || 'Khách')}</b> • 📞 ${o.phone || ''}</div>
-                <div style="font-size: 0.78rem; color: #64748B;">📍 ${cleanCorruptedText(o.deliveryAddress || 'Giao hàng tận nơi')}</div>
+            <!-- ORDER DETAILS: READABLE ADDRESS, WAITING TIME LEFT, CLOCK RIGHT -->
+            <div class="ios-order-summary">
+              <div class="ios-order-code">${o.id}</div>
+              <div class="ios-order-customer">Khách: <b>${cleanCorruptedText(o.customerName || 'Khách')}</b> • 📞 ${o.phone || ''}</div>
+              <div class="ios-order-address">📍 ${cleanCorruptedText(o.deliveryAddress || 'Giao hàng tận nơi')}</div>
+            </div>
+            <div class="ios-order-timing">
+              <div class="live-wait-timer-badge">
+                <span>⏳</span> Đã chờ: <span class="live-wait-timer" data-time="${createdTimeIso}">${currentWaitText}</span>
               </div>
-              <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-                <div style="font-size: 0.8rem; font-weight: 700; color: #92400E; background: #FDE68A; padding: 2px 8px; border-radius: 6px;">⏰ ${o.time || '--:--'}</div>
-                <div class="live-wait-timer-badge">
-                  <span>⏳</span> Đã chờ: <span class="live-wait-timer" data-time="${createdTimeIso}">${currentWaitText}</span>
-                </div>
-              </div>
+              <div class="ios-order-clock">⏰ ${o.time || '--:--'}</div>
             </div>
 
             <!-- MÓN ĂN VỚI HÌNH ẢNH TO RÕ -->
@@ -9295,7 +9293,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
               <div>
                 <div style="font-size: 1.25rem; font-weight: 900; color: #0F172A; letter-spacing: -0.5px;">${o.id}</div>
                 <div style="font-size: 0.88rem; font-weight: 700; color: #1E293B; margin-top: 2px;">Khách: <b>${cleanCorruptedText(o.customerName || 'Khách')}</b> • 📞 ${o.phone || ''}</div>
-                <div style="font-size: 0.8rem; color: #64748B; margin-top: 2px;">📍 ${cleanCorruptedText(o.deliveryAddress || 'Giao hàng tận nơi')}</div>
+                <div class="ios-order-address" style="margin-top: 2px;">📍 ${cleanCorruptedText(o.deliveryAddress || 'Giao hàng tận nơi')}</div>
               </div>
               <div style="text-align: right;">
                 <div style="font-size: 0.82rem; font-weight: 800; color: var(--accent); background: #DCFCE7; padding: 3px 8px; border-radius: 6px;">${formatMoney(o.beverageTotal || o.total)}</div>
@@ -9502,7 +9500,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         '<div style="background:#FFF7ED;color:#9A3412;padding:9px 12px;border-radius:9px;font-weight:800;">' + label + '</div>' +
         '<div style="display:flex;justify-content:space-between;align-items:start;gap:12px;margin:12px 0;">' +
         '<div><h3 style="margin:0;color:#0F172A;">' + id + '</h3><div style="font-weight:700;color:#334155;">Khách: ' + safe(cleanCorruptedText(order.customerName || 'Khách')) + ' • 📞 ' + safe(order.phone || '') + '</div>' +
-        '<div style="font-size:.82rem;color:#64748B;">📍 ' + safe(cleanCorruptedText(order.deliveryAddress || order.address || 'Giao hàng tận nơi')) + '</div></div>' +
+        '<div class="ios-order-address">📍 ' + safe(cleanCorruptedText(order.deliveryAddress || order.address || 'Giao hàng tận nơi')) + '</div></div>' +
         '<b style="color:#166534;white-space:nowrap;">' + formatMoney(order.beverageTotal ?? order.total) + '</b></div>' +
         '<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:10px 12px;margin:10px 0;">' +
         '<b style="font-size:.82rem;color:#475569;">MÓN KHÁCH ĐẶT</b>' + (items || '<p>Chưa có chi tiết món</p>') + '</div>' +

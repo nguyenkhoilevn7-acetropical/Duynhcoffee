@@ -119,15 +119,21 @@
     }
     const current=state,serial=requestId,revision=++state.langRevision;
     if(lang==='vi'){state.lang='vi';state.translating=false;localStorage.setItem('duynh_recipe_lang','vi');el('recipe-message').textContent='';renderView();return;}
-    if(!state.recipe){el('recipe-message').textContent='Anh tạo hoặc tải ảnh công thức trước để dịch sang tiếng Anh.';return;}
-    if(!state.translation && state.recipe.english && !state.custom)state.translation={english:state.recipe.english,custom_en:''};
+    // English must remain usable even before a recipe has been saved. If there
+    // are customer requests, translate those through the existing verified API.
+    if(!state.recipe && !state.custom.trim()){
+      state.lang='en';state.translating=false;
+      localStorage.setItem('duynh_recipe_lang','en');
+      el('recipe-message').textContent='';renderView();return;
+    }
+    if(!state.translation && state.recipe?.english && !state.custom)state.translation={english:state.recipe.english,custom_en:''};
     if(!state.translation){
       state.translating=true;el('recipe-message').textContent='Đang dịch nguyên liệu, cách pha và lưu ý sang tiếng Anh…';
       try {
-        const recipe=state.recipe;
+        const recipe=state.recipe || {ingredients:[],steps:'',notes:''};
         const result=await api('POST',{translate:true,itemId:state.id,version:recipe.version,recipe:{ingredients:recipe.ingredients,steps:recipe.steps,notes:recipe.notes},custom:state.custom});
         if(state!==current||serial!==requestId||revision!==state.langRevision)return;
-        state.translation=result;state.recipe.english=result.english;
+        state.translation=result;if(state.recipe)state.recipe.english=result.english;
       }catch(error){if(state===current&&serial===requestId&&revision===state.langRevision){state.translating=false;el('recipe-message').textContent=error.message;}return;}
     }
     if(state!==current||serial!==requestId||revision!==state.langRevision)return;
