@@ -1,0 +1,385 @@
+/* Mom Tea & Coffee — Admin iOS-inspired appearance. Scoped to admin only. */
+#view-backend {
+  --ios-bg: #f2f2f7;
+  --ios-surface: #ffffff;
+  --ios-text: #17202f;
+  --ios-secondary: #5f6b7a;
+  --ios-blue: #086edc;
+  --ios-line: #e4e8ef;
+  --ios-shadow: 0 6px 22px rgba(22, 34, 53, .045);
+  background: var(--ios-bg) !important;
+  color: var(--ios-text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  border-radius: 22px;
+  padding: 18px !important;
+  min-width: 0;
+}
+#view-backend *,
+#ios-admin-drawer *,
+#ios-admin-backdrop { box-sizing: border-box; }
+#view-backend .backend-header {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 12px !important;
+  padding: 16px 18px !important;
+  margin: 0 0 14px !important;
+  border: 1px solid var(--ios-line);
+  border-radius: 20px;
+  background: rgba(255,255,255,.98);
+  box-shadow: var(--ios-shadow);
+}
+#view-backend .backend-header > div:first-child { flex: 1; min-width: 0; }
+#view-backend .backend-header h2 {
+  color: var(--ios-text) !important;
+  font-size: clamp(18px, 2.6vw, 23px) !important;
+  font-weight: 750 !important;
+  letter-spacing: -.03em;
+  line-height: 1.27;
+  margin: 0 0 5px !important;
+}
+#view-backend .backend-header > div:first-child > span {
+  color: var(--ios-secondary) !important;
+  display: block;
+  font-size: 13px !important;
+  line-height: 1.38;
+}
+#view-backend .ios-admin-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  flex: 0 0 auto;
+}
+#view-backend .ios-admin-current-tab {
+  display: inline-flex;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  align-items: center;
+  padding: 8px 12px;
+  color: var(--ios-blue);
+  background: #eaf3ff;
+  border-radius: 100px;
+  font-size: 14px;
+  font-weight: 700;
+}
+#view-backend .ios-admin-menu-toggle,
+#ios-admin-drawer .ios-admin-close {
+  width: 46px;
+  min-width: 46px;
+  height: 46px;
+  border: 1px solid #d8e1ed;
+  border-radius: 14px;
+  color: var(--ios-blue);
+  background: #f7faff;
+  font-size: 24px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+  touch-action: manipulation;
+}
+#view-backend .ios-admin-menu-toggle:active,
+#ios-admin-drawer .ios-admin-close:active { transform: scale(.96); }
+#view-backend .ios-admin-stats {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+  margin-bottom: 16px !important;
+}
+#view-backend .ios-admin-stats > div {
+  background: var(--ios-surface) !important;
+  border: 1px solid var(--ios-line) !important;
+  border-radius: 18px !important;
+  box-shadow: var(--ios-shadow) !important;
+  padding: 16px !important;
+  min-width: 0;
+}
+#view-backend .ios-admin-stats > div > div:first-child {
+  color: var(--ios-secondary) !important;
+  font-size: 14px !important;
+  line-height: 1.35;
+  font-weight: 550;
+}
+#view-backend .ios-admin-stats > div > div:last-child {
+  font-size: clamp(21px, 2.5vw, 28px) !important;
+  font-weight: 780 !important;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+#view-backend .backend-tabs-nav {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  overflow: visible !important;
+  gap: 7px !important;
+  padding: 6px !important;
+  margin-bottom: 15px !important;
+  border: 1px solid #e3e8f0 !important;
+  border-radius: 17px !important;
+  background: #e9edf3;
+}
+#view-backend .backend-tabs-nav .backend-tab-btn {
+  min-width: 0;
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 9px !important;
+  border: 1px solid transparent !important;
+  border-radius: 12px !important;
+  font-size: 15px !important;
+  font-weight: 650 !important;
+  line-height: 1.35;
+  color: #526071 !important;
+  background: transparent !important;
+  justify-content: center;
+  text-align: center;
+  white-space: normal !important;
+  box-shadow: none !important;
+}
+#view-backend .backend-tabs-nav .backend-tab-btn.active {
+  color: #0762c5 !important;
+  background: #fff !important;
+  border-color: #e4e9f1 !important;
+  box-shadow: 0 2px 8px rgba(38, 54, 76, .11) !important;
+}
+#view-backend .backend-tab-btn .tab-badge {
+  display: inline-flex;
+  justify-content: center;
+  min-width: 22px;
+  min-height: 21px;
+  padding: 2px 5px;
+  border-radius: 15px;
+  background: #e0454e;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.2;
+}
+#view-backend .backend-tab-content .backend-order-card,
+#view-backend .backend-tab-content .table-responsive {
+  border: 1px solid var(--ios-line) !important;
+  border-radius: 18px !important;
+  background: #fff !important;
+  box-shadow: var(--ios-shadow) !important;
+}
+#view-backend .backend-tab-content .backend-orders-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)) !important;
+  gap: 13px !important;
+}
+#view-backend .backend-tab-content .backend-order-card {
+  padding: 16px !important;
+  font-size: 15px;
+  line-height: 1.45;
+}
+#view-backend .backend-tab-content .form-control,
+#view-backend .backend-tab-content input,
+#view-backend .backend-tab-content select,
+#view-backend .backend-tab-content textarea {
+  font-size: 16px !important;
+  line-height: 1.4;
+  min-height: 44px;
+  border-radius: 12px;
+}
+#view-backend .backend-tab-content .nav-btn,
+#view-backend .backend-tab-content button:not(.tab-badge) {
+  min-height: 42px;
+  font-size: max(14px, .875rem);
+  touch-action: manipulation;
+}
+#view-backend .backend-tab-content .data-table { font-size: 14px; }
+#view-backend .backend-tab-content .data-table th,
+#view-backend .backend-tab-content .data-table td {
+  padding: 12px !important;
+  line-height: 1.45;
+}
+#view-backend :is(button, a, input, select, textarea):focus-visible,
+#ios-admin-drawer :is(button, a, input, select):focus-visible {
+  outline: 3px solid rgba(10,111,221,.56) !important;
+  outline-offset: 2px;
+}
+
+/* Drawer is portaled to <body>, so it stays above the app's content. */
+body.ios-admin-menu-open { overflow: hidden !important; }
+#ios-admin-backdrop[hidden],
+#ios-admin-drawer[hidden] { display: none !important; }
+#ios-admin-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(21,30,45,.42);
+  z-index: 22000;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+#ios-admin-drawer {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 22001;
+  display: flex;
+  flex-direction: column;
+  width: min(390px, 91vw);
+  min-width: 0;
+  max-height: 100dvh;
+  padding: max(16px, env(safe-area-inset-top)) 12px max(18px, env(safe-area-inset-bottom));
+  background: #f2f2f7;
+  color: #17202f;
+  border-radius: 0 25px 25px 0;
+  box-shadow: 18px 0 60px rgba(11, 29, 54, .21);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+}
+#ios-admin-drawer .ios-admin-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 7px 16px;
+}
+#ios-admin-drawer .ios-admin-drawer-title {
+  font-size: 28px;
+  font-weight: 780;
+  letter-spacing: -.035em;
+}
+#ios-admin-drawer .ios-admin-drawer-scroll {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 4px 16px;
+}
+#ios-admin-drawer .ios-admin-drawer-group {
+  margin-bottom: 18px;
+}
+#ios-admin-drawer .ios-admin-drawer-group > h3 {
+  color: #677488;
+  font-size: 12px;
+  line-height: 1.35;
+  letter-spacing: .065em;
+  text-transform: uppercase;
+  font-weight: 750;
+  padding: 0 12px;
+  margin: 0 0 7px;
+}
+#ios-admin-drawer .ios-admin-drawer-tab,
+#ios-admin-drawer .ios-admin-tool-buttons > .nav-btn {
+  width: 100%;
+  min-height: 49px;
+  text-align: left;
+  justify-content: flex-start;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 11px 14px !important;
+  margin: 0 0 2px;
+  border: 1px solid #e8edf3 !important;
+  border-radius: 12px !important;
+  color: #223046 !important;
+  background: #fff !important;
+  font-size: 15px !important;
+  font-weight: 630;
+  line-height: 1.4;
+  white-space: normal !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+#ios-admin-drawer .ios-admin-drawer-tab.active {
+  color: #0066cf !important;
+  border-color: #acd0fb !important;
+  background: #eaf3ff !important;
+}
+#ios-admin-drawer .ios-admin-tool-buttons {
+  display: flex !important;
+  flex-direction: column;
+  align-items: stretch !important;
+  width: 100%;
+  gap: 3px !important;
+}
+#ios-admin-drawer .ios-admin-tool-buttons > .nav-btn[onclick*="logoutAdmin"] {
+  color: #b42332 !important;
+  background: #fff4f5 !important;
+  border-color: #f1c9ce !important;
+}
+#ios-admin-drawer .ios-admin-push-panel {
+  padding: 13px !important;
+  margin: 0 !important;
+  background: #fff !important;
+  border: 1px solid #e4e8ef !important;
+  border-radius: 16px !important;
+  box-shadow: none !important;
+}
+#ios-admin-drawer .ios-admin-push-panel > div {
+  display: flex !important;
+  flex-direction: column;
+  align-items: stretch;
+}
+#ios-admin-drawer .ios-admin-push-panel .nav-btn {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #d6e5f5 !important;
+  border-radius: 12px !important;
+  background: #eef6ff !important;
+  color: #0759ae !important;
+  text-align: left;
+  font-size: 14px !important;
+  font-weight: 650;
+}
+#ios-admin-drawer .ios-admin-push-panel .nav-btn:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+}
+#ios-admin-drawer .ios-admin-push-panel p {
+  color: #5f6b7a !important;
+  font-size: 13px !important;
+  line-height: 1.5;
+}
+#ios-admin-drawer .tab-badge {
+  padding: 2px 7px;
+  border-radius: 99px;
+  color: #fff;
+  background: #db4255;
+  font-size: 12px;
+  font-weight: 700;
+}
+@media (max-width: 640px) {
+  #view-backend { padding: 9px !important; border-radius: 16px; }
+  #view-backend .backend-header {
+    padding: 12px 13px !important;
+    gap: 9px !important;
+    border-radius: 17px;
+  }
+  #view-backend .backend-header h2 { font-size: 18px !important; }
+  #view-backend .backend-header > div:first-child > span { font-size: 12px !important; }
+  #view-backend .ios-admin-current-tab { display: none; }
+  #view-backend .ios-admin-menu-toggle { width: 44px; height: 44px; min-width: 44px; }
+  #view-backend .ios-admin-stats {
+    grid-template-columns: none !important;
+    grid-auto-columns: minmax(170px, 72%) !important;
+    grid-auto-flow: column !important;
+    overflow-x: auto !important;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    padding: 0 0 7px;
+    gap: 9px !important;
+  }
+  #view-backend .ios-admin-stats > div { scroll-snap-align: start; padding: 13px !important; }
+  #view-backend .ios-admin-stats > div > div:last-child { font-size: 23px !important; }
+  #view-backend .backend-tabs-nav { gap: 4px !important; padding: 4px !important; }
+  #view-backend .backend-tabs-nav .backend-tab-btn {
+    font-size: 13px !important;
+    padding: 9px 5px !important;
+    min-height: 50px;
+    gap: 4px;
+  }
+  #view-backend .backend-tab-content .backend-orders-grid { grid-template-columns: minmax(0,1fr) !important; }
+  #view-backend .backend-tab-content .data-table th,
+  #view-backend .backend-tab-content .data-table td { padding: 10px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #view-backend .ios-admin-menu-toggle,
+  #ios-admin-drawer button { transition: none !important; animation: none !important; }
+}
