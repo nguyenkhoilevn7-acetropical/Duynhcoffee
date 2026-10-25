@@ -151,8 +151,8 @@
       const button = event.target.closest('button');
       if (!button) return;
       if (button.classList.contains('backend-tab-btn') ||
-          button.getAttribute('onclick')?.includes('logoutAdmin(') ||
-          button.getAttribute('onclick')?.includes("switchView('customer')")) {
+          button.closest('.ios-admin-tool-buttons') ||
+          button.getAttribute('onclick')?.includes('DuynhAdminNotifications.open(')) {
         setOpen(false);
       }
     });
