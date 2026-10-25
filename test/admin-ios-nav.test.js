@@ -40,6 +40,11 @@ test('iOS admin navigation preserves original tabs and opens a functional drawer
     doc.getElementById('ios-admin-backdrop').click();
     assert.equal(drawer.hidden, true);
     toggle.click();
+    const soundSettings = doc.querySelector('#ios-admin-drawer .nav-btn[onclick="openSoundSettingsModal()"]');
+    assert.ok(soundSettings);
+    soundSettings.click();
+    assert.equal(drawer.hidden, true, 'the menu must not cover the sound settings modal');
+    toggle.click();
     doc.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     assert.equal(drawer.hidden, true);
 
