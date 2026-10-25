@@ -116,3 +116,46 @@ test('saved English opens without a new AI request and follows the site language
   assert.match(c.el('recipe-content').textContent,/Cà phê/);
  }finally{c.dom.window.close();}
 });
+
+test('English button works for a product without saved recipe and with no custom requests', async () => {
+ const c=client(null);
+ try {
+  await c.w.openDrinkRecipe(1,1,'');
+  let postCalls=0;
+  c.w.fetch=async()=>{postCalls++;throw Error('Translation API should not be called for empty recipe');};
+  c.el('recipe-lang-en').click();
+  assert.equal(c.el('recipe-lang-en').getAttribute('aria-pressed'),'true');
+  assert.match(c.el('recipe-order').textContent,/Standard recipe for 1 cup/);
+  assert.match(c.el('recipe-upload-open').textContent,/Upload recipe photo/);
+  assert.match(c.el('recipe-content').textContent,/No recipe yet/);
+  assert.equal(postCalls,0);
+  c.el('recipe-lang-vi').click();
+  assert.equal(c.el('recipe-lang-vi').getAttribute('aria-pressed'),'true');
+  assert.match(c.el('recipe-order').textContent,/Định lượng chuẩn/);
+ } finally {c.dom.window.close();}
+});
+test('English button translates customer requests even without a saved recipe', async () => {
+ const c=client(null);
+ try {
+  await c.w.openDrinkRecipe(1,2,'50% (ít đá) • không đường');
+  let calls=0;
+  c.w.fetch=async(url,opts)=>{
+    calls++;
+    assert.match(url,/\/api\/drink-recipes\/translate$/);
+    const data=JSON.parse(opts.body);
+    assert.equal(data.custom,'50% (ít đá) • không đường');
+    assert.deepEqual(data.recipe,{ingredients:[],steps:'',notes:''});
+    return {ok:true,json:async()=>({english:{ingredients:[],steps:'',notes:'',sourceHash:'empty-recipe'},custom_en:'50% (less ice) • no sugar'})};
+  };
+  c.el('recipe-lang-en').click();
+  await settle(()=>c.el('recipe-lang-en').getAttribute('aria-pressed')==='true');
+  assert.match(c.el('recipe-order').textContent,/Quantity: 2 cups/);
+  assert.match(c.el('recipe-notices').textContent,/less ice/);
+  assert.match(c.el('recipe-notices').textContent,/no sugar/);
+  assert.equal(calls,1);
+  c.el('recipe-lang-vi').click();
+  assert.match(c.el('recipe-notices').textContent,/ít đá/);
+  c.el('recipe-lang-en').click();
+  assert.equal(calls,1,'translation should be cached for the currently opened recipe');
+ } finally {c.dom.window.close();}
+});
