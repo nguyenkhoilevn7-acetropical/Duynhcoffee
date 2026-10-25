@@ -139,10 +139,10 @@
       return (copy.textContent || '').replace(/\s+/g, ' ').trim();
     }
     function syncActive() {
-      const active = root.querySelector('.backend-tab-btn.active');
+      const active = document.querySelector('.backend-tab-btn.active');
       if (!active) return;
       current.textContent = currentTabLabel(active);
-      root.querySelectorAll('.backend-tab-btn').forEach(function (button) {
+      document.querySelectorAll('.backend-tab-btn').forEach(function (button) {
         button.setAttribute('aria-current', button === active ? 'page' : 'false');
       });
     }
@@ -157,7 +157,7 @@
       }
     });
     nav.addEventListener('click', syncActive);
-    const observedButtons = root.querySelectorAll('.backend-tab-btn');
+    const observedButtons = document.querySelectorAll('.backend-tab-btn');
     const observer = new MutationObserver(syncActive);
     observedButtons.forEach(function (button) {
       observer.observe(button, { attributes: true, attributeFilter: ['class'] });
