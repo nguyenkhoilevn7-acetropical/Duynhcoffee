@@ -65,14 +65,17 @@ jobs:
             throw error;
           }
           async function main() {
-            const [html, css, js, rawOrders] = await Promise.all([
-              get('/'),get('/admin-ios.css?v=20261025-1'),get('/admin-ios.js?v=20261025-1'),get('/api/orders')
+            const [html, css, js, recipeJs, rawOrders] = await Promise.all([
+              get('/'),get('/admin-ios.css?v=20261025-2'),get('/admin-ios.js?v=20261025-2'),get('/admin-recipes.js?v=20261025-2'),get('/api/orders')
             ]);
             const assetTests = {
-              'HTML links new iOS CSS': html.includes('admin-ios.css?v=20261025-1'),
-              'HTML links new iOS JS': html.includes('admin-ios.js?v=20261025-1'),
+              'HTML links new iOS CSS': html.includes('admin-ios.css?v=20261025-2'),
+              'HTML links new iOS JS': html.includes('admin-ios.js?v=20261025-2'),
               'CSS supplies drawer styles': css.includes('#ios-admin-drawer'),
-              'JS initializes menu toggle': js.includes('ios-admin-menu-toggle')
+              'JS initializes menu toggle': js.includes('ios-admin-menu-toggle'),
+              'Drawer is right-aligned': css.includes('inset: 0 0 0 auto'),
+              'Order timing layout is active': css.includes('.ios-order-timing'),
+              'English handles missing recipes': recipeJs.includes('if(!state.recipe && !state.custom.trim())')
             };
             Object.entries(assetTests).forEach(([name, ok]) => console.log(name+': '+(ok?'PASS':'FAIL')));
             if (Object.values(assetTests).some(ok => !ok)) throw new Error('Production UI smoke test failed');
