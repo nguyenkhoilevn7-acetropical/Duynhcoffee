@@ -10965,6 +10965,9 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         const stockLeft = (item.stock !== undefined) ? item.stock : 50;
         const itemName = getItemLocalizedName(item);
         const itemDesc = getItemLocalizedDesc(item);
+        const salePreview=window.MomSalePricing?.calculate([{id:item.id,unitPrice:item.price,qty:1}],discounts,'');
+        const salePrice=salePreview?.total ?? item.price;
+        const hasSale=salePrice < item.price;
 
         let badgeHtml = '';
         if (item.isBestSeller) {
@@ -10980,13 +10983,14 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
             <div class="product-img-box">
               <img src="${item.image || getCategoryFallbackSvg(item.category, itemName)}" alt="${itemName}" class="product-img" loading="lazy" decoding="async" onerror="this.onerror=null; this.src=window.getSafeProductImageFallback(this.getAttribute('data-category') || 'tea', this.getAttribute('alt') || 'Mom');" data-category="${item.category}">
               ${badgeHtml}
+              ${hasSale && !isOutOfStock ? '<span class="mom-sale-badge" style="position:absolute;right:8px;top:8px;">SALE</span>':''}
               ${(!isOutOfStock && stockLeft <= 10) ? `<span class="product-stock-tag stock-low">Chỉ còn ${stockLeft}</span>` : ''}
             </div>
             <div class="product-info">
               <div class="product-name">${itemName}</div>
               <div class="product-desc">${itemDesc}</div>
               <div class="product-bottom">
-                <div class="product-price">${formatMoney(item.price)}</div>
+                <div class="product-price">${hasSale ? '<span class="mom-sale-original">'+formatMoney(item.price)+'</span> <span>'+formatMoney(salePrice)+'</span>' : formatMoney(item.price)}</div>
                 <div class="product-card-actions">
                   <button type="button" class="btn-card-add" onclick="event.stopPropagation(); openProductCustomModal(${item.id})" ${isOutOfStock ? 'disabled' : ''}>
                     ${isOutOfStock ? 'Hết' : '+ Thêm'}
@@ -11035,7 +11039,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       const bar = document.getElementById('floating-cart-bar');
       if (!bar) return;
       const count = cart.reduce((s, c) => s + c.qty, 0);
-      const total = cart.reduce((s, c) => s + (c.item.price * c.qty), 0);
+      const total=getSaleCheckoutResult().total;
 
       if (count <= 0) {
         hideFloatingCartNow();
@@ -11088,7 +11092,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       const bar = document.getElementById('floating-cart-bar');
       if (!bar) return;
       const count = cart.reduce((s, c) => s + c.qty, 0);
-      const total = cart.reduce((s, c) => s + (c.item.price * c.qty), 0);
+      const total=getSaleCheckoutResult().total;
 
       const countBadge = document.getElementById('floating-cart-count');
       const totalText = document.getElementById('floating-cart-total');
@@ -11121,7 +11125,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         return;
       }
 
-      const total = cart.reduce((s, c) => s + (c.item.price * c.qty), 0);
+      const pricing=getSaleCheckoutResult(),total=pricing.total;
 
       container.innerHTML = cart.map((c, idx) => `
         <div class="cart-item-row">
@@ -11140,7 +11144,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         </div>
       `).join('');
 
-      if (subtotalElem) subtotalElem.textContent = formatMoney(total);
+      if (subtotalElem) subtotalElem.textContent = formatMoney(pricing.rawTotal);
       if (totalElem) totalElem.textContent = formatMoney(total);
     }
 
