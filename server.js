@@ -36,6 +36,17 @@ const MENU_FILE = path.join(ROOT_DIR, 'menu.json');
 const PROFIT_FILE = path.join(ROOT_DIR, 'profit-settings.json');
 const RECIPES_FILE = path.join(ROOT_DIR, 'drink-recipes.json');
 const DISCOUNTS_FILE = path.join(ROOT_DIR, 'discounts.json');
+const {validateCampaign} = require('./sale-promotions');
+function checkSaleMutation(incoming, existing, menu, authorized) {
+  if (!Array.isArray(incoming) || incoming.length > 150) throw Object.assign(new Error('Danh sách giảm giá không hợp lệ'),{status:400});
+  const selected = list => list.filter(x => x?.mode==='automatic' || x?.kind==='sale');
+  const oldSales=selected(Array.isArray(existing)?existing:[]),newSales=selected(incoming);
+  if (JSON.stringify(oldSales)!==JSON.stringify(newSales) && !authorized)
+    throw Object.assign(new Error('Chỉ quản trị mới được thay đổi chương trình SALE'),{status:403});
+  if(newSales.length>30)throw Object.assign(new Error('Tối đa 30 chương trình SALE'),{status:400});
+  for(const p of newSales) validateCampaign(p,menu);
+}
+
 const INVENTORY_FILE = path.join(ROOT_DIR, 'inventory.json');
 
 // Lấy địa chỉ IP mạng nội bộ (Wi-Fi / LAN)
@@ -830,6 +841,9 @@ const server = http.createServer(async (req, res) => {
             writeJsonFile(MENU_FILE, menuCache);
           }
           if (Array.isArray(body.discounts)) {
+            discountsCache = readJsonFile(DISCOUNTS_FILE, discountsCache);
+            checkSaleMutation(body.discounts, discountsCache, menuCache,
+              adminPush.verify((req.headers.authorization || '').replace(/^Bearer /, '')));
             discountsCache = body.discounts;
             writeJsonFile(DISCOUNTS_FILE, discountsCache);
           }
@@ -1183,6 +1197,8 @@ const server = http.createServer(async (req, res) => {
         const body = await parseRequestBody(req);
         if (Array.isArray(body)) {
           discountsCache = readJsonFile(DISCOUNTS_FILE, discountsCache);
+          checkSaleMutation(body, discountsCache, menuCache,
+            adminPush.verify((req.headers.authorization || '').replace(/^Bearer /, '')));
           if (JSON.stringify(discountsCache) === JSON.stringify(body)) {
             sendJson(res, 200, {success:true, unchanged:true, count:discountsCache.length});
             return;
@@ -1195,7 +1211,7 @@ const server = http.createServer(async (req, res) => {
           sendJson(res, 400, { error: 'Dữ liệu phải là mảng JSON' });
         }
       } catch (err) {
-        sendJson(res, 500, { error: err.message });
+        sendJson(res, err.status || 500, { error: err.message });
       }
       return;
     }
