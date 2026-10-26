@@ -75,7 +75,7 @@
   }
   async function save(next) {
     const token=localStorage.getItem('duynh_admin_api_token')||localStorage.getItem('duynh_admin_push_token')||'';
-    if(!token){message('Chưa có quyền quản trị API. Vui lòng đăng nhập Admin và kết nối quyền quản trị.',true);return false;}
+    if(!token){el('mom-sale-auth').open=true;message('Cần kích hoạt quyền quản trị SALE bằng tài khoản Admin.',true);return false;}
     busy=true;el('mom-sale-save').disabled=true;
     try{
       const response=await fetch(getCloudApiUrl('/api/discounts'),{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(next)});
@@ -117,6 +117,25 @@
     if(!confirm('Xóa chương trình SALE này?'))return;
     if(await save(discounts.filter(d=>d.id!==id))){if(editingId===id)editingId=null;message('✅ Đã xóa chương trình.');}
   }
+  async function login() {
+    if(!admin()||busy)return;
+    const username=el('mom-sale-username')?.value.trim()||'';
+    const password=el('mom-sale-password')?.value||'';
+    if(!username||!password){message('Nhập tài khoản và mật khẩu Admin.',true);return;}
+    busy=true;
+    try {
+      const response=await fetch(getCloudApiUrl('/api/admin-push/session'),{
+        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
+      const result=await response.json();
+      if(!response.ok||!result.token)throw Error(result.error||'Không xác thực được quyền quản trị.');
+      localStorage.setItem('duynh_admin_push_token',result.token);
+      el('mom-sale-password').value='';
+      el('mom-sale-auth').open=false;
+      message('✅ Đã kích hoạt quyền quản trị SALE trên thiết bị này.');
+    }catch(error){message(error.message,true);}
+    finally{busy=false;}
+  }
   window.toggleSaleProducts=toggleProducts;window.renderSaleProducts=products;window.createAutomaticSale=create;
-  window.MomSaleAdmin={render};
+  window.loginSaleAdmin=login;
+  window.MomSaleAdmin={render,toggleProducts,products,create,login};
 })();
