@@ -65,8 +65,8 @@ jobs:
             throw error;
           }
           async function main() {
-            const [html, css, js, recipeJs, rawOrders] = await Promise.all([
-              get('/'),get('/admin-ios.css?v=20261025-2'),get('/admin-ios.js?v=20261025-2'),get('/admin-recipes.js?v=20261025-2'),get('/api/orders')
+            const [html, css, js, recipeJs, rawOrders, saleJs, adminJs, saleCss] = await Promise.all([
+              get('/'),get('/admin-ios.css?v=20261025-2'),get('/admin-ios.js?v=20261025-2'),get('/admin-recipes.js?v=20261025-2'),get('/api/orders'),get('/sale-promotions.js?v=20261026-1'),get('/sale-admin.js?v=20261026-1'),get('/sale-promotions.css?v=20261026-1')
             ]);
             const assetTests = {
               'HTML links new iOS CSS': html.includes('admin-ios.css?v=20261025-2'),
@@ -76,7 +76,11 @@ jobs:
               'Drawer is right-aligned': css.includes('inset: 0 0 0 auto'),
               'Order timing layout is active': css.includes('.ios-order-timing'),
               'Product quantity buttons have 10px gap': html.includes('#product-custom-modal .ios-qty-stepper') && html.includes('gap: 10px;'),
-              'English handles missing recipes': recipeJs.includes('if(!state.recipe && !state.custom.trim())')
+              'English handles missing recipes': recipeJs.includes('if(!state.recipe && !state.custom.trim())'),
+              'SALE UI loaded': html.includes('id="mom-sale-products"') && html.includes('sale-admin.js?v=20261026-1'),
+              'SALE price shared': saleJs.includes('function calculate(items,discounts'),
+              'SALE admin controls': adminJs.includes('async function create()'),
+              'SALE CSS loaded': saleCss.includes('.mom-sale-admin')
             };
             Object.entries(assetTests).forEach(([name, ok]) => console.log(name+': '+(ok?'PASS':'FAIL')));
             if (Object.values(assetTests).some(ok => !ok)) throw new Error('Production UI smoke test failed');
