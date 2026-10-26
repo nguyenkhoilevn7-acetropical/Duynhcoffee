@@ -224,6 +224,7 @@
   "Danh Mục": "Category",
   "Giá Bán": "Price",
   "Tồn Kho": "Stock",
+  "Sản phẩm SALE": "SALE products",
   "🏷️ Chương trình SALE tự động": "🏷️ Automatic Sale Campaigns",
   "Giảm cho món chọn hoặc toàn bộ menu, tự áp dụng khi thanh toán.": "Offer discounts on selected products or the entire menu, applied automatically at checkout.",
   "0 chương trình": "0 campaigns",
