@@ -89,3 +89,5 @@ jobs:
           }
           main().catch(e=>{console.error(e.message);process.exitCode=1;});
           NODE
+
+# Predeploy read-only verification of live order fingerprint for CSS-only PR #8, 2026-10-26.
