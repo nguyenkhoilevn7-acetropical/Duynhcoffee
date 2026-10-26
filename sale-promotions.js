@@ -37,8 +37,8 @@
     if (p.endsAt && (!Number.isFinite(Date.parse(p.endsAt)) || date >= Date.parse(p.endsAt))) return false;
     try {validateCampaign(p);return true;}catch{return false;}
   }
-  function campaignAmount(rows,p) {
-    if (!isActive(p)) return 0;
+  function campaignAmount(rows,p,now=Date.now()) {
+    if (!isActive(p,now)) return 0;
     let savings=0;
     for (const row of rows) {
       if (p.scope === 'selected' && !p.productIds.map(String).includes(String(row.id))) continue;
@@ -63,7 +63,7 @@
     let best={amount:0,discount:null};
     for (const p of current) {
       if (!isActive(p,now)) continue;
-      const amount=campaignAmount(rows,p);
+      const amount=campaignAmount(rows,p,now);
       if (amount > best.amount) best={amount,discount:{mode:'automatic',id:p.id,code:null,title:p.title,
         type:p.type,value:p.value,scope:p.scope,amount,desc:p.title}};
     }
