@@ -133,21 +133,18 @@ function unitPrice(entry,item) {
   }
   return Number(item.price)+extras;
 }
+const { calculate: calculateSalePrice } = require('./sale-promotions');
 function calculateAmount(items, menu, discounts, code) {
   if (!Array.isArray(items) || !items.length || items.length > 100) throw new Error('Giỏ hàng không hợp lệ');
-  let total = 0;
-  for (const entry of items) {
+  const rows = items.map(entry => {
     const item = menu.find(m => String(m.id) === String(entry.id));
-    if (!item || !Number.isInteger(entry.qty) || entry.qty < 1 || entry.qty > 100 || !Number.isSafeInteger(Number(item.price)) || Number(item.price) < 0) throw new Error('Món hoặc số lượng không hợp lệ');
-    total += unitPrice(entry,item) * entry.qty;
-  }
-  if (code) {
-    const discount = discounts.find(d => String(d.code).toUpperCase() === String(code).toUpperCase());
-    if (!discount || (discount.active === false || discount.isActive === false) || !Number.isFinite(Number(discount.percent)) || discount.percent < 0 || discount.percent > 100) throw new Error('Mã giảm giá không còn hợp lệ');
-    total -= Math.round(total * Number(discount.percent) / 100);
-  }
-  if (!Number.isSafeInteger(total) || total <= 0) throw new Error('Số tiền không hợp lệ');
-  return total;
+    if (!item || !Number.isInteger(entry.qty) || entry.qty < 1 || entry.qty > 100 ||
+        !Number.isSafeInteger(Number(item.price)) || Number(item.price) < 0) throw new Error('Món hoặc số lượng không hợp lệ');
+    return {id:item.id, qty:entry.qty, unitPrice:unitPrice(entry,item)};
+  });
+  const result=calculateSalePrice(rows,discounts,code);
+  if (!Number.isSafeInteger(result.total) || result.total <= 0) throw new Error('Số tiền không hợp lệ');
+  return result.total;
 }
 function createReceiptVerifier({ readState, recognize, now = Date.now, deadlineMs = 20000, cacheOcr = !recognize }) {
   const secret = crypto.randomBytes(32);
