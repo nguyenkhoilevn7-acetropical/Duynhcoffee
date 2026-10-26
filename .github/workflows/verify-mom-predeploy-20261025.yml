@@ -75,6 +75,7 @@ jobs:
               'JS initializes menu toggle': js.includes('ios-admin-menu-toggle'),
               'Drawer is right-aligned': css.includes('inset: 0 0 0 auto'),
               'Order timing layout is active': css.includes('.ios-order-timing'),
+              'Product quantity buttons have 10px gap': html.includes('#product-custom-modal .ios-qty-stepper') && html.includes('gap: 10px;'),
               'English handles missing recipes': recipeJs.includes('if(!state.recipe && !state.custom.trim())')
             };
             Object.entries(assetTests).forEach(([name, ok]) => console.log(name+': '+(ok?'PASS':'FAIL')));
