@@ -3664,6 +3664,14 @@ body {
             </div>
             <p class="mom-sale-note">Không cộng dồn với voucher: hệ thống tự chọn mức giảm tốt nhất. Không giảm phí giao hàng.</p>
             <button type="button" class="btn-checkout-now mom-sale-save" id="mom-sale-save" onclick="createAutomaticSale()">＋ Tạo chương trình SALE</button>
+            <details class="mom-sale-auth" id="mom-sale-auth">
+              <summary>🔐 Kích hoạt quyền quản trị SALE</summary>
+              <div class="mom-sale-auth-fields">
+                <label>Tài khoản Admin<input type="text" autocomplete="username" class="form-control" id="mom-sale-username"></label>
+                <label>Mật khẩu Admin<input type="password" autocomplete="current-password" class="form-control" id="mom-sale-password"></label>
+                <button type="button" class="nav-btn" onclick="loginSaleAdmin()">Đăng nhập quyền SALE</button>
+              </div>
+            </details>
             <p id="mom-sale-message" role="status" aria-live="polite"></p>
             <div id="mom-sale-list" class="mom-sale-list"></div>
           </section>
@@ -12240,6 +12248,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     window.toggleSaleProducts = () => window.MomSaleAdmin?.toggleProducts?.();
     window.renderSaleProducts = () => window.MomSaleAdmin?.products?.();
     window.createAutomaticSale = () => window.MomSaleAdmin?.create?.();
+    window.loginSaleAdmin = () => window.MomSaleAdmin?.login?.();
     window.renderFrontendBanner = renderFrontendBanner;
     window.openProductCustomModal = openProductCustomModal;
     window.closeProductCustomModal = closeProductCustomModal;
