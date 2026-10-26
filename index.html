@@ -3333,7 +3333,9 @@ body {
 <script src="site-i18n.js" defer></script>
 <script src="admin-notifications.js" defer></script>
   <!-- Admin-only iOS-inspired layout; operational handlers remain unchanged -->
+  <link rel="stylesheet" href="sale-promotions.css?v=20261026-1">
   <link rel="stylesheet" href="admin-ios.css?v=20261025-2">
+  <script src="sale-promotions.js?v=20261026-1" defer></script>
   <script src="admin-ios.js?v=20261025-2" defer></script>
 </head>
 <body>
@@ -3637,6 +3639,33 @@ body {
               <span class="product-stock-tag stock-ok" id="stat-total-discounts">3 Mã giảm giá</span>
             </div>
           </div>
+
+          <!-- Automatic product or store-wide promotions. Original coupon codes remain below. -->
+          <section class="mom-sale-admin" aria-labelledby="mom-sale-title">
+            <div class="mom-sale-top"><div><h3 id="mom-sale-title">🏷️ Chương trình SALE tự động</h3>
+              <p>Giảm cho món chọn hoặc toàn bộ menu, tự áp dụng khi thanh toán.</p></div>
+              <span id="mom-sale-count" class="mom-sale-count">0 chương trình</span></div>
+            <div class="mom-sale-fields">
+              <label>Tên chương trình<input class="form-control" id="mom-sale-title-input" maxlength="100" placeholder="Ví dụ: Happy Hour Trà Trái Cây"></label>
+              <label>Loại giảm<select class="form-control" id="mom-sale-type"><option value="percent">Phần trăm (%)</option><option value="amount">Số tiền / ly (đ)</option></select></label>
+              <label>Mức giảm<input class="form-control" id="mom-sale-value" type="number" min="1" step="1" placeholder="20"></label>
+              <label>Áp dụng cho<select class="form-control" id="mom-sale-scope" onchange="toggleSaleProducts()"><option value="selected">Sản phẩm tùy chọn</option><option value="all">Tất cả sản phẩm</option></select></label>
+            </div>
+            <div id="mom-sale-products-wrap" class="mom-sale-products-wrap">
+              <label for="mom-sale-search">Chọn món được giảm giá</label>
+              <input class="form-control" id="mom-sale-search" type="search" placeholder="🔎 Tìm món..." oninput="renderSaleProducts()">
+              <div id="mom-sale-products" class="mom-sale-products" role="group" aria-label="Sản phẩm SALE"></div>
+            </div>
+            <div class="mom-sale-fields mom-sale-dates">
+              <label>Bắt đầu (để trống: ngay)<input class="form-control" type="datetime-local" id="mom-sale-start"></label>
+              <label>Kết thúc (để trống: không hết hạn)<input class="form-control" type="datetime-local" id="mom-sale-end"></label>
+              <label class="mom-sale-checkbox"><input type="checkbox" id="mom-sale-enabled" checked> Kích hoạt chương trình</label>
+            </div>
+            <p class="mom-sale-note">Không cộng dồn với voucher: hệ thống tự chọn mức giảm tốt nhất. Không giảm phí giao hàng.</p>
+            <button type="button" class="btn-checkout-now mom-sale-save" id="mom-sale-save" onclick="createAutomaticSale()">＋ Tạo chương trình SALE</button>
+            <p id="mom-sale-message" role="status" aria-live="polite"></p>
+            <div id="mom-sale-list" class="mom-sale-list"></div>
+          </section>
 
           <!-- FORM TẠO MÃ GIẢM GIÁ MỚI -->
           <div style="background: #F8FAF6; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
