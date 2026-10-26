@@ -36,7 +36,11 @@ const MENU_FILE = path.join(ROOT_DIR, 'menu.json');
 const PROFIT_FILE = path.join(ROOT_DIR, 'profit-settings.json');
 const RECIPES_FILE = path.join(ROOT_DIR, 'drink-recipes.json');
 const DISCOUNTS_FILE = path.join(ROOT_DIR, 'discounts.json');
-const {validateCampaign} = require('./sale-promotions');
+const validateCampaign = (() => {
+  try { return require('./sale-promotions').validateCampaign; }
+  catch(error) { if(error.code!=='MODULE_NOT_FOUND')throw error;
+    return () => {throw Object.assign(new Error('SALE module unavailable'),{status:503});}; }
+})();
 function checkSaleMutation(incoming, existing, menu, authorized) {
   if (!Array.isArray(incoming) || incoming.length > 150) throw Object.assign(new Error('Danh sách giảm giá không hợp lệ'),{status:400});
   const selected = list => list.filter(x => x?.mode==='automatic' || x?.kind==='sale');
