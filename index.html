@@ -8222,7 +8222,7 @@ function openProductCustomModal(itemId) {
       } catch(e) {}
       if (!syncToServer) return;
       const token=localStorage.getItem('duynh_admin_api_token')||localStorage.getItem('duynh_admin_push_token')||'';
-      fetch(getCloudApiUrl('/api/discounts'), {
+      fetch(typeof getCloudApiUrl==='function' ? getCloudApiUrl('/api/discounts') : '/api/discounts', {
         method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},
         body:JSON.stringify(discounts)
       }).catch(()=>{});
@@ -12236,6 +12236,10 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     window.closeQuickRestockModal = closeQuickRestockModal;
     window.executeQuickRestock = executeQuickRestock;
     window.renderCustomerProducts = renderCustomerProducts;
+    // Inline fallbacks allow early interaction before deferred sale-admin.js loads.
+    window.toggleSaleProducts = () => window.MomSaleAdmin?.toggleProducts?.();
+    window.renderSaleProducts = () => window.MomSaleAdmin?.products?.();
+    window.createAutomaticSale = () => window.MomSaleAdmin?.create?.();
     window.renderFrontendBanner = renderFrontendBanner;
     window.openProductCustomModal = openProductCustomModal;
     window.closeProductCustomModal = closeProductCustomModal;
