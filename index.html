@@ -3333,7 +3333,10 @@ body {
 <script src="site-i18n.js" defer></script>
 <script src="admin-notifications.js" defer></script>
   <!-- Admin-only iOS-inspired layout; operational handlers remain unchanged -->
+  <link rel="stylesheet" href="sale-promotions.css?v=20261026-1">
   <link rel="stylesheet" href="admin-ios.css?v=20261025-2">
+  <script src="sale-promotions.js?v=20261026-1" defer></script>
+  <script src="sale-admin.js?v=20261026-1" defer></script>
   <script src="admin-ios.js?v=20261025-2" defer></script>
 </head>
 <body>
@@ -3637,6 +3640,41 @@ body {
               <span class="product-stock-tag stock-ok" id="stat-total-discounts">3 Mã giảm giá</span>
             </div>
           </div>
+
+          <!-- Automatic product or store-wide promotions. Original coupon codes remain below. -->
+          <section class="mom-sale-admin" aria-labelledby="mom-sale-title">
+            <div class="mom-sale-top"><div><h3 id="mom-sale-title">🏷️ Chương trình SALE tự động</h3>
+              <p>Giảm cho món chọn hoặc toàn bộ menu, tự áp dụng khi thanh toán.</p></div>
+              <span id="mom-sale-count" class="mom-sale-count">0 chương trình</span></div>
+            <div class="mom-sale-fields">
+              <label>Tên chương trình<input class="form-control" id="mom-sale-title-input" maxlength="100" placeholder="Ví dụ: Happy Hour Trà Trái Cây"></label>
+              <label>Loại giảm<select class="form-control" id="mom-sale-type"><option value="percent">Phần trăm (%)</option><option value="amount">Số tiền / ly (đ)</option></select></label>
+              <label>Mức giảm<input class="form-control" id="mom-sale-value" type="number" min="1" step="1" placeholder="20"></label>
+              <label>Áp dụng cho<select class="form-control" id="mom-sale-scope" onchange="toggleSaleProducts()"><option value="selected">Sản phẩm tùy chọn</option><option value="all">Tất cả sản phẩm</option></select></label>
+            </div>
+            <div id="mom-sale-products-wrap" class="mom-sale-products-wrap">
+              <label for="mom-sale-search">Chọn món được giảm giá</label>
+              <input class="form-control" id="mom-sale-search" type="search" placeholder="🔎 Tìm món..." oninput="renderSaleProducts()">
+              <div id="mom-sale-products" class="mom-sale-products" role="group" aria-label="Sản phẩm SALE"></div>
+            </div>
+            <div class="mom-sale-fields mom-sale-dates">
+              <label>Bắt đầu (để trống: ngay)<input class="form-control" type="datetime-local" id="mom-sale-start"></label>
+              <label>Kết thúc (để trống: không hết hạn)<input class="form-control" type="datetime-local" id="mom-sale-end"></label>
+              <label class="mom-sale-checkbox"><input type="checkbox" id="mom-sale-enabled" checked> Kích hoạt chương trình</label>
+            </div>
+            <p class="mom-sale-note">Không cộng dồn với voucher: hệ thống tự chọn mức giảm tốt nhất. Không giảm phí giao hàng.</p>
+            <button type="button" class="btn-checkout-now mom-sale-save" id="mom-sale-save" onclick="createAutomaticSale()">＋ Tạo chương trình SALE</button>
+            <details class="mom-sale-auth" id="mom-sale-auth">
+              <summary>🔐 Kích hoạt quyền quản trị SALE</summary>
+              <div class="mom-sale-auth-fields">
+                <label>Tài khoản Admin<input type="text" autocomplete="username" class="form-control" id="mom-sale-username"></label>
+                <label>Mật khẩu Admin<input type="password" autocomplete="current-password" class="form-control" id="mom-sale-password"></label>
+                <button type="button" class="nav-btn" onclick="loginSaleAdmin()">Đăng nhập quyền SALE</button>
+              </div>
+            </details>
+            <p id="mom-sale-message" role="status" aria-live="polite"></p>
+            <div id="mom-sale-list" class="mom-sale-list"></div>
+          </section>
 
           <!-- FORM TẠO MÃ GIẢM GIÁ MỚI -->
           <div style="background: #F8FAF6; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
@@ -5624,7 +5662,8 @@ body {
     let receiptScanGeneration = 0;
     function paymentContext() {
       return JSON.stringify({ items: cart.map(c => ({ id: c.item.id, qty: c.qty, price: c.item.price, toppings: c.toppings || [] })),
-        discount: activeDiscount ? activeDiscount.code : null, bank: storeConfig.bankConfig });
+        discount: activeDiscount ? activeDiscount.code : null,
+      sale: typeof getSaleCheckoutResult==='function' ? getSaleCheckoutResult().discount : null, bank: storeConfig.bankConfig });
     }
     function invalidateReceiptVerification() {
       receiptScanGeneration++;
@@ -6005,6 +6044,7 @@ body {
             discounts = freshDiscounts;
             lastDiscountsVersion = payload.discountsVersion || lastDiscountsVersion;
             saveLocalDiscounts(false);
+            if(typeof refreshSaleUi==='function')refreshSaleUi();
             if (isAdminDevice) {
               renderAdminDiscountsTable();
             }
@@ -6056,7 +6096,7 @@ body {
           if (Array.isArray(pData.discounts)) {
             if (!lastDiscountsVersion || (pData.discountsVersion && pData.discountsVersion !== lastDiscountsVersion) || !isInitialLoadDone) {
               discountsChanged = JSON.stringify(discounts) !== JSON.stringify(pData.discounts);
-              if (discountsChanged) { discounts = pData.discounts; saveLocalDiscounts(false); }
+              if (discountsChanged) { discounts = pData.discounts; saveLocalDiscounts(false); if(typeof refreshSaleUi==='function')refreshSaleUi(); }
               lastDiscountsVersion = pData.discountsVersion || lastDiscountsVersion;
             }
           }
@@ -8168,17 +8208,32 @@ function openProductCustomModal(itemId) {
       { id: 3, code: "VIP50", percent: 50, desc: "Mã tri ân khách hàng thân thiết 50%", active: true, usedCount: 4 }
     ];
     let activeDiscount = null;
+    function getSaleCheckoutResult() {
+      const rows=cart.map(c=>({id:c.item.id,qty:c.qty,unitPrice:c.item.price}));
+      if(window.MomSalePricing?.calculate)return window.MomSalePricing.calculate(rows,discounts,activeDiscount?.code||'');
+      const rawTotal=rows.reduce((s,i)=>s+i.qty*i.unitPrice,0);
+      const amount=activeDiscount?Math.round(rawTotal*(activeDiscount.percent||0)/100):0;
+      return {rawTotal,total:rawTotal-amount,amount,discount:activeDiscount};
+    }
+    function refreshSaleUi() {
+      if (typeof renderCustomerProducts==='function') renderCustomerProducts();
+      window.MomSaleAdmin?.render();
+      if (document.getElementById('checkout-modal')?.style.display==='flex') {
+        if(receiptVerificationContext && receiptVerificationContext!==paymentContext()) invalidateReceiptVerification();
+        updateCheckoutFinancials();
+      }
+    }
 
     function saveLocalDiscounts(syncToServer = true) {
       try {
         localStorage.setItem('duynh_discounts', JSON.stringify(discounts));
       } catch(e) {}
       if (!syncToServer) return;
-      fetch('/api/discounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(discounts)
-      }).catch(() => {});
+      const token=localStorage.getItem('duynh_admin_api_token')||localStorage.getItem('duynh_admin_push_token')||'';
+      fetch(typeof getCloudApiUrl==='function' ? getCloudApiUrl('/api/discounts') : '/api/discounts', {
+        method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},
+        body:JSON.stringify(discounts)
+      }).catch(()=>{});
     }
 
 
@@ -8840,19 +8895,14 @@ async function openPaymentCheckoutModal() {
       const phone = (document.getElementById('checkout-phone') ? document.getElementById('checkout-phone').value.trim() : '') || '0988776655';
       const note = (document.getElementById('checkout-general-note') ? document.getElementById('checkout-general-note').value.trim() : '');
 
-      const rawBeverageTotal = cart.reduce((s, c) => s + (c.item.price * c.qty), 0);
-      let beverageTotal = rawBeverageTotal;
-      let discountDetails = null;
-
-      if (activeDiscount) {
-        const discAmt = Math.round(rawBeverageTotal * (activeDiscount.percent / 100));
-        beverageTotal = Math.max(0, rawBeverageTotal - discAmt);
-        discountDetails = {
-          code: activeDiscount.code,
-          percent: activeDiscount.percent,
-          amount: discAmt
-        };
-      }
+      const salePrice=typeof getSaleCheckoutResult==='function' ? getSaleCheckoutResult() : (()=>{
+        const rawTotal=cart.reduce((sum,c)=>sum+c.item.price*c.qty,0);
+        const amount=activeDiscount?Math.round(rawTotal*activeDiscount.percent/100):0;
+        return {rawTotal,total:rawTotal-amount,amount,discount:activeDiscount?{...activeDiscount,amount}:null};
+      })();
+      const rawBeverageTotal=salePrice.rawTotal;
+      const beverageTotal=salePrice.total;
+      const discountDetails=salePrice.discount;
       const shippingFee = getSelectedShippingFee();
 
       const now = new Date();
@@ -10007,7 +10057,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         return;
       }
 
-      const found = discounts.find(d => d.code.toUpperCase() === codeInput && d.active !== false);
+      const found = discounts.find(d => d?.mode!=='automatic' && typeof d?.code==='string' && d.code.toUpperCase()===codeInput && d.active!==false);
       if (!found) {
         if (statusMsg) {
           statusMsg.style.display = 'block';
@@ -10018,25 +10068,18 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         return;
       }
 
-      const rawBeverageTotal = cart.reduce((s, c) => s + (c.item.price * c.qty), 0);
-      const discountAmt = Math.round(rawBeverageTotal * (found.percent / 100));
-
-      activeDiscount = {
-        code: found.code,
-        percent: found.percent,
-        amount: discountAmt,
-        desc: found.desc
-      };
-
-      found.usedCount = (found.usedCount || 0) + 1;
-      saveLocalDiscounts();
+      activeDiscount={code:found.code,percent:found.percent,desc:found.desc};
+      const price=getSaleCheckoutResult(),discountAmt=price.amount;
+      if(receiptVerificationContext && receiptVerificationContext!==paymentContext()) invalidateReceiptVerification();
 
       if (badge) badge.style.display = 'inline-block';
       if (cancelBtn) cancelBtn.style.display = 'inline-block';
       if (statusMsg) {
         statusMsg.style.display = 'block';
         statusMsg.style.color = '#15803D';
-        statusMsg.innerHTML = `🎉 Áp dụng thành công mã <b>${found.code}</b>: Giảm ${found.percent}% (-${formatMoney(discountAmt)})!`;
+        statusMsg.textContent=price.discount?.mode==='automatic'
+        ? '🏷️ SALE đang giảm nhiều hơn voucher '+found.code+' (-'+formatMoney(discountAmt)+').'
+        : '🎉 Đã áp dụng voucher '+found.code+' (-'+formatMoney(discountAmt)+').';
       }
 
       updateCheckoutFinancials();
@@ -10065,32 +10108,29 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     // TÍNH TOÁN LẠI TỔNG TIỀN VÀ CẬP NHẬT MÃ VIETQR KHI CÓ DISCOUNT
     function updateCheckoutFinancials() {
       renderPaymentBankInfo();
-      const rawBeverageTotal = cart.reduce((s, c) => s + (c.item.price * c.qty), 0);
-      let finalBeverageTotal = rawBeverageTotal;
+      const price=typeof getSaleCheckoutResult==='function' ? getSaleCheckoutResult() : (()=> {
+        const rawTotal=cart.reduce((s,c)=>s+c.item.price*c.qty,0);
+        const amount=activeDiscount?Math.round(rawTotal*activeDiscount.percent/100):0;
+        return {rawTotal,total:rawTotal-amount,amount,discount:activeDiscount};
+      })();
+      const rawBeverageTotal=price.rawTotal,finalBeverageTotal=price.total;
 
       const origRow = document.getElementById('summary-original-beverage-row');
       const discRow = document.getElementById('summary-discount-row');
       const discLabel = document.getElementById('summary-discount-label');
       const discAmtText = document.getElementById('checkout-discount-amount-text');
 
-      if (activeDiscount) {
-        const discountAmt = Math.round(rawBeverageTotal * (activeDiscount.percent / 100));
-        activeDiscount.amount = discountAmt;
-        finalBeverageTotal = Math.max(0, rawBeverageTotal - discountAmt);
-
-        if (origRow) {
-          origRow.style.display = 'flex';
-          const origText = document.getElementById('checkout-original-beverage-text');
-          if (origText) origText.textContent = formatMoney(rawBeverageTotal);
-        }
-        if (discRow) {
-          discRow.style.display = 'flex';
-          if (discLabel) discLabel.textContent = `${activeDiscount.percent}%`;
-          if (discAmtText) discAmtText.textContent = `-${formatMoney(discountAmt)}`;
-        }
-      } else {
-        if (origRow) origRow.style.display = 'none';
-        if (discRow) discRow.style.display = 'none';
+      if(price.amount>0){
+        if(origRow)origRow.style.display='flex';
+        const origText=document.getElementById('checkout-original-beverage-text');
+        if(origText)origText.textContent=formatMoney(rawBeverageTotal);
+        if(discRow)discRow.style.display='flex';
+        if(discLabel)discLabel.textContent=price.discount?.mode==='automatic'
+          ? 'SALE · '+price.discount.title : (price.discount?.percent||0)+'%';
+        if(discAmtText)discAmtText.textContent='-'+formatMoney(price.amount);
+      }else{
+        if(origRow)origRow.style.display='none';
+        if(discRow)discRow.style.display='none';
       }
 
       const bevText = document.getElementById('checkout-beverage-total-text');
@@ -10115,10 +10155,11 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       const badgeCount = document.getElementById('badge-count-discounts');
       const statTotal = document.getElementById('stat-total-discounts');
       if (badgeCount) badgeCount.textContent = discounts.filter(d => d.active !== false).length;
-      if (statTotal) statTotal.textContent = `${discounts.length} Mã giảm giá`;
+      if (statTotal) statTotal.textContent = `${discounts.filter(d=>d.mode!=='automatic').length} Mã giảm giá`;
+      window.MomSaleAdmin?.render();
       if (!tbody) return;
 
-      tbody.innerHTML = discounts.map(d => `
+      tbody.innerHTML = discounts.filter(d=>d.mode!=='automatic').map(d => `
         <tr>
           <td><b style="font-size:1.05rem; color:var(--primary);">${d.code}</b></td>
           <td>
@@ -10178,7 +10219,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         return;
       }
 
-      if (discounts.some(d => d.code.toUpperCase() === codeInput)) {
+      if (discounts.some(d => typeof d.code==='string' && d.code.toUpperCase() === codeInput)) {
         alert(`Mã "${codeInput}" đã tồn tại! Vui lòng chọn tên mã khác.`);
         return;
       }
@@ -10945,6 +10986,9 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         const stockLeft = (item.stock !== undefined) ? item.stock : 50;
         const itemName = getItemLocalizedName(item);
         const itemDesc = getItemLocalizedDesc(item);
+        const salePreview=window.MomSalePricing?.calculate([{id:item.id,unitPrice:item.price,qty:1}],discounts,'');
+        const salePrice=salePreview?.total ?? item.price;
+        const hasSale=salePrice < item.price;
 
         let badgeHtml = '';
         if (item.isBestSeller) {
@@ -10960,13 +11004,14 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
             <div class="product-img-box">
               <img src="${item.image || getCategoryFallbackSvg(item.category, itemName)}" alt="${itemName}" class="product-img" loading="lazy" decoding="async" onerror="this.onerror=null; this.src=window.getSafeProductImageFallback(this.getAttribute('data-category') || 'tea', this.getAttribute('alt') || 'Mom');" data-category="${item.category}">
               ${badgeHtml}
+              ${hasSale && !isOutOfStock ? '<span class="mom-sale-badge" style="position:absolute;right:8px;top:8px;">SALE</span>':''}
               ${(!isOutOfStock && stockLeft <= 10) ? `<span class="product-stock-tag stock-low">Chỉ còn ${stockLeft}</span>` : ''}
             </div>
             <div class="product-info">
               <div class="product-name">${itemName}</div>
               <div class="product-desc">${itemDesc}</div>
               <div class="product-bottom">
-                <div class="product-price">${formatMoney(item.price)}</div>
+                <div class="product-price">${hasSale ? '<span class="mom-sale-original">'+formatMoney(item.price)+'</span> <span>'+formatMoney(salePrice)+'</span>' : formatMoney(item.price)}</div>
                 <div class="product-card-actions">
                   <button type="button" class="btn-card-add" onclick="event.stopPropagation(); openProductCustomModal(${item.id})" ${isOutOfStock ? 'disabled' : ''}>
                     ${isOutOfStock ? 'Hết' : '+ Thêm'}
@@ -11015,7 +11060,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       const bar = document.getElementById('floating-cart-bar');
       if (!bar) return;
       const count = cart.reduce((s, c) => s + c.qty, 0);
-      const total = cart.reduce((s, c) => s + (c.item.price * c.qty), 0);
+      const total=getSaleCheckoutResult().total;
 
       if (count <= 0) {
         hideFloatingCartNow();
@@ -11068,7 +11113,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       const bar = document.getElementById('floating-cart-bar');
       if (!bar) return;
       const count = cart.reduce((s, c) => s + c.qty, 0);
-      const total = cart.reduce((s, c) => s + (c.item.price * c.qty), 0);
+      const total=getSaleCheckoutResult().total;
 
       const countBadge = document.getElementById('floating-cart-count');
       const totalText = document.getElementById('floating-cart-total');
@@ -11101,7 +11146,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         return;
       }
 
-      const total = cart.reduce((s, c) => s + (c.item.price * c.qty), 0);
+      const pricing=getSaleCheckoutResult(),total=pricing.total;
 
       container.innerHTML = cart.map((c, idx) => `
         <div class="cart-item-row">
@@ -11120,7 +11165,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         </div>
       `).join('');
 
-      if (subtotalElem) subtotalElem.textContent = formatMoney(total);
+      if (subtotalElem) subtotalElem.textContent = formatMoney(pricing.rawTotal);
       if (totalElem) totalElem.textContent = formatMoney(total);
     }
 
@@ -12199,6 +12244,11 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     window.closeQuickRestockModal = closeQuickRestockModal;
     window.executeQuickRestock = executeQuickRestock;
     window.renderCustomerProducts = renderCustomerProducts;
+    // Inline fallbacks allow early interaction before deferred sale-admin.js loads.
+    window.toggleSaleProducts = () => window.MomSaleAdmin?.toggleProducts?.();
+    window.renderSaleProducts = () => window.MomSaleAdmin?.products?.();
+    window.createAutomaticSale = () => window.MomSaleAdmin?.create?.();
+    window.loginSaleAdmin = () => window.MomSaleAdmin?.login?.();
     window.renderFrontendBanner = renderFrontendBanner;
     window.openProductCustomModal = openProductCustomModal;
     window.closeProductCustomModal = closeProductCustomModal;

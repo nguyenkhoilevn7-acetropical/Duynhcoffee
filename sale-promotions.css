@@ -1,0 +1,42 @@
+.mom-sale-admin{border:1px solid #d3e8db;border-radius:18px;padding:16px;margin:0 0 22px;background:linear-gradient(160deg,#f4fbf6,#fff);color:#173a2a}
+.mom-sale-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.mom-sale-top h3{margin:0 0 4px;font-size:1.17rem;color:#1b4a31}
+.mom-sale-top p,.mom-sale-note{margin:0;font-size:.88rem;color:#566b5e;line-height:1.55}
+.mom-sale-count{background:#e5f5e9;color:#166534;border-radius:999px;padding:6px 12px;font-size:.8rem;font-weight:800}
+.mom-sale-fields{display:grid;grid-template-columns:2fr 1fr 1fr 1.3fr;gap:12px;margin-bottom:14px}
+.mom-sale-fields label,.mom-sale-products-wrap>label{font-weight:700;color:#284b37;font-size:.86rem;display:flex;flex-direction:column;gap:6px}
+.mom-sale-fields .form-control,.mom-sale-products-wrap .form-control{width:100%;min-height:44px;font-size:16px;border-radius:12px}
+.mom-sale-dates{grid-template-columns:1fr 1fr 1fr;align-items:end}
+.mom-sale-checkbox{flex-direction:row!important;align-items:center;gap:10px!important;min-height:44px}
+.mom-sale-checkbox input{width:21px;height:21px;accent-color:#20804e}
+.mom-sale-products-wrap{background:#fff;border:1px solid #d7e6dc;border-radius:13px;padding:12px;margin-bottom:14px}
+.mom-sale-products-wrap input[type=search]{margin:8px 0}
+.mom-sale-products{max-height:210px;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:7px}
+.mom-sale-product-row{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:10px;border:1px solid #e2ece5;background:#fbfdfb;font-size:.86rem;line-height:1.35;min-height:44px;cursor:pointer}
+.mom-sale-product-row input{width:19px;height:19px;accent-color:#20804e;flex-shrink:0}
+.mom-sale-product-row:has(input:checked){background:#ebf8ee;border-color:#92cfa1}
+.mom-sale-save{min-height:44px!important;max-width:340px;margin:12px 0 2px;font-size:.9rem!important}
+#mom-sale-message{font-size:.86rem;min-height:16px;font-weight:700}
+.mom-sale-list{display:grid;gap:10px;margin-top:10px}
+.mom-sale-card{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#fff;border:1px solid #dce9e0;border-radius:14px;padding:12px}
+.mom-sale-card-text{flex:1;min-width:0}
+.mom-sale-card strong{font-size:.95rem;color:#143b25}
+.mom-sale-card small{display:block;color:#5b6b5f;font-size:.82rem;line-height:1.5;margin-top:4px}
+.mom-sale-card-actions{display:flex;align-items:center;flex-wrap:wrap;gap:7px}
+.mom-sale-card-actions button{min-height:42px;border-radius:10px;border:1px solid #c8dcd0;padding:7px 10px;background:#fff;color:#225b3c;font-weight:700;cursor:pointer}
+.mom-sale-card-actions .mom-sale-danger{color:#b42332;border-color:#f0c5cb;background:#fff4f5}
+.mom-sale-pill{font-size:.75rem;font-weight:750;border-radius:999px;padding:3px 8px;background:#eaf4ec;color:#166534}
+.mom-sale-pill.off{color:#745b54;background:#f4f0ed}
+#product-custom-modal .mom-sale-price{display:inline-flex;gap:8px;align-items:center;justify-content:center}
+.mom-sale-original{text-decoration:line-through;color:#858b85;font-size:.8em;font-weight:500}
+.mom-sale-badge{display:inline-flex;padding:3px 8px;background:#c93333;color:#fff;border-radius:10px;font-size:.75rem;font-weight:800}
+@media(max-width:760px){.mom-sale-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.mom-sale-dates{grid-template-columns:repeat(2,minmax(0,1fr))}.mom-sale-products{grid-template-columns:1fr}}
+@media(max-width:430px){.mom-sale-fields,.mom-sale-dates{grid-template-columns:1fr}.mom-sale-admin{padding:12px}.mom-sale-save{width:100%;max-width:none}}
+
+.mom-sale-auth{margin-top:12px;border:1px solid #d7e6dc;padding:10px 12px;border-radius:12px;background:#fff}
+.mom-sale-auth summary{cursor:pointer;font-size:.85rem;font-weight:720;color:#1f5737}
+.mom-sale-auth-fields{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-top:11px}
+.mom-sale-auth-fields label{display:flex;flex-direction:column;gap:5px;font-size:.85rem;font-weight:650}
+.mom-sale-auth-fields input{min-height:44px;font-size:16px}
+.mom-sale-auth-fields button{min-height:44px}
+@media(max-width:700px){.mom-sale-auth-fields{grid-template-columns:1fr}}
