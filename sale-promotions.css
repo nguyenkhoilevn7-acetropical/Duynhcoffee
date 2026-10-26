@@ -32,3 +32,11 @@
 .mom-sale-badge{display:inline-flex;padding:3px 8px;background:#c93333;color:#fff;border-radius:10px;font-size:.75rem;font-weight:800}
 @media(max-width:760px){.mom-sale-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.mom-sale-dates{grid-template-columns:repeat(2,minmax(0,1fr))}.mom-sale-products{grid-template-columns:1fr}}
 @media(max-width:430px){.mom-sale-fields,.mom-sale-dates{grid-template-columns:1fr}.mom-sale-admin{padding:12px}.mom-sale-save{width:100%;max-width:none}}
+
+.mom-sale-auth{margin-top:12px;border:1px solid #d7e6dc;padding:10px 12px;border-radius:12px;background:#fff}
+.mom-sale-auth summary{cursor:pointer;font-size:.85rem;font-weight:720;color:#1f5737}
+.mom-sale-auth-fields{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-top:11px}
+.mom-sale-auth-fields label{display:flex;flex-direction:column;gap:5px;font-size:.85rem;font-weight:650}
+.mom-sale-auth-fields input{min-height:44px;font-size:16px}
+.mom-sale-auth-fields button{min-height:44px}
+@media(max-width:700px){.mom-sale-auth-fields{grid-template-columns:1fr}}
