@@ -5654,7 +5654,8 @@ body {
     let receiptScanGeneration = 0;
     function paymentContext() {
       return JSON.stringify({ items: cart.map(c => ({ id: c.item.id, qty: c.qty, price: c.item.price, toppings: c.toppings || [] })),
-        discount: activeDiscount ? activeDiscount.code : null, sale:getSaleCheckoutResult().discount, bank: storeConfig.bankConfig });
+        discount: activeDiscount ? activeDiscount.code : null,
+      sale: typeof getSaleCheckoutResult==='function' ? getSaleCheckoutResult().discount : null, bank: storeConfig.bankConfig });
     }
     function invalidateReceiptVerification() {
       receiptScanGeneration++;
@@ -6035,7 +6036,7 @@ body {
             discounts = freshDiscounts;
             lastDiscountsVersion = payload.discountsVersion || lastDiscountsVersion;
             saveLocalDiscounts(false);
-            refreshSaleUi();
+            if(typeof refreshSaleUi==='function')refreshSaleUi();
             if (isAdminDevice) {
               renderAdminDiscountsTable();
             }
@@ -6087,7 +6088,7 @@ body {
           if (Array.isArray(pData.discounts)) {
             if (!lastDiscountsVersion || (pData.discountsVersion && pData.discountsVersion !== lastDiscountsVersion) || !isInitialLoadDone) {
               discountsChanged = JSON.stringify(discounts) !== JSON.stringify(pData.discounts);
-              if (discountsChanged) { discounts = pData.discounts; saveLocalDiscounts(false); refreshSaleUi(); }
+              if (discountsChanged) { discounts = pData.discounts; saveLocalDiscounts(false); if(typeof refreshSaleUi==='function')refreshSaleUi(); }
               lastDiscountsVersion = pData.discountsVersion || lastDiscountsVersion;
             }
           }
@@ -8200,8 +8201,11 @@ function openProductCustomModal(itemId) {
     ];
     let activeDiscount = null;
     function getSaleCheckoutResult() {
-      return window.MomSalePricing.calculate(cart.map(c => ({ id:c.item.id,qty:c.qty,unitPrice:c.item.price })),
-        discounts,activeDiscount?.code || '');
+      const rows=cart.map(c=>({id:c.item.id,qty:c.qty,unitPrice:c.item.price}));
+      if(window.MomSalePricing?.calculate)return window.MomSalePricing.calculate(rows,discounts,activeDiscount?.code||'');
+      const rawTotal=rows.reduce((s,i)=>s+i.qty*i.unitPrice,0);
+      const amount=activeDiscount?Math.round(rawTotal*(activeDiscount.percent||0)/100):0;
+      return {rawTotal,total:rawTotal-amount,amount,discount:activeDiscount};
     }
     function refreshSaleUi() {
       if (typeof renderCustomerProducts==='function') renderCustomerProducts();
@@ -8883,7 +8887,11 @@ async function openPaymentCheckoutModal() {
       const phone = (document.getElementById('checkout-phone') ? document.getElementById('checkout-phone').value.trim() : '') || '0988776655';
       const note = (document.getElementById('checkout-general-note') ? document.getElementById('checkout-general-note').value.trim() : '');
 
-      const salePrice=getSaleCheckoutResult();
+      const salePrice=typeof getSaleCheckoutResult==='function' ? getSaleCheckoutResult() : (()=>{
+        const rawTotal=cart.reduce((sum,c)=>sum+c.item.price*c.qty,0);
+        const amount=activeDiscount?Math.round(rawTotal*activeDiscount.percent/100):0;
+        return {rawTotal,total:rawTotal-amount,amount,discount:activeDiscount?{...activeDiscount,amount}:null};
+      })();
       const rawBeverageTotal=salePrice.rawTotal;
       const beverageTotal=salePrice.total;
       const discountDetails=salePrice.discount;
@@ -10092,7 +10100,12 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
     // TÍNH TOÁN LẠI TỔNG TIỀN VÀ CẬP NHẬT MÃ VIETQR KHI CÓ DISCOUNT
     function updateCheckoutFinancials() {
       renderPaymentBankInfo();
-      const price=getSaleCheckoutResult(),rawBeverageTotal=price.rawTotal,finalBeverageTotal=price.total;
+      const price=typeof getSaleCheckoutResult==='function' ? getSaleCheckoutResult() : (()=> {
+        const rawTotal=cart.reduce((s,c)=>s+c.item.price*c.qty,0);
+        const amount=activeDiscount?Math.round(rawTotal*activeDiscount.percent/100):0;
+        return {rawTotal,total:rawTotal-amount,amount,discount:activeDiscount};
+      })();
+      const rawBeverageTotal=price.rawTotal,finalBeverageTotal=price.total;
 
       const origRow = document.getElementById('summary-original-beverage-row');
       const discRow = document.getElementById('summary-discount-row');
