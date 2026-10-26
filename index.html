@@ -728,6 +728,20 @@
       color: var(--text-main);
     }
 
+    /* Product popup only: keep + / − comfortably separated from the quantity. */
+    #product-custom-modal .ios-qty-stepper {
+      gap: 10px;
+      padding-inline: 10px;
+      flex-wrap: nowrap;
+    }
+    #product-custom-modal #ios-custom-qty-display {
+      display: inline-block;
+      min-width: 20px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+
     .ios-add-cart-btn {
       background: var(--primary);
       color: #FFF;
