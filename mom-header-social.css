@@ -1,0 +1,89 @@
+/* Mom’s social links: move original controls into the top-right header.
+   Same IDs, provider URLs, TikTok pending behavior, no new JS/API. */
+header .header-inner > .mom-header-social {
+  display: flex !important;
+  position: relative;
+  margin: 0 0 0 8px !important;
+  padding: 0 !important;
+  flex: 0 0 auto;
+  align-self: center;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px !important;
+  flex-wrap: nowrap !important;
+}
+header .mom-header-social .social-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box;
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  flex: 0 0 44px !important;
+  border-radius: 50% !important;
+  border: 1px solid rgba(28,69,39,.10) !important;
+  padding: 0 !important;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(26,60,32,.09) !important;
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+header .mom-header-social .social-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 15px rgba(26,60,32,.14) !important;
+}
+header .mom-header-social .social-button:focus-visible {
+  outline: 3px solid #92bf70;
+  outline-offset: 2px;
+}
+header .mom-header-social .social-facebook {
+  background: #fff !important;
+  color: #1877f2 !important;
+}
+header .mom-header-social .social-facebook svg {
+  width: 40px !important;
+  height: 40px !important;
+}
+header .mom-header-social .social-tiktok {
+  background: #151515 !important;
+  color: #fff !important;
+}
+header .mom-header-social .social-tiktok svg {
+  width: 22px !important;
+  height: 22px !important;
+}
+header .mom-header-social [hidden] {
+  display: none !important;
+}
+header .mom-header-social .social-button:disabled {
+  cursor: default !important;
+  opacity: .55 !important;
+}
+body:has(#view-backend.active) header .mom-header-social {
+  display: none !important;
+}
+@media (max-width: 800px) {
+  body:has(#view-customer.active) header .header-inner {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    justify-content: space-between !important;
+  }
+  body:has(#view-customer.active) header .brand-logo-area {
+    margin: 0 auto 0 0 !important;
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+  body:has(#view-customer.active) header .mom-header-social {
+    display: flex !important;
+    margin: 0 0 0 auto !important;
+    gap: 7px !important;
+    flex-shrink: 0;
+  }
+}
+@media (max-width: 359px) {
+  body:has(#view-customer.active) header .mom-header-social { gap: 4px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  header .mom-header-social .social-button { transition: none !important; }
+}
