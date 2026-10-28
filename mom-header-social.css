@@ -1,4 +1,4 @@
-/* Mom’s header glyphs (approved preview): Facebook blue f and black TikTok note only.
+/* Mom’s header glyphs: optically aligned blue Facebook f and black TikTok note.
    44px invisible hit targets retained; no circle, border, shadow or background.
    Same IDs, provider URLs, TikTok pending behavior, no JS/API changes. */
 header .header-inner > .mom-header-social {
@@ -44,20 +44,23 @@ header .mom-header-social .social-facebook {
   color: #1877F2 !important;
 }
 header .mom-header-social .social-facebook svg {
-  width: 34px !important;
-  height: 34px !important;
+  width: 32px !important;
+  height: 32px !important;
 }
 header .mom-header-social .social-tiktok {
   background: transparent !important;
   color: #101010 !important;
 }
 header .mom-header-social .social-tiktok svg {
-  width: 27px !important;
-  height: 27px !important;
+  width: 32px !important;
+  height: 32px !important;
 }
 header .mom-header-social .social-button svg {
-  fill: currentColor !important;
   display: block;
+  flex-shrink: 0;
+  align-self: center;
+  vertical-align: middle;
+  fill: currentColor !important;
 }
 header .mom-header-social [hidden] {
   display: none !important;
