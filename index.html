@@ -3336,7 +3336,9 @@ body {
   <link rel="stylesheet" href="sale-promotions.css?v=20261026-1">
   <link rel="stylesheet" href="admin-ios.css?v=20261025-2">
   <script src="sale-promotions.js?v=20261026-1" defer></script>
-  <script src="sale-admin.js?v=20261026-1" defer></script>
+  <script src="sale-admin.js?v=20261028-1" defer></script>
+  <link rel="stylesheet" href="sale-banner.css?v=20261028-1">
+  <script src="sale-banner.js?v=20261028-1" defer></script>
   <script src="admin-ios.js?v=20261025-2" defer></script>
   <!-- Presentation-only Mom customer storefront theme; loaded after legacy styles. -->
   <link rel="stylesheet" href="mom-storefront.css?v=20261028-1">
@@ -3440,6 +3442,8 @@ body {
           </h1>
           <p id="hero-desc-text" style="font-size: 0.86rem; color: rgba(255,255,255,0.85); margin-top: 6px; max-width: 520px; line-height: 1.5;"></p>
           <div id="hero-promo-badge-container" style="margin-top: 10px;"></div>
+          <!-- Live/scheduled SALE area only; hidden when all campaigns are off or expired. -->
+          <div id="mom-sale-hero" hidden aria-live="off" aria-label="Thông báo chương trình SALE"></div>
           <a class="mom-hero-cta" href="#mom-menu-section" aria-label="Đến danh sách món uống">Đặt hàng ngay <span aria-hidden="true">→</span></a>
         </div>
         <div id="hero-banner-image-container" class="hero-banner-image-container" style="display: none;"></div>
@@ -3724,6 +3728,10 @@ body {
               <label>Mức giảm<input class="form-control" id="mom-sale-value" type="number" min="1" step="1" placeholder="20"></label>
               <label>Áp dụng cho<select class="form-control" id="mom-sale-scope" onchange="toggleSaleProducts()"><option value="selected">Sản phẩm tùy chọn</option><option value="all">Tất cả sản phẩm</option></select></label>
             </div>
+            <label class="mom-sale-reason-label" for="mom-sale-reason">Lý do SALE / Thông điệp gửi khách
+              <textarea class="form-control" id="mom-sale-reason" rows="2" maxlength="240"
+                placeholder="Ví dụ: Mừng khai trương — cảm ơn khách hàng đã đồng hành."></textarea>
+            </label>
             <div id="mom-sale-products-wrap" class="mom-sale-products-wrap">
               <label for="mom-sale-search">Chọn món được giảm giá</label>
               <input class="form-control" id="mom-sale-search" type="search" placeholder="🔎 Tìm món..." oninput="renderSaleProducts()">
@@ -8420,6 +8428,15 @@ function openProductCustomModal(itemId) {
       { id: 3, code: "VIP50", percent: 50, desc: "Mã tri ân khách hàng thân thiết 50%", active: true, usedCount: 4 }
     ];
     let activeDiscount = null;
+    window.getMomPublicSales=()=>discounts;
+    window.getMomPublicMenu=()=>menu;
+    window.refreshMomSaleBoundary=()=>{
+      if(typeof renderCustomerProducts==='function')renderCustomerProducts();
+      if(document.getElementById('checkout-modal')?.style.display==='flex'){
+        if(receiptVerificationContext && receiptVerificationContext!==paymentContext())invalidateReceiptVerification();
+        updateCheckoutFinancials();
+      }
+    };
     function getSaleCheckoutResult() {
       const rows=cart.map(c=>({id:c.item.id,qty:c.qty,unitPrice:c.item.price}));
       if(window.MomSalePricing?.calculate)return window.MomSalePricing.calculate(rows,discounts,activeDiscount?.code||'');
@@ -8428,6 +8445,7 @@ function openProductCustomModal(itemId) {
       return {rawTotal,total:rawTotal-amount,amount,discount:activeDiscount};
     }
     function refreshSaleUi() {
+      window.MomSaleBanner?.refresh();
       if (typeof renderCustomerProducts==='function') renderCustomerProducts();
       window.MomSaleAdmin?.render();
       if (document.getElementById('checkout-modal')?.style.display==='flex') {
