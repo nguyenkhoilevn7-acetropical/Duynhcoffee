@@ -6,6 +6,20 @@
 })(function () {
   'use strict';
   const catalog = {
+  "✍️ Nội dung “Câu chuyện Mom’s”": "✍️ Mom’s story content",
+  "Chỉnh các dòng chữ trong khung giới thiệu ở trang khách. Hai ngôn ngữ được lưu chung trên máy chủ Render và đồng bộ đến các thiết bị. Nút bấm luôn dẫn đến Thực đơn.": "Edit the text in the customer story panel. Both languages are saved on Render and synchronized between devices. The button always opens the menu.",
+  "🇻🇳 Tiếng Việt": "🇻🇳 Vietnamese",
+  "Nhãn nhỏ phía trên": "Small heading label",
+  "Tiêu đề chính": "Main headline",
+  "Đoạn giới thiệu": "Description",
+  "Khẩu hiệu dưới logo": "Slogan beneath the logo",
+  "Chữ trên nút": "Button text",
+  "Xem trước:": "Preview:",
+  "Tiếng Việt": "Vietnamese",
+  "Chỉnh nội dung và nhấn Lưu.": "Edit the content and press Save.",
+  "💾 Lưu Câu chuyện Mom’s": "💾 Save Mom’s story",
+  "Câu chuyện Mom’s": "Mom’s story",
+  "Tùy chỉnh nội dung Câu chuyện Mom’s": "Edit Mom’s story content",
   "Điều hướng điện thoại": "Mobile navigation",
   "Giỏ hàng": "Cart",
   "Tra cứu": "Track",

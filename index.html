@@ -3342,6 +3342,7 @@ body {
   <link rel="stylesheet" href="mom-storefront.css?v=20261028-1">
   <link rel="stylesheet" href="mom-mobile-refinement.css?v=20261028-3">
   <link rel="stylesheet" href="mom-header-social.css?v=20261028-4">
+  <link rel="stylesheet" href="mom-story-admin.css?v=20261028-1">
   <script src="mom-mobile-nav.js?v=20261028-2" defer></script>
 </head>
 <body>
@@ -3470,12 +3471,12 @@ body {
       <div class="products-grid" id="customer-products-grid"></div>
 
       <section class="mom-story-card" id="mom-story" aria-label="Giới thiệu Mom’s Tea & Coffee">
-        <div class="mom-story-art"><img src="/public/mom-logo-white.jpg" alt="Mom’s Tea & Coffee" loading="lazy" decoding="async"><em>Good drinks · Good mood</em></div>
+        <div class="mom-story-art"><img src="/public/mom-logo-white.jpg" alt="Mom’s Tea & Coffee" loading="lazy" decoding="async"><em id="mom-story-slogan">Good drinks · Good mood</em></div>
         <div class="mom-story-copy">
-          <span class="mom-kicker">CÂU CHUYỆN MOM’S</span>
-          <h2>Trà ngon từ trái tim.</h2>
-          <p>Một chút trà, một chút cà phê và những khoảnh khắc dễ chịu mỗi ngày. Mom’s Tea & Coffee phục vụ đặt món trực tuyến, để thức uống bạn yêu thích luôn gần hơn.</p>
-          <a href="#mom-menu-section">Xem thực đơn <span aria-hidden="true">↗</span></a>
+          <span class="mom-kicker" id="mom-story-eyebrow">CÂU CHUYỆN MOM’S</span>
+          <h2 id="mom-story-headline">Trà ngon từ trái tim.</h2>
+          <p id="mom-story-description">Một chút trà, một chút cà phê và những khoảnh khắc dễ chịu mỗi ngày. Mom’s Tea & Coffee phục vụ đặt món trực tuyến, để thức uống bạn yêu thích luôn gần hơn.</p>
+          <a href="#mom-menu-section"><span id="mom-story-cta">Xem thực đơn</span> <span aria-hidden="true">↗</span></a>
         </div>
       </section>
 
@@ -4024,6 +4025,39 @@ body {
             💾 LƯU CẤU HÌNH QUÁN
           </button>
         </div>
+        <section class="mom-story-admin-card" id="mom-story-admin-card" aria-label="Tùy chỉnh nội dung Câu chuyện Mom’s">
+          <h3>✍️ Nội dung “Câu chuyện Mom’s”</h3>
+          <p class="mom-story-admin-hint">Chỉnh các dòng chữ trong khung giới thiệu ở trang khách. Hai ngôn ngữ được lưu chung trên máy chủ Render và đồng bộ đến các thiết bị. Nút bấm luôn dẫn đến Thực đơn.</p>
+          <div class="mom-story-editor-cols">
+            <div class="mom-story-editor-language">
+              <h4>🇻🇳 Tiếng Việt</h4>
+              <div class="form-group"><label for="story-eyebrow">Nhãn nhỏ phía trên</label><input id="story-eyebrow" class="form-control mom-story-editor-input" maxlength="80" required oninput="previewMomStoryEditor()"></div>
+              <div class="form-group"><label for="story-headline">Tiêu đề chính</label><input id="story-headline" class="form-control mom-story-editor-input" maxlength="130" required oninput="previewMomStoryEditor()"></div>
+              <div class="form-group"><label for="story-description">Đoạn giới thiệu</label><textarea id="story-description" class="form-control mom-story-editor-input" maxlength="800" rows="4" required oninput="previewMomStoryEditor()"></textarea></div>
+              <div class="form-group"><label for="story-slogan">Khẩu hiệu dưới logo</label><input id="story-slogan" class="form-control mom-story-editor-input" maxlength="100" required oninput="previewMomStoryEditor()"></div>
+              <div class="form-group"><label for="story-cta">Chữ trên nút</label><input id="story-cta" class="form-control mom-story-editor-input" maxlength="50" required oninput="previewMomStoryEditor()"></div>
+            </div>
+            <div class="mom-story-editor-language">
+              <h4>🇬🇧 English</h4>
+              <div class="form-group"><label for="story-eyebrow-en">Small label</label><input id="story-eyebrow-en" class="form-control mom-story-editor-input" maxlength="80" required oninput="previewMomStoryEditor()"></div>
+              <div class="form-group"><label for="story-headline-en">Headline</label><input id="story-headline-en" class="form-control mom-story-editor-input" maxlength="130" required oninput="previewMomStoryEditor()"></div>
+              <div class="form-group"><label for="story-description-en">Description</label><textarea id="story-description-en" class="form-control mom-story-editor-input" maxlength="800" rows="4" required oninput="previewMomStoryEditor()"></textarea></div>
+              <div class="form-group"><label for="story-slogan-en">Tagline under logo</label><input id="story-slogan-en" class="form-control mom-story-editor-input" maxlength="100" required oninput="previewMomStoryEditor()"></div>
+              <div class="form-group"><label for="story-cta-en">Button label</label><input id="story-cta-en" class="form-control mom-story-editor-input" maxlength="50" required oninput="previewMomStoryEditor()"></div>
+            </div>
+          </div>
+          <label class="mom-story-preview-language">Xem trước:
+            <select id="mom-story-preview-language" onchange="previewMomStoryEditor()"><option value="vi">Tiếng Việt</option><option value="en">English</option></select>
+          </label>
+          <div class="mom-story-admin-preview" aria-live="polite">
+            <div><span id="story-preview-eyebrow">CÂU CHUYỆN MOM’S</span><h4 id="story-preview-headline">Trà ngon từ trái tim.</h4><p id="story-preview-description"></p><span id="story-preview-cta">Xem thực đơn</span></div>
+            <em id="story-preview-slogan">Good drinks · Good mood</em>
+          </div>
+          <div class="mom-story-admin-actions">
+            <span id="mom-story-save-status" role="status" aria-live="polite">Chỉnh nội dung và nhấn Lưu.</span>
+            <button type="button" id="btn-save-mom-story" class="btn-checkout-now" onclick="saveMomStorySettings()">💾 Lưu Câu chuyện Mom’s</button>
+          </div>
+        </section>
       </div>
     </section>
 
@@ -5411,6 +5445,7 @@ body {
       if (typeof isAdminViewActive === 'function' && isAdminViewActive()) renderAllBackendTabs();
       if (document.getElementById('checkout-modal')?.style.display === 'flex') renderCheckoutItemsPreview();
       applyLanguageToStaticDom();
+      if (typeof renderMomStory==='function') renderMomStory();
     }
     window.setLanguage = setLanguage;
     function toggleLanguage() { setLanguage(currentLang === 'vi' ? 'en' : 'vi'); }
@@ -5758,6 +5793,113 @@ body {
       }
       if (receiptVerificationContext && receiptVerificationContext !== paymentContext()) invalidateReceiptVerification();
     }
+
+    // Câu chuyện Mom’s — plain-text content, stored centrally and translated explicitly.
+    const MOM_STORY_DEFAULTS = {
+      eyebrow:'CÂU CHUYỆN MOM’S', eyebrow_en:'THE MOM’S STORY',
+      headline:'Trà ngon từ trái tim.', headline_en:'Tea made with heart.',
+      description:'Một chút trà, một chút cà phê và những khoảnh khắc dễ chịu mỗi ngày. Mom’s Tea & Coffee phục vụ đặt món trực tuyến, để thức uống bạn yêu thích luôn gần hơn.',
+      description_en:'A little tea, a little coffee, and comforting moments every day. Mom’s Tea & Coffee serves online orders, bringing your favorite drinks closer to you.',
+      slogan:'Good drinks · Good mood', slogan_en:'Good drinks · Good mood',
+      cta:'Xem thực đơn', cta_en:'View menu'
+    };
+    const MOM_STORY_FIELDS = Object.keys(MOM_STORY_DEFAULTS);
+    function momStoryConfig() {
+      return {...MOM_STORY_DEFAULTS, ...((storeConfig && storeConfig.storyContent) || {})};
+    }
+    function renderMomStory() {
+      const story=momStoryConfig(),english=(typeof currentLang==='string' && currentLang==='en');
+      const assign=(id,key)=>{
+        const el=document.getElementById(id);
+        if(el)el.textContent=story[english ? key+'_en' : key] || MOM_STORY_DEFAULTS[english ? key+'_en' : key];
+      };
+      assign('mom-story-eyebrow','eyebrow');
+      assign('mom-story-headline','headline');
+      assign('mom-story-description','description');
+      assign('mom-story-slogan','slogan');
+      assign('mom-story-cta','cta');
+    }
+    function renderMomStoryEditor(force=false) {
+      const story=momStoryConfig();
+      for(const key of MOM_STORY_FIELDS) {
+        const el=document.getElementById('story-'+key.replace(/_en$/,'-en'));
+        if(el && (force || (el.dataset.dirty!=='true' && document.activeElement!==el))) {
+          el.value=story[key];
+          if(force)delete el.dataset.dirty;
+        }
+      }
+      previewMomStoryEditor();
+    }
+    function momStoryEditorDraft() {
+      const draft={};
+      for(const key of MOM_STORY_FIELDS) {
+        const input=document.getElementById('story-'+key.replace(/_en$/,'-en'));
+        if(!input)throw new Error('Không tìm thấy trường nội dung: '+key);
+        const value=input.value.trim();
+        const limit=key.startsWith('description')?800:key.startsWith('headline')?130:key.startsWith('eyebrow')?80:key.startsWith('slogan')?100:50;
+        if(!value || value.length>limit)throw new Error('Vui lòng nhập nội dung '+key+' (tối đa '+limit+' ký tự).');
+        draft[key]=value;
+      }
+      return draft;
+    }
+    function previewMomStoryEditor() {
+      const active=document.activeElement;
+      if(active && active.classList?.contains('mom-story-editor-input'))active.dataset.dirty='true';
+      const language=document.getElementById('mom-story-preview-language')?.value==='en'?'en':'vi';
+      const key=id=>document.getElementById('story-'+id+(language==='en'?'-en':''));
+      const assign=(id,name)=>{
+        const node=document.getElementById('story-preview-'+id);
+        if(node)node.textContent=key(name)?.value || MOM_STORY_DEFAULTS[name+(language==='en'?'_en':'')];
+      };
+      assign('eyebrow','eyebrow');
+      assign('headline','headline');
+      assign('description','description');
+      assign('slogan','slogan');
+      assign('cta','cta');
+    }
+    async function saveMomStorySettings() {
+      const status=document.getElementById('mom-story-save-status');
+      const button=document.getElementById('btn-save-mom-story');
+      if(button?.disabled)return;
+      const token=localStorage.getItem('duynh_admin_api_token') || localStorage.getItem('duynh_admin_push_token') || '';
+      if(!isUserAdmin() || !token) {
+        if(status)status.textContent='Cần đăng nhập quản trị để lưu.';
+        const modal=document.getElementById('admin-login-modal');
+        if(modal)modal.style.display='flex';
+        return;
+      }
+      try {
+        const storyContent=momStoryEditorDraft();
+        if(button)button.disabled=true;
+        if(status)status.textContent='Đang lưu lên máy chủ…';
+        const response=await fetch(getCloudApiUrl('/api/admin/story'),{
+          method:'POST',cache:'no-store',
+          headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+          body:JSON.stringify({storyContent})
+        });
+        let result={};
+        try{result=await response.json();}catch(_){}
+        if(!response.ok || !result.success || !result.config) {
+          if(response.status===401) {
+            localStorage.removeItem('duynh_admin_api_token');
+            localStorage.removeItem('duynh_admin_push_token');
+            const modal=document.getElementById('admin-login-modal');
+            if(modal)modal.style.display='flex';
+          }
+          throw new Error(result.error || 'Không lưu được. HTTP '+response.status);
+        }
+        applyServerConfig(result.config,result.configVersion);
+        renderMomStoryEditor(true);
+        renderMomStory();
+        saveLocalData();
+        if(status)status.textContent='Đã lưu và đồng bộ đến trang khách.';
+        showSmsToast('💾 ĐÃ LƯU CÂU CHUYỆN MOM’S','Nội dung tiếng Việt và tiếng Anh đã đồng bộ.');
+      } catch(error) {
+        if(status)status.textContent='Chưa lưu: '+error.message;
+        showSmsToast('⚠️ CHƯA LƯU ĐƯỢC',error.message);
+      } finally {if(button)button.disabled=false;}
+    }
+
     function applyServerConfig(config, version) {
       if (!config || typeof config !== 'object' || Array.isArray(config)) return false;
       if (version && lastConfigVersion && version < lastConfigVersion) return false;
@@ -5775,6 +5917,7 @@ body {
       renderPaymentBankInfo();
       if (document.getElementById('checkout-modal')?.style.display === 'flex') updateCheckoutFinancials();
       if (typeof renderCustomerFooterInfo === 'function') renderCustomerFooterInfo();
+      if (typeof renderMomStory==='function') renderMomStory();
       return true;
     }
 
@@ -5791,6 +5934,7 @@ body {
       setVal('setting-store-phone', storeConfig.storePhone);
       setVal('setting-facebook-url', storeConfig.facebookUrl || 'https://www.facebook.com/share/1MRVZsTv4i/');
       setVal('setting-tiktok-url', storeConfig.tiktokUrl || '');
+      renderMomStoryEditor();
       if (storeConfig.bankConfig) {
         setVal('setting-bank-name', storeConfig.bankConfig.bankName);
         setVal('setting-bank-account', storeConfig.bankConfig.accountNumber);
@@ -10328,6 +10472,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
         window.DuynhProfits?.open();
       } else if (tabId === 'tab-inventory') {
         window.MomInventory?.open();
+      } else if (tabId === 'tab-settings') {
+        renderBackendConfig();
       } else if (tabId === 'tab-banner') {
         loadBannerSettingsToAdmin();
       } else if (tabId === 'tab-all') {
@@ -11041,6 +11187,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
     function renderCustomerProducts() {
       if (typeof renderCustomerFooterInfo === 'function') renderCustomerFooterInfo();
+      if (typeof renderMomStory==='function') renderMomStory();
       if (typeof registerSiteTranslationData === 'function') registerSiteTranslationData();
       const grid = document.getElementById('customer-products-grid');
       if (!grid) return;
