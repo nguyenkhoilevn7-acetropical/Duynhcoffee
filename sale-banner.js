@@ -56,7 +56,7 @@
     const chosen=eligible(p,products);
     const scope=p.scope==='all'
       ? (language==='en'?'All drinks':'Toàn bộ sản phẩm')
-      : (language==='en'?chosen.length+' selected drinks':chosen.length+' sản phẩm được chọn');
+      : (language==='en'?(p.productIds?.length||chosen.length)+' selected drinks':(p.productIds?.length||chosen.length)+' sản phẩm được chọn');
     const amount=p.type==='percent'
       ? '-'+Number(p.value)+'%'
       : (language==='en'?'Save ':'Giảm ')+fmt(Number(p.value),language)+(language==='en'?' / cup':' / ly');
@@ -71,7 +71,7 @@
     return {scope,amount,base,after};
   }
 
-  let rootNode=null,signature='',timer=null,expanded=false,lastPhase='';
+  let rootNode=null,signature='',timer=null;
   function list(){try{return window.getMomPublicSales?.()||[];}catch{return [];}}
   function menu(){try{return window.getMomPublicMenu?.()||[];}catch{return [];}}
   function sig(rows,language,products){
@@ -98,10 +98,12 @@
     const offer=el('strong','mom-sale-hero-offer',info.amount);
     head.append(state,offer);
     const title=el('h3','mom-sale-hero-title',p.title.trim());
-    const reason=el('p','mom-sale-hero-reason',
-      typeof p.reason==='string'&&p.reason.trim()?p.reason.trim():p.title.trim());
+    const reasonText=typeof p.reason==='string'?p.reason.trim():'';
     const items=el('p','mom-sale-hero-scope',info.scope);
-    article.append(head,title,reason,items);
+    article.append(head,title);
+    if(reasonText && reasonText.toLocaleLowerCase()!==p.title.trim().toLocaleLowerCase())
+      article.append(el('p','mom-sale-hero-reason',reasonText));
+    article.append(items);
     if(info.after!==null){
       const price=el('p','mom-sale-hero-price');
       price.append(
@@ -153,18 +155,16 @@
   }
   function tick(now=Date.now()){
     if(typeof document==='undefined')return;
-    const previous=rootNode&&!rootNode.hidden
-      ?new Set([...rootNode.querySelectorAll('.mom-sale-hero-card')].map(x=>x.classList.contains('is-live')?'live':'upcoming'))
-      :new Set();
     const priorSignature=signature;
     render(now);
-    if(!rootNode||rootNode.hidden)return;
-    const language=locale();
-    for(const node of rootNode.querySelectorAll('.mom-sale-hero-timer')){
-      const target=node.dataset.saleEnd?Number(node.dataset.saleEnd):null;
-      node.textContent=formatDuration(target===null?null:target-now,language);
+    if(rootNode&&!rootNode.hidden){
+      const language=locale();
+      for(const node of rootNode.querySelectorAll('.mom-sale-hero-timer')){
+        const target=node.dataset.saleEnd?Number(node.dataset.saleEnd):null;
+        node.textContent=formatDuration(target===null?null:target-now,language);
+      }
     }
-    // A scheduled boundary may change product prices. Only the actual transition triggers recalc.
+    // Include expiration-to-empty: hiding the banner must also refresh expired prices.
     if(priorSignature && signature!==priorSignature && typeof window.refreshMomSaleBoundary==='function')
       window.refreshMomSaleBoundary();
   }
