@@ -14,8 +14,8 @@ test('use exactly the approved Mom image without altering pixels; serve it as JP
   const original = fs.readFileSync(path.join(root,'public/mom-logo.png'));
   const attached = fs.readFileSync(path.join(root,'public/mom-brand-20261028.jpg'));
   assert.deepEqual(attached,original);
-  assert.equal(crypto.createHash('sha1').update(Buffer.concat([Buffer.from('blob '+attached.length+'\\0'),attached])).digest('hex'),'f678a24a6ba290ac9d91bd4c896f3aff7ea8127d');
-  assert.match(html,/src="\\/public\\/mom-brand-20261028\\.jpg"/);
+  assert.equal(crypto.createHash('sha1').update(Buffer.concat([Buffer.from('blob '+attached.length+'\0'),attached])).digest('hex'),'f678a24a6ba290ac9d91bd4c896f3aff7ea8127d');
+  assert.match(html,/src="\/public\/mom-brand-20261028\.jpg"/);
 });
 test('mobile dock has exactly five actionable tabs wired to existing functions',()=>{
   const dom = new JSDOM(html);
@@ -32,11 +32,11 @@ test('mobile dock has exactly five actionable tabs wired to existing functions',
   } finally {dom.window.close();}
 });
 test('product cards use plus-only customization and keep existing quick-buy handler',()=>{
-  assert.match(html,/class="btn-card-add"[^>]*onclick="event.stopPropagation\\(\\); openProductCustomModal\\(\\$\\{item.id\\}\\)"/);
-  assert.match(html,/isOutOfStock \\? 'Hết' : '\\+'/);
-  assert.match(html,/function quickBuyProductNow\\(itemId\\)/);
-  assert.match(html,/function openProductCustomModal\\(itemId\\)/);
-  assert.match(css,/#view-customer \\.product-info \\.product-card-actions \\.btn-card-buy\\s*\\{\\s*display: none/);
+  assert.match(html,/class="btn-card-add"[^>]*onclick="event.stopPropagation\(\); openProductCustomModal\(\$\{item.id\}\)"/);
+  assert.match(html,/isOutOfStock \? 'Hết' : '\+'/);
+  assert.match(html,/function quickBuyProductNow\(itemId\)/);
+  assert.match(html,/function openProductCustomModal\(itemId\)/);
+  assert.match(css,/#view-customer \.product-info \.product-card-actions \.btn-card-buy\s*\{\s*display: none/);
 });
 test('cart badge follows real cart quantities and hides at zero without changing checkout state',()=>{
   const start=html.indexOf('    function updateCartBadge() {');
@@ -49,10 +49,10 @@ test('cart badge follows real cart quantities and hides at zero without changing
   ctx.cart=[];ctx.updateCartBadge();assert.equal(nodes['mom-mobile-cart-count'].hidden,true);
 });
 test('customer-only responsive CSS does not modify backend and avoids drawer/modal overlap',()=>{
-  assert.match(html,/mom-mobile-refinement\\.css\\?v=20261028-2/);
-  assert.match(css,/body:has\\(#view-backend\\.active\\) \\.mom-mobile-nav \\{ display: none !important;/);
-  assert.match(css,/body:has\\(#view-customer\\.active\\) \\.header-controls/);
-  assert.match(css,/#view-customer #category-filter-pills\\.category-scroll-nav/);
-  assert.match(css,/#view-customer #floating-cart-bar \\{ display: none !important;/);
-  assert.equal((css.match(/\\{/g)||[]).length,(css.match(/\\}/g)||[]).length);
+  assert.match(html,/mom-mobile-refinement\.css\?v=20261028-2/);
+  assert.match(css,/body:has\(#view-backend\.active\) \.mom-mobile-nav \{ display: none !important;/);
+  assert.match(css,/body:has\(#view-customer\.active\) \.header-controls/);
+  assert.match(css,/#view-customer #category-filter-pills\.category-scroll-nav/);
+  assert.match(css,/#view-customer #floating-cart-bar \{ display: none !important;/);
+  assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length);
 });
