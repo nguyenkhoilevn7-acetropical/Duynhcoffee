@@ -47,7 +47,7 @@ test('social placement is top-right on mobile; admin and bottom dock remain unch
   assert.match(css,/body:has\(#view-backend\.active\) header \.mom-header-social/);
   assert.match(css,/\.mom-header-social \[hidden\]/);
   assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length);
-  assert.match(html,/mom-header-social\.css\?v=20261028-2/);
+  assert.match(html,/mom-header-social\.css\?v=20261028-3/);
 });
 
 test('approved preview renders standalone blue Facebook f and black TikTok note without circles',()=>{
@@ -78,4 +78,25 @@ test('approved preview renders standalone blue Facebook f and black TikTok note 
   assert.match(tt[1],/background: transparent !important/);
   assert.match(css,/header \.mom-header-social \.social-button:disabled\s*\{[^}]*opacity: 1 !important/);
   assert.doesNotMatch(css,/border-radius: 50% !important|background: #151515 !important/);
+});
+
+test('Facebook and TikTok graphics are optically aligned inside identical 32px icon boxes',()=>{
+  const doc=new JSDOM(html).window.document;
+  const fbSvg=doc.querySelector('#customer-facebook-link svg');
+  const tiktokSvg=doc.querySelector('#customer-tiktok-link svg');
+  const tiktokPendingSvg=doc.querySelector('#customer-tiktok-pending svg');
+  assert.equal(fbSvg.getAttribute('viewBox'),'5.5 4.2 13 19.8');
+  assert.equal(tiktokSvg.getAttribute('viewBox'),'0 0 24 24');
+  assert.equal(tiktokPendingSvg.getAttribute('viewBox'),'0 0 24 24');
+  const fbCss=css.match(/header \.mom-header-social \.social-facebook svg\s*\{([^}]+)\}/s);
+  const ttCss=css.match(/header \.mom-header-social \.social-tiktok svg\s*\{([^}]+)\}/s);
+  for(const rule of [fbCss,ttCss]){
+    assert.ok(rule);
+    assert.match(rule[1],/width: 32px !important/);
+    assert.match(rule[1],/height: 32px !important/);
+  }
+  assert.match(css,/header \.mom-header-social \.social-button svg\s*\{[^}]*align-self: center;/s);
+  assert.match(css,/header \.mom-header-social \.social-button\s*\{[^}]*align-items: center !important;[^}]*justify-content: center !important;/s);
+  assert.match(css,/header \.mom-header-social \.social-facebook\s*\{[^}]*color: #1877F2 !important;/s);
+  assert.match(css,/header \.mom-header-social \.social-tiktok\s*\{[^}]*color: #101010 !important;/s);
 });
