@@ -11080,7 +11080,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
               <div class="product-bottom">
                 <div class="product-price">${hasSale ? '<span class="mom-sale-original">'+formatMoney(item.price)+'</span> <span>'+formatMoney(salePrice)+'</span>' : formatMoney(item.price)}</div>
                 <div class="product-card-actions">
-                  <button type="button" class="btn-card-add" aria-label="Chọn ${orderText(itemName)} để thêm vào giỏ" title="Thêm vào giỏ" onclick="event.stopPropagation(); openProductCustomModal(${item.id})" ${isOutOfStock ? 'disabled' : ''}>
+                  <button type="button" class="btn-card-add" aria-label="Thêm vào giỏ" title="Thêm vào giỏ" onclick="event.stopPropagation(); openProductCustomModal(${item.id})" ${isOutOfStock ? 'disabled' : ''}>
                     ${isOutOfStock ? 'Hết' : '+'}
                   </button>
                   <button type="button" class="btn-card-buy" onclick="event.stopPropagation(); quickBuyProductNow(${item.id})" ${isOutOfStock ? 'disabled' : ''}>
