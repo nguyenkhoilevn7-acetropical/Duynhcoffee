@@ -47,7 +47,7 @@ test('social placement is top-right on mobile; admin and bottom dock remain unch
   assert.match(css,/body:has\(#view-backend\.active\) header \.mom-header-social/);
   assert.match(css,/\.mom-header-social \[hidden\]/);
   assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length);
-  assert.match(html,/mom-header-social\.css\?v=20261028-3/);
+  assert.match(html,/mom-header-social\.css\?v=20261028-4/);
 });
 
 test('approved preview renders standalone blue Facebook f and black TikTok note without circles',()=>{
@@ -80,7 +80,7 @@ test('approved preview renders standalone blue Facebook f and black TikTok note 
   assert.doesNotMatch(css,/border-radius: 50% !important|background: #151515 !important/);
 });
 
-test('Facebook and TikTok graphics are optically aligned inside identical 32px icon boxes',()=>{
+test('Facebook and TikTok graphics are optically aligned inside identical 29px icon boxes',()=>{
   const doc=new JSDOM(html).window.document;
   const fbSvg=doc.querySelector('#customer-facebook-link svg');
   const tiktokSvg=doc.querySelector('#customer-tiktok-link svg');
@@ -92,8 +92,8 @@ test('Facebook and TikTok graphics are optically aligned inside identical 32px i
   const ttCss=css.match(/header \.mom-header-social \.social-tiktok svg\s*\{([^}]+)\}/s);
   for(const rule of [fbCss,ttCss]){
     assert.ok(rule);
-    assert.match(rule[1],/width: 32px !important/);
-    assert.match(rule[1],/height: 32px !important/);
+    assert.match(rule[1],/width: 29px !important/);
+    assert.match(rule[1],/height: 29px !important/);
   }
   assert.match(css,/header \.mom-header-social \.social-button svg\s*\{[^}]*align-self: center;/s);
   assert.match(css,/header \.mom-header-social \.social-button\s*\{[^}]*align-items: center !important;[^}]*justify-content: center !important;/s);
