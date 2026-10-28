@@ -49,7 +49,7 @@ test('cart badge follows real cart quantities and hides at zero without changing
   ctx.cart=[];ctx.updateCartBadge();assert.equal(nodes['mom-mobile-cart-count'].hidden,true);
 });
 test('customer-only responsive CSS does not modify backend and avoids drawer/modal overlap',()=>{
-  assert.match(html,/mom-mobile-refinement\.css\?v=20261028-2/);
+  assert.match(html,/mom-mobile-refinement\.css\?v=20261028-3/);
   assert.match(css,/body:has\(#view-backend\.active\) \.mom-mobile-nav \{ display: none !important;/);
   assert.match(css,/body:has\(#view-customer\.active\) \.header-controls/);
   assert.match(css,/#view-customer #category-filter-pills\.category-scroll-nav/);
