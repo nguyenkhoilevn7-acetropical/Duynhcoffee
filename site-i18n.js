@@ -6,6 +6,14 @@
 })(function () {
   'use strict';
   const catalog = {
+  "Điều hướng điện thoại": "Mobile navigation",
+  "Giỏ hàng": "Cart",
+  "Tra cứu": "Track",
+  "Ngôn ngữ": "Language",
+  "Đổi ngôn ngữ": "Change language",
+  "Thêm vào giỏ": "Add to cart",
+  "Chọn": "Select",
+  "để thêm vào giỏ": "to add to cart",
   "Điều hướng trang bán hàng": "Storefront navigation",
   "Trang chủ": "Home",
   "Thực đơn": "Menu",

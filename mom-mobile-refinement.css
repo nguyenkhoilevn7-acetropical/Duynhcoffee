@@ -1,0 +1,292 @@
+/* Mom's Tea & Coffee — approved mobile visual refinement, 2026-10-28
+ * Presentation layer only: no cart, price, payment, receipt or API changes.
+ * Must load after mom-storefront.css.
+ */
+.mom-logo-frame {
+  aspect-ratio: 1017 / 573 !important;
+  width: 154px !important;
+  border-radius: 12px !important;
+  background: #fdf9ed !important;
+  overflow: hidden !important;
+  box-shadow: none !important;
+}
+.mom-logo-frame .header-logo-img {
+  position: static !important;
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  left: auto !important; top: auto !important;
+  object-fit: contain !important;
+}
+.mom-mobile-nav { display: none; }
+
+/* + is a visual shortcut to the SAME product customization modal. */
+#view-customer .product-info .product-bottom {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 44px !important;
+  align-items: center !important;
+  gap: 8px !important;
+  min-width: 0;
+}
+#view-customer .product-info .product-price {
+  min-width: 0;
+  line-height: 1.4 !important;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(.89rem, 1.2vw, 1.04rem) !important;
+}
+#view-customer .product-info .product-card-actions {
+  display: flex !important;
+  grid-template-columns: unset !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  width: 44px !important;
+  min-width: 44px !important;
+  gap: 0 !important;
+}
+#view-customer .product-info .product-card-actions .btn-card-add {
+  display: inline-flex !important;
+  width: 42px !important;
+  min-width: 42px !important;
+  max-width: 42px !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  max-height: 42px !important;
+  padding: 0 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+  border: 0 !important;
+  background: #244e2f !important;
+  color: #fff !important;
+  font-size: 1.63rem !important;
+  font-weight: 450 !important;
+  line-height: 1 !important;
+  box-shadow: 0 3px 10px rgba(21,69,32,.15) !important;
+  transition: transform .18s ease, background .18s ease !important;
+}
+#view-customer .product-info .product-card-actions .btn-card-add:hover {
+  background: #356d40 !important;
+  transform: scale(1.07);
+}
+#view-customer .product-info .product-card-actions .btn-card-add:focus-visible {
+  outline: 3px solid #b7d78e;
+  outline-offset: 3px;
+}
+#view-customer .product-info .product-card-actions .btn-card-add:disabled {
+  font-size: .64rem !important;
+  background: #b8c3b6 !important;
+  color: #314232 !important;
+  box-shadow: none !important;
+}
+#view-customer .product-info .product-card-actions .btn-card-buy {
+  display: none !important; /* Mua ngay remains available in product modal */
+}
+
+/* Categories should be pills, never the oversized 2/3-column tiles. */
+#view-customer #category-filter-pills.category-scroll-nav {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  grid-template-columns: unset !important;
+  grid-auto-rows: unset !important;
+  gap: 9px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  padding: 2px 2px 14px !important;
+  margin: 0 0 8px !important;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-inline: contain;
+}
+#view-customer #category-filter-pills::-webkit-scrollbar { display:none; }
+#view-customer #category-filter-pills .cat-btn {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: auto !important;
+  max-width: min(70vw, 230px);
+  min-height: 38px !important;
+  height: auto !important;
+  padding: 8px 14px !important;
+  border-radius: 999px !important;
+  gap: 6px !important;
+  font-size: .79rem !important;
+  font-weight: 750 !important;
+  line-height: 1.35 !important;
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
+  text-align: center !important;
+  scroll-snap-align: start;
+}
+#view-customer #category-filter-pills .cat-btn.active {
+  background: #214e2d !important;
+  border-color: #214e2d !important;
+  color: #fff !important;
+  box-shadow: 0 4px 13px rgba(23,64,34,.15) !important;
+}
+
+/* Reference: light ivory panels and tighter two-column mobile cards. */
+#view-customer .product-card { border-radius: 15px !important; }
+#view-customer .product-img-box { aspect-ratio: 1 / 1.06 !important; }
+#view-customer .product-info .product-name {
+  min-height: 0 !important;
+  font-size: .93rem !important;
+  line-height: 1.35 !important;
+}
+#view-customer .product-info .product-desc { line-height: 1.4 !important; }
+#view-customer .mom-section-intro h2 { color: #182a1b !important; }
+@media (max-width: 800px) {
+  body:has(#view-customer.active) .header-inner {
+    min-height: 67px !important;
+    justify-content: center !important;
+    padding: 6px 12px !important;
+  }
+  body:has(#view-customer.active) .header-controls,
+  body:has(#view-customer.active) .mom-site-nav { display: none !important; }
+  body:has(#view-customer.active) .brand-logo-area { margin: 0 auto; }
+  body:has(#view-customer.active) .mom-logo-frame { width: 140px !important; }
+
+  .mom-mobile-nav {
+    position: fixed;
+    z-index: 1200;
+    left: 0; right: 0; bottom: 0;
+    display: grid;
+    grid-template-columns: repeat(5,minmax(0,1fr));
+    align-items: end;
+    gap: 0;
+    min-height: calc(73px + env(safe-area-inset-bottom));
+    padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
+    border-top: 1px solid #e9e9de;
+    background: rgba(255,254,250,.98);
+    box-shadow: 0 -5px 24px rgba(23,47,24,.075);
+  }
+  body:has(#view-backend.active) .mom-mobile-nav { display: none !important; }
+  .mom-mobile-nav :is(button,a) {
+    text-decoration: none;
+    appearance: none;
+    -webkit-appearance: none;
+    -webkit-tap-highlight-color: transparent;
+    border: 0;
+    background: transparent;
+    color: #526253;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 2px;
+    position: relative;
+    min-width: 0;
+    min-height: 55px;
+    padding: 4px 2px 1px;
+    border-radius: 14px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .mom-mobile-nav :is(button,a) svg {
+    width: 23px; height: 23px;
+    stroke: currentColor; stroke-width: 2.15;
+    stroke-linecap: round; stroke-linejoin: round;
+    fill: none;
+    flex-shrink: 0;
+  }
+  .mom-mobile-nav .mom-tab-label {
+    display: block; font-size: .64rem;
+    font-weight: 680; line-height: 1.3;
+    white-space: nowrap; text-align: center;
+  }
+  .mom-mobile-nav :is(button,a).active { color: #214e2d; }
+  .mom-mobile-nav :is(button,a):focus-visible { outline: 2px solid #6c9b64; outline-offset: -2px; }
+  .mom-mobile-nav .mom-nav-cart {
+    transform: translateY(-15px);
+    z-index: 1;
+    min-height: 67px;
+    padding-bottom: 0;
+    color: #244c2e;
+  }
+  .mom-mobile-nav .mom-cart-bubble {
+    position: relative;
+    width: 61px;
+    height: 61px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1c4e27;
+    color: #fff;
+    border: 5px solid #fffefa;
+    box-shadow: 0 5px 15px rgba(16,51,26,.26);
+    border-radius: 50%;
+  }
+  .mom-mobile-nav .mom-cart-bubble svg { height: 26px; width: 26px; }
+  .mom-mobile-nav .mom-cart-badge[hidden] { display: none !important; }
+  .mom-mobile-nav .mom-cart-badge {
+    position: absolute;
+    top: -3px; right: -2px;
+    min-width: 19px; height: 19px;
+    padding: 0 5px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #c84645;
+    color: #fff;
+    font-size: .67rem;
+    line-height: 1; font-weight: 800;
+  }
+  .mom-mobile-nav .mom-nav-cart .mom-tab-label {
+    position: absolute; bottom: -6px;
+    color: #244e30;
+  }
+  #view-customer #floating-cart-bar { display: none !important; }
+  body:has(#view-customer.active) main.view-container {
+    padding-bottom: calc(110px + env(safe-area-inset-bottom)) !important;
+  }
+  body:has(#view-customer.active) > footer { padding-bottom: calc(75px + env(safe-area-inset-bottom)); }
+  #view-customer #category-filter-pills .cat-btn {
+    min-height: 36px !important;
+    padding: 7px 11px !important;
+    font-size: .73rem !important;
+  }
+  #view-customer #customer-products-grid.products-grid {
+    grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+    gap: 10px !important;
+  }
+  #view-customer .product-info { padding: 10px 9px 11px !important; }
+  #view-customer .product-info .product-name { font-size: .83rem !important; }
+  #view-customer .product-info .product-desc { font-size: .71rem !important; }
+  #view-customer .product-info .product-bottom {
+    grid-template-columns: minmax(0,1fr) 36px !important;
+    gap: 4px !important;
+    padding-top: 9px !important;
+  }
+  #view-customer .product-info .product-price { font-size: .84rem !important; }
+  #view-customer .product-info .product-card-actions {
+    width: 36px !important; min-width: 36px !important;
+  }
+  #view-customer .product-info .product-card-actions .btn-card-add {
+    width: 36px !important; min-width: 36px !important;
+    max-width: 36px !important; min-height: 36px !important;
+    height: 36px !important; max-height: 36px !important;
+    font-size: 1.49rem !important;
+  }
+}
+@media (max-width: 359px) {
+  .mom-mobile-nav { padding-left: 3px; padding-right: 3px; }
+  .mom-mobile-nav .mom-tab-label { font-size: .58rem; }
+  .mom-mobile-nav .mom-cart-bubble { width: 56px; height: 56px; }
+  #view-customer .product-info .product-bottom { grid-template-columns: minmax(0,1fr) 34px !important; }
+  #view-customer .product-info .product-card-actions,
+  #view-customer .product-info .product-card-actions .btn-card-add {
+    width: 34px !important; min-width: 34px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mom-mobile-nav :is(button,a),
+  #view-customer .product-card-actions .btn-card-add { transition:none !important; }
+}
