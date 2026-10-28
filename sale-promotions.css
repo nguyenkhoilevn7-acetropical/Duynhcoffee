@@ -40,3 +40,6 @@
 .mom-sale-auth-fields input{min-height:44px;font-size:16px}
 .mom-sale-auth-fields button{min-height:44px}
 @media(max-width:700px){.mom-sale-auth-fields{grid-template-columns:1fr}}
+
+.mom-sale-reason-label{display:flex;flex-direction:column;gap:6px;margin:0 0 15px;color:#284b37;font-size:.86rem;font-weight:700}
+.mom-sale-reason-label textarea{width:100%;min-height:68px;resize:vertical;border-radius:12px;line-height:1.5;padding:11px 13px;font-size:16px}
