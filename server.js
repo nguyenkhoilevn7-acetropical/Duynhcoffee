@@ -22,7 +22,7 @@ const menuAI = createMenuAI();
 const profitReport = require('./profit-report');
 const { exportReport } = require('./profit-excel');
 const {validateOptions}=require('./menu-options');
-const {validateMomStory}=require('./mom-story-config');
+
 const {emptyInventory,validateInventory,mutateInventory}=require('./inventory');
 const {validateRecipe,createRecipeScanner,createRecipeTranslator,recipeSourceHash}=require('./drink-recipes');
 const recipeScanner=createRecipeScanner();
@@ -200,6 +200,35 @@ const notifiedOrderIds = new Set(ordersCache.map(order => String(order.id)));
 const delivery = createDelivery({ getOrders: () => ordersCache,
   saveOrders: () => writeJsonFile(ORDERS_FILE, ordersCache), broadcast: broadcastRealtime });
 setInterval(() => delivery.poll().catch(() => {}), 60000).unref();
+const MOM_STORY_LIMITS = Object.freeze({
+  eyebrow: 80, eyebrow_en: 80,
+  headline: 130, headline_en: 130,
+  description: 800, description_en: 800,
+  slogan: 100, slogan_en: 100,
+  cta: 50, cta_en: 50
+});
+
+function validateMomStory(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw Object.assign(new Error('Nội dung giới thiệu không hợp lệ.'), {status:422});
+  }
+  const allowed = Object.keys(MOM_STORY_LIMITS);
+  if (Object.keys(input).some(key => !allowed.includes(key))) {
+    throw Object.assign(new Error('Nội dung giới thiệu chứa trường không hỗ trợ.'), {status:422});
+  }
+  const clean = {};
+  for (const key of allowed) {
+    const value = input[key];
+    const limit = MOM_STORY_LIMITS[key];
+    if (typeof value !== 'string' || !value.trim() || value.length > limit
+      || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u202a-\u202e]/.test(value)) {
+      throw Object.assign(new Error('Vui lòng nhập nội dung hợp lệ cho ' + key + ' (tối đa ' + limit + ' ký tự).'), {status:422});
+    }
+    clean[key] = value.trim().replace(/\r\n?/g, '\n');
+  }
+  return clean;
+}
+
 function mergeConfig(current, patch) {
   // Story copy is owner-only. Do not allow public /api/config or legacy mesh sync to replace it.
   if (Object.prototype.hasOwnProperty.call(patch,'storyContent')) {
