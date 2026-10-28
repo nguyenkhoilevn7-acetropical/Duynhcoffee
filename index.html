@@ -3340,6 +3340,8 @@ body {
   <script src="admin-ios.js?v=20261025-2" defer></script>
   <!-- Presentation-only Mom customer storefront theme; loaded after legacy styles. -->
   <link rel="stylesheet" href="mom-storefront.css?v=20261028-1">
+  <link rel="stylesheet" href="mom-mobile-refinement.css?v=20261028-2">
+  <script src="mom-mobile-nav.js?v=20261028-2" defer></script>
 </head>
 <body>
 
@@ -3347,7 +3349,7 @@ body {
   <header>
     <div class="header-inner">
       <div class="brand-logo-area" onclick="switchView('customer')">
-        <span class="mom-logo-frame"><img src="/public/mom-logo-white.jpg" alt="Mom’s Tea &amp; Coffee" class="header-logo-img" width="1536" height="1147" fetchpriority="high"></span>
+        <span class="mom-logo-frame"><img src="/public/mom-brand-20261028.jpg" alt="Mom’s Tea &amp; Coffee" class="header-logo-img" width="1017" height="573" fetchpriority="high"></span>
       </div>
 
       <nav class="mom-site-nav" aria-label="Điều hướng trang bán hàng">
@@ -3381,6 +3383,33 @@ body {
       </div>
     </div>
   </header>
+
+  <!-- Bottom navigation for customer storefront. Existing handlers remain unchanged. -->
+  <nav id="mom-mobile-nav" class="mom-mobile-nav" aria-label="Điều hướng điện thoại">
+    <a class="active" href="#view-customer" data-mom-tab="home" aria-label="Trang chủ">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>
+      <span class="mom-tab-label">Trang chủ</span>
+    </a>
+    <a href="#mom-menu-section" data-mom-tab="menu" aria-label="Thực đơn">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14l-1.1 18H6.1L5 3Z"/><path d="M8 7h8M8.5 11h7M9 15h6"/></svg>
+      <span class="mom-tab-label">Thực đơn</span>
+    </a>
+    <button type="button" class="mom-nav-cart" data-mom-tab="cart" onclick="openCartDrawer()" aria-label="Giỏ hàng">
+      <span class="mom-cart-bubble">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="20" r="1"/><circle cx="19" cy="20" r="1"/><path d="M2 3h2l2.5 12h12l2.5-9H5"/></svg>
+        <span class="mom-cart-badge" id="mom-mobile-cart-count" hidden>0</span>
+      </span>
+      <span class="mom-tab-label">Giỏ hàng</span>
+    </button>
+    <button type="button" data-mom-tab="tracking" onclick="openOrderTrackingModal()" aria-label="Tra cứu đơn hàng">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h8M8 12h8m-8 4h5"/></svg>
+      <span class="mom-tab-label">Tra cứu</span>
+    </button>
+    <button type="button" data-mom-tab="language" onclick="toggleLanguage()" aria-label="Đổi ngôn ngữ">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a16 16 0 0 1 0 18M12 3a16 16 0 0 0 0 18"/></svg>
+      <span class="mom-tab-label">Ngôn ngữ <span id="mom-mobile-lang-value">VI</span></span>
+    </button>
+  </nav>
 
   <!-- ==================== MAIN CONTAINER ==================== -->
   <main class="view-container">
@@ -3435,7 +3464,7 @@ body {
       <div class="products-grid" id="customer-products-grid"></div>
 
       <section class="mom-story-card" id="mom-story" aria-label="Giới thiệu Mom’s Tea & Coffee">
-        <div class="mom-story-art"><img src="/public/mom-logo.png" alt="Mom’s Tea & Coffee" loading="lazy" decoding="async"><em>Good drinks · Good mood</em></div>
+        <div class="mom-story-art"><img src="/public/mom-brand-20261028.jpg" alt="Mom’s Tea & Coffee" loading="lazy" decoding="async"><em>Good drinks · Good mood</em></div>
         <div class="mom-story-copy">
           <span class="mom-kicker">CÂU CHUYỆN MOM’S</span>
           <h2>Trà ngon từ trái tim.</h2>
@@ -5390,6 +5419,8 @@ body {
       const flag = document.getElementById('lang-flag'), label = document.getElementById('lang-label');
       if (flag) flag.textContent = currentLang === 'en' ? '🇬🇧' : '🇻🇳';
       if (label) label.textContent = currentLang === 'en' ? 'EN' : 'VI';
+      const bottomLang = document.getElementById('mom-mobile-lang-value');
+      if (bottomLang) bottomLang.textContent = currentLang === 'en' ? 'EN' : 'VI';
       if (window.DuynhI18n) window.DuynhI18n.setLanguage(currentLang);
     }
     window.applyLanguageToStaticDom = applyLanguageToStaticDom;
@@ -11049,8 +11080,8 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
               <div class="product-bottom">
                 <div class="product-price">${hasSale ? '<span class="mom-sale-original">'+formatMoney(item.price)+'</span> <span>'+formatMoney(salePrice)+'</span>' : formatMoney(item.price)}</div>
                 <div class="product-card-actions">
-                  <button type="button" class="btn-card-add" onclick="event.stopPropagation(); openProductCustomModal(${item.id})" ${isOutOfStock ? 'disabled' : ''}>
-                    ${isOutOfStock ? 'Hết' : '+ Thêm'}
+                  <button type="button" class="btn-card-add" aria-label="Chọn ${orderText(itemName)} để thêm vào giỏ" title="Thêm vào giỏ" onclick="event.stopPropagation(); openProductCustomModal(${item.id})" ${isOutOfStock ? 'disabled' : ''}>
+                    ${isOutOfStock ? 'Hết' : '+'}
                   </button>
                   <button type="button" class="btn-card-buy" onclick="event.stopPropagation(); quickBuyProductNow(${item.id})" ${isOutOfStock ? 'disabled' : ''}>
                     ⚡ Mua Ngay
@@ -11087,6 +11118,11 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
       const count = cart.reduce((s, c) => s + c.qty, 0);
       const badge = document.getElementById('cart-counter');
       if (badge) badge.textContent = count;
+      const mobileBadge = document.getElementById('mom-mobile-cart-count');
+      if (mobileBadge) {
+        mobileBadge.textContent = count;
+        mobileBadge.hidden = count <= 0;
+      }
       updateFloatingCartBar();
     }
 
