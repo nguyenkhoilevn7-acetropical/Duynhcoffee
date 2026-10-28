@@ -98,3 +98,5 @@ jobs:
 # Predeploy read-only verification of live order fingerprint for CSS-only PR #8, 2026-10-26.
 
 # Predeploy read-only check before automatic SALE campaign deployment (2026-10-26).
+
+# Read-only live order metadata check before Flash Sale banner deployment (2026-10-28).
