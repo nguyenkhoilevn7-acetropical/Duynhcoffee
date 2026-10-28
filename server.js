@@ -22,6 +22,7 @@ const menuAI = createMenuAI();
 const profitReport = require('./profit-report');
 const { exportReport } = require('./profit-excel');
 const {validateOptions}=require('./menu-options');
+const {validateMomStory}=require('./mom-story-config');
 const {emptyInventory,validateInventory,mutateInventory}=require('./inventory');
 const {validateRecipe,createRecipeScanner,createRecipeTranslator,recipeSourceHash}=require('./drink-recipes');
 const recipeScanner=createRecipeScanner();
@@ -200,6 +201,14 @@ const delivery = createDelivery({ getOrders: () => ordersCache,
   saveOrders: () => writeJsonFile(ORDERS_FILE, ordersCache), broadcast: broadcastRealtime });
 setInterval(() => delivery.poll().catch(() => {}), 60000).unref();
 function mergeConfig(current, patch) {
+  // Story copy is owner-only. Do not allow public /api/config or legacy mesh sync to replace it.
+  if (Object.prototype.hasOwnProperty.call(patch,'storyContent')) {
+    if (JSON.stringify(patch.storyContent) !== JSON.stringify(current.storyContent)) {
+      throw Object.assign(new Error('Chỉ quản trị được phép sửa nội dung Câu chuyện Mom’s.'), {status:403});
+    }
+    patch = {...patch};
+    delete patch.storyContent;
+  }
   for (const [field,domain] of [['facebookUrl','facebook.com'],['tiktokUrl','tiktok.com']]) {
     if (patch[field] === undefined || patch[field] === '') continue;
     let valid=false;
@@ -1071,6 +1080,26 @@ const server = http.createServer(async (req, res) => {
       }
       return;
     }
+  }
+
+  // Owner-only editorial settings. Existing /api/config remains read-compatible but cannot edit storyContent.
+  if (pathname === '/api/admin/story') {
+    res.setHeader('Cache-Control','no-store');
+    if (req.method !== 'POST') {sendJson(res,405,{error:'Phương thức không được hỗ trợ.'});return;}
+    if (!adminPush.verify((req.headers.authorization || '').replace(/^Bearer /, ''))) {
+      sendJson(res,401,{error:'Vui lòng đăng nhập quản trị để sửa Câu chuyện Mom’s.'});return;
+    }
+    try {
+      const body = await parseRequestBody(req, 16 * 1024);
+      const storyContent = validateMomStory(body.storyContent);
+      const current = readJsonFile(CONFIG_FILE, configCache);
+      const next = {...current, storyContent};
+      if (!writeJsonFile(CONFIG_FILE,next)) throw new Error('Không lưu được nội dung giới thiệu.');
+      configCache = next;
+      broadcastRealtime('CONFIG_UPDATE',configCache);
+      sendJson(res,200,{success:true,config:configCache,configVersion,backup:backupService.status()});
+    } catch(error) {sendJson(res,error.status || 500,{error:error.message});}
+    return;
   }
 
   if (pathname === '/api/drink-recipes/translate' && req.method === 'POST') {
