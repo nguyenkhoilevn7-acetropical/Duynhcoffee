@@ -3342,6 +3342,7 @@ body {
   <link rel="stylesheet" href="mom-storefront.css?v=20261028-1">
   <link rel="stylesheet" href="mom-mobile-refinement.css?v=20261028-3">
   <link rel="stylesheet" href="mom-header-social.css?v=20261028-4">
+  <link rel="stylesheet" href="mom-story-admin.css?v=20261028-1">
   <script src="mom-mobile-nav.js?v=20261028-2" defer></script>
 </head>
 <body>
@@ -3470,12 +3471,12 @@ body {
       <div class="products-grid" id="customer-products-grid"></div>
 
       <section class="mom-story-card" id="mom-story" aria-label="Giới thiệu Mom’s Tea & Coffee">
-        <div class="mom-story-art"><img src="/public/mom-logo-white.jpg" alt="Mom’s Tea & Coffee" loading="lazy" decoding="async"><em>Good drinks · Good mood</em></div>
+        <div class="mom-story-art"><img src="/public/mom-logo-white.jpg" alt="Mom’s Tea & Coffee" loading="lazy" decoding="async"><em id="mom-story-slogan">Good drinks · Good mood</em></div>
         <div class="mom-story-copy">
-          <span class="mom-kicker">CÂU CHUYỆN MOM’S</span>
-          <h2>Trà ngon từ trái tim.</h2>
-          <p>Một chút trà, một chút cà phê và những khoảnh khắc dễ chịu mỗi ngày. Mom’s Tea & Coffee phục vụ đặt món trực tuyến, để thức uống bạn yêu thích luôn gần hơn.</p>
-          <a href="#mom-menu-section">Xem thực đơn <span aria-hidden="true">↗</span></a>
+          <span class="mom-kicker" id="mom-story-eyebrow">CÂU CHUYỆN MOM’S</span>
+          <h2 id="mom-story-headline">Trà ngon từ trái tim.</h2>
+          <p id="mom-story-description">Một chút trà, một chút cà phê và những khoảnh khắc dễ chịu mỗi ngày. Mom’s Tea & Coffee phục vụ đặt món trực tuyến, để thức uống bạn yêu thích luôn gần hơn.</p>
+          <a href="#mom-menu-section"><span id="mom-story-cta">Xem thực đơn</span> <span aria-hidden="true">↗</span></a>
         </div>
       </section>
 
@@ -4024,6 +4025,36 @@ body {
             💾 LƯU CẤU HÌNH QUÁN
           </button>
         </div>
+        <section class="mom-story-admin-card" id="mom-story-admin-card" aria-label="Tùy chỉnh nội dung Câu chuyện Mom’s">
+          <h3>✍️ Nội dung “Câu chuyện Mom’s”</h3>
+          <p class="mom-story-admin-hint">Chỉnh các dòng chữ trong khung giới thiệu ở trang khách. Hai ngôn ngữ được lưu chung trên máy chủ Render và đồng bộ đến các thiết bị. Nút bấm luôn dẫn đến Thực đơn.</p>
+          <div class="mom-story-editor-cols">
+            <div class="mom-story-editor-language">
+              <h4>🇻🇳 Tiếng Việt</h4>
+              <div class="form-group"><label for="story-eyebrow">Nhãn nhỏ phía trên</label><input id="story-eyebrow" class="form-control mom-story-editor-input" maxlength="80" required oninput="previewMomStoryEditor()"></div>
+              <div class="form-group"><label for="story-headline">Tiêu đề chính</label><input id="story-headline" class="form-control mom-story-editor-input" maxlength="130" required oninput="previewMomStoryEditor()"></div>
+              <div class="form-group"><label for="story-description">Đoạn giới thiệu</label><textarea id="story-description" class="form-control mom-story-editor-input" maxlength="800" rows="4" required oninput="previewMomStoryEditor()"></textarea></div>
+              <div class="form-group"><label for="story-slogan">Khẩu hiệu dưới logo</label><input id="story-slogan" class="form-control mom-story-editor-input" maxlength="100" required oninput="previewMomStoryEditor()"></div>
+              <div class="form-group"><label for="story-cta">Chữ trên nút</label><input id="story-cta" class="form-control mom-story-editor-input" maxlength="50" required oninput="previewMomStoryEditor()"></div>
+            </div>
+            <div class="mom-story-editor-language">
+              <h4>🇬🇧 English</h4>
+              <div class="form-group"><label for="story-eyebrow-en">Small label</label><input id="story-eyebrow-en" class="form-control mom-story-editor-input" maxlength="80" required oninput="previewMomStoryEditor()"></div>
+              <div class="form-group"><label for="story-headline-en">Headline</label><input id="story-headline-en" class="form-control mom-story-editor-input" maxlength="130" required oninput="previewMomStoryEditor()"></div>
+              <div class="form-group"><label for="story-description-en">Description</label><textarea id="story-description-en" class="form-control mom-story-editor-input" maxlength="800" rows="4" required oninput="previewMomStoryEditor()"></textarea></div>
+              <div class="form-group"><label for="story-slogan-en">Tagline under logo</label><input id="story-slogan-en" class="form-control mom-story-editor-input" maxlength="100" required oninput="previewMomStoryEditor()"></div>
+              <div class="form-group"><label for="story-cta-en">Button label</label><input id="story-cta-en" class="form-control mom-story-editor-input" maxlength="50" required oninput="previewMomStoryEditor()"></div>
+            </div>
+          </div>
+          <div class="mom-story-admin-preview" aria-live="polite">
+            <div><span id="story-preview-eyebrow">CÂU CHUYỆN MOM’S</span><h4 id="story-preview-headline">Trà ngon từ trái tim.</h4><p id="story-preview-description"></p><span id="story-preview-cta">Xem thực đơn</span></div>
+            <em id="story-preview-slogan">Good drinks · Good mood</em>
+          </div>
+          <div class="mom-story-admin-actions">
+            <span id="mom-story-save-status" role="status" aria-live="polite">Chỉnh nội dung và nhấn Lưu.</span>
+            <button type="button" id="btn-save-mom-story" class="btn-checkout-now" onclick="saveMomStorySettings()">💾 Lưu Câu chuyện Mom’s</button>
+          </div>
+        </section>
       </div>
     </section>
 
