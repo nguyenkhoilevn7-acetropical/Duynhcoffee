@@ -9,7 +9,20 @@ const root=path.join(__dirname,'..');
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const css=fs.readFileSync(path.join(root,'mom-story-admin.css'),'utf8');
 const server=fs.readFileSync(path.join(root,'server.js'),'utf8');
-const {MOM_STORY_DEFAULTS,validateMomStory}=require('../mom-story-config');
+// Validate the actual inline server implementation (standalone server fixtures do not copy extra modules).
+const validatorSource=server.slice(server.indexOf('const MOM_STORY_LIMITS ='),server.indexOf('function mergeConfig('));
+if(!validatorSource.includes('function validateMomStory('))throw Error('Story validator not found in server');
+const validatorContext={};
+vm.createContext(validatorContext);
+vm.runInContext(validatorSource+';this.validateMomStory=validateMomStory;',validatorContext);
+const validateMomStory=validatorContext.validateMomStory;
+const MOM_STORY_DEFAULTS=Object.freeze({
+  eyebrow:'CÂU CHUYỆN MOM’S',eyebrow_en:'THE MOM’S STORY',
+  headline:'Trà ngon từ trái tim.',headline_en:'Tea made with heart.',
+  description:'Mô tả sản phẩm Mom’s.',description_en:'Mom’s story description.',
+  slogan:'Good drinks · Good mood',slogan_en:'Good drinks · Good mood',
+  cta:'Xem thực đơn',cta_en:'View menu'
+});
 
 test('story editor preserves all 10 bilingual fields and original menu navigation',()=>{
   const dom=new JSDOM(html),d=dom.window.document;
