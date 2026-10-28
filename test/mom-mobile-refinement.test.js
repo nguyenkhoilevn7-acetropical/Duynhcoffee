@@ -10,12 +10,12 @@ const root = path.join(__dirname,'..');
 const html = fs.readFileSync(path.join(root,'index.html'),'utf8');
 const css = fs.readFileSync(path.join(root,'mom-mobile-refinement.css'),'utf8');
 
-test('use exactly the approved Mom image without altering pixels; serve it as JPG',()=>{
+test('retain previous image asset but restore original Mom logo in customer UI',()=>{
   const original = fs.readFileSync(path.join(root,'public/mom-logo.png'));
   const attached = fs.readFileSync(path.join(root,'public/mom-brand-20261028.jpg'));
   assert.deepEqual(attached,original);
   assert.equal(crypto.createHash('sha1').update(Buffer.concat([Buffer.from('blob '+attached.length+'\0'),attached])).digest('hex'),'f678a24a6ba290ac9d91bd4c896f3aff7ea8127d');
-  assert.match(html,/src="\/public\/mom-brand-20261028\.jpg"/);
+  assert.match(html,/src="\/public\/mom-logo-white\.jpg"/);
 });
 test('mobile dock has exactly five actionable tabs wired to existing functions',()=>{
   const dom = new JSDOM(html);
@@ -49,7 +49,7 @@ test('cart badge follows real cart quantities and hides at zero without changing
   ctx.cart=[];ctx.updateCartBadge();assert.equal(nodes['mom-mobile-cart-count'].hidden,true);
 });
 test('customer-only responsive CSS does not modify backend and avoids drawer/modal overlap',()=>{
-  assert.match(html,/mom-mobile-refinement\.css\?v=20261028-2/);
+  assert.match(html,/mom-mobile-refinement\.css\?v=20261028-3/);
   assert.match(css,/body:has\(#view-backend\.active\) \.mom-mobile-nav \{ display: none !important;/);
   assert.match(css,/body:has\(#view-customer\.active\) \.header-controls/);
   assert.match(css,/#view-customer #category-filter-pills\.category-scroll-nav/);

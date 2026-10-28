@@ -3340,7 +3340,7 @@ body {
   <script src="admin-ios.js?v=20261025-2" defer></script>
   <!-- Presentation-only Mom customer storefront theme; loaded after legacy styles. -->
   <link rel="stylesheet" href="mom-storefront.css?v=20261028-1">
-  <link rel="stylesheet" href="mom-mobile-refinement.css?v=20261028-2">
+  <link rel="stylesheet" href="mom-mobile-refinement.css?v=20261028-3">
   <script src="mom-mobile-nav.js?v=20261028-2" defer></script>
 </head>
 <body>
@@ -3349,7 +3349,7 @@ body {
   <header>
     <div class="header-inner">
       <div class="brand-logo-area" onclick="switchView('customer')">
-        <span class="mom-logo-frame"><img src="/public/mom-brand-20261028.jpg" alt="Mom’s Tea &amp; Coffee" class="header-logo-img" width="1017" height="573" fetchpriority="high"></span>
+        <span class="mom-logo-frame"><img src="/public/mom-logo-white.jpg" alt="Mom’s Tea &amp; Coffee" class="header-logo-img" width="1536" height="1147" fetchpriority="high"></span>
       </div>
 
       <nav class="mom-site-nav" aria-label="Điều hướng trang bán hàng">
@@ -3444,10 +3444,8 @@ body {
         <div class="mom-benefit"><span class="mom-benefit-icon" aria-hidden="true">📦</span><span><b>Theo dõi đơn hàng</b><small>Kiểm tra trạng thái đơn</small></span></div>
       </div>
 
-      <div class="mom-section-intro" id="mom-menu-section">
-        <div><span class="mom-kicker">MOM’S MENU</span><h2>Hôm nay mình uống gì?</h2></div>
-        <p>Trà, cà phê và những món uống yêu thích — chọn món phù hợp với bạn.</p>
-      </div>
+      <!-- Giữ anchor thực đơn cho điều hướng mobile, bỏ phần giới thiệu dư thừa. -->
+      <div id="mom-menu-section" class="mom-menu-anchor" aria-hidden="true"></div>
       <!-- BỘ LỌC DANH MỤC -->
       <div class="category-scroll-nav" id="category-filter-pills">
         <button type="button" class="cat-btn active" onclick="filterCategory('all', this)">✨ Tất Cả Món</button>
@@ -3464,7 +3462,7 @@ body {
       <div class="products-grid" id="customer-products-grid"></div>
 
       <section class="mom-story-card" id="mom-story" aria-label="Giới thiệu Mom’s Tea & Coffee">
-        <div class="mom-story-art"><img src="/public/mom-brand-20261028.jpg" alt="Mom’s Tea & Coffee" loading="lazy" decoding="async"><em>Good drinks · Good mood</em></div>
+        <div class="mom-story-art"><img src="/public/mom-logo-white.jpg" alt="Mom’s Tea & Coffee" loading="lazy" decoding="async"><em>Good drinks · Good mood</em></div>
         <div class="mom-story-copy">
           <span class="mom-kicker">CÂU CHUYỆN MOM’S</span>
           <h2>Trà ngon từ trái tim.</h2>
