@@ -5445,7 +5445,7 @@ body {
       if (typeof isAdminViewActive === 'function' && isAdminViewActive()) renderAllBackendTabs();
       if (document.getElementById('checkout-modal')?.style.display === 'flex') renderCheckoutItemsPreview();
       applyLanguageToStaticDom();
-      renderMomStory();
+      if (typeof renderMomStory==='function') renderMomStory();
     }
     window.setLanguage = setLanguage;
     function toggleLanguage() { setLanguage(currentLang === 'vi' ? 'en' : 'vi'); }
@@ -5808,7 +5808,7 @@ body {
       return {...MOM_STORY_DEFAULTS, ...((storeConfig && storeConfig.storyContent) || {})};
     }
     function renderMomStory() {
-      const story=momStoryConfig(),english=currentLang==='en';
+      const story=momStoryConfig(),english=(typeof currentLang==='string' && currentLang==='en');
       const assign=(id,key)=>{
         const el=document.getElementById(id);
         if(el)el.textContent=story[english ? key+'_en' : key] || MOM_STORY_DEFAULTS[english ? key+'_en' : key];
@@ -5917,7 +5917,7 @@ body {
       renderPaymentBankInfo();
       if (document.getElementById('checkout-modal')?.style.display === 'flex') updateCheckoutFinancials();
       if (typeof renderCustomerFooterInfo === 'function') renderCustomerFooterInfo();
-      renderMomStory();
+      if (typeof renderMomStory==='function') renderMomStory();
       return true;
     }
 
@@ -11187,7 +11187,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
 
     function renderCustomerProducts() {
       if (typeof renderCustomerFooterInfo === 'function') renderCustomerFooterInfo();
-      renderMomStory();
+      if (typeof renderMomStory==='function') renderMomStory();
       if (typeof registerSiteTranslationData === 'function') registerSiteTranslationData();
       const grid = document.getElementById('customer-products-grid');
       if (!grid) return;
