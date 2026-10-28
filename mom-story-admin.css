@@ -1,0 +1,65 @@
+/* Mom’s story panel: configurable editorial copy and mobile-first admin editor.
+   Existing logo source is retained; compositing removes its white raster canvas visually. */
+#mom-story .mom-story-art img {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  filter: grayscale(1) invert(1) contrast(1.85) !important;
+  mix-blend-mode: screen !important;
+}
+header .mom-logo-frame {
+  background: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+header .mom-logo-frame .header-logo-img {
+  filter: brightness(1.035) contrast(1.18);
+  mix-blend-mode: multiply;
+}
+#mom-story #mom-story-description { white-space: pre-line; overflow-wrap: anywhere; }
+#mom-story #mom-story-headline { overflow-wrap: anywhere; }
+#mom-story #mom-story-slogan { text-align: center; overflow-wrap: anywhere; }
+#mom-story #mom-story-cta { overflow-wrap: anywhere; }
+
+.mom-story-admin-card {
+  width: min(100%, 980px);
+  box-sizing: border-box;
+  padding: clamp(16px, 2.6vw, 28px);
+  margin: 20px 0 0;
+  border-radius: 17px;
+  border: 1px solid #dee6d6;
+  background: #fff;
+  box-shadow: 0 6px 22px rgba(24,58,33,.06);
+  color: #253e2d;
+}
+.mom-story-admin-card h3 { font-size: 1.1rem; font-weight: 850; margin: 0 0 8px; }
+.mom-story-admin-hint { font-size: .86rem; line-height: 1.65; color: #657565; margin: 0 0 18px; }
+.mom-story-editor-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(14px, 3vw, 25px); }
+.mom-story-editor-language { min-width: 0; padding: 16px; border: 1px solid #e6eadd; border-radius: 13px; background: #fbfcf8; }
+.mom-story-editor-language h4 { margin: 0 0 15px; font-size: .95rem; font-weight: 850; color: #244e2c; }
+.mom-story-editor-language .form-group { margin-bottom: 11px; }
+.mom-story-editor-language label { display: block; font-weight: 720; margin-bottom: 5px; font-size: .8rem; color: #3b5140; }
+.mom-story-editor-language .form-control { width: 100%; min-width: 0; box-sizing: border-box; font-size: .9rem; background: #fff; }
+.mom-story-editor-language textarea.form-control { min-height: 98px; resize: vertical; line-height: 1.6; }
+.mom-story-editor-language :is(input, textarea):focus-visible { outline: 2px solid #74a46c; outline-offset: 1px; }
+.mom-story-preview-language { display: flex; align-items: center; gap: 12px; margin: 18px 0 9px; font-size: .85rem; font-weight: 750; }
+.mom-story-preview-language select { border: 1px solid #cfdbc9; border-radius: 9px; background: #f8fbf4; padding: 7px 12px; font: inherit; }
+.mom-story-admin-preview { display: flex; justify-content: space-between; align-items: center; gap: 15px; background: #f3f7ee; border: 1px dashed #aec4a1; border-radius: 12px; padding: 18px 20px; }
+.mom-story-admin-preview > div { flex: 1; min-width: 0; }
+.mom-story-admin-preview #story-preview-eyebrow { display: block; font-size: .7rem; letter-spacing: 1.3px; color: #68835e; font-weight: 850; }
+.mom-story-admin-preview #story-preview-headline { font-size: 1.25rem; margin: 6px 0; font-weight: 850; line-height: 1.28; overflow-wrap: anywhere; }
+.mom-story-admin-preview #story-preview-description { white-space: pre-line; line-height: 1.65; margin: 0 0 10px; color: #667667; overflow-wrap: anywhere; }
+.mom-story-admin-preview #story-preview-cta { display: inline-block; border-radius: 999px; padding: 8px 12px; background: #234f2e; color: #fff; font-size: .82rem; font-weight: 800; }
+.mom-story-admin-preview #story-preview-slogan { max-width: 34%; color: #315c35; font-family: Georgia, serif; font-size: 1rem; text-align: center; }
+.mom-story-admin-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-top: 16px; }
+.mom-story-admin-actions #mom-story-save-status { font-size: .82rem; color: #526b54; }
+.mom-story-admin-actions #btn-save-mom-story { margin: 0; width: auto; min-width: 165px; padding: 12px 20px; font-size: .86rem; border-radius: 12px; height: auto; }
+.mom-story-admin-actions #btn-save-mom-story:disabled { opacity: .6; cursor: wait; }
+@media (max-width: 680px) {
+  .mom-story-editor-cols { grid-template-columns: 1fr; gap: 13px; }
+  .mom-story-editor-language { padding: 12px; }
+  .mom-story-admin-preview { flex-direction: column; align-items: stretch; }
+  .mom-story-admin-preview #story-preview-slogan { max-width: none; text-align: left; }
+  .mom-story-admin-actions #btn-save-mom-story { width: 100%; }
+}
