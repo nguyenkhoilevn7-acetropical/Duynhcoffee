@@ -47,5 +47,35 @@ test('social placement is top-right on mobile; admin and bottom dock remain unch
   assert.match(css,/body:has\(#view-backend\.active\) header \.mom-header-social/);
   assert.match(css,/\.mom-header-social \[hidden\]/);
   assert.equal((css.match(/\{/g)||[]).length,(css.match(/\}/g)||[]).length);
-  assert.match(html,/mom-header-social\.css\?v=20261028-1/);
+  assert.match(html,/mom-header-social\.css\?v=20261028-2/);
+});
+
+test('approved preview renders standalone blue Facebook f and black TikTok note without circles',()=>{
+  const doc=new JSDOM(html).window.document;
+  const facebook=doc.getElementById('customer-facebook-link');
+  const fPath=facebook.querySelector('svg path').getAttribute('d');
+  assert.match(fPath,/^M9\.101 23\.691/);
+  assert.match(fPath,/v8\.245Z$/);
+  assert.doesNotMatch(fPath,/C19\.396 23\.238|c0-6\.627-5\.373-12-12-12/);
+  for(const id of ['customer-tiktok-link','customer-tiktok-pending']){
+    const icon=doc.getElementById(id).querySelector('svg path').getAttribute('d');
+    assert.match(icon,/^M12\.525\.02/,'preserve TikTok note shape');
+  }
+  const base=css.match(/header \.mom-header-social \.social-button\s*\{([^}]+)\}/s);
+  assert.ok(base,'header social styles exist');
+  assert.match(base[1],/width: 44px !important/);
+  assert.match(base[1],/height: 44px !important/);
+  assert.match(base[1],/border-radius: 0 !important/);
+  assert.match(base[1],/border: 0 !important/);
+  assert.match(base[1],/background: transparent !important/);
+  assert.match(base[1],/box-shadow: none !important/);
+  const fb=css.match(/header \.mom-header-social \.social-facebook\s*\{([^}]+)\}/s);
+  const tt=css.match(/header \.mom-header-social \.social-tiktok\s*\{([^}]+)\}/s);
+  assert.ok(fb && tt);
+  assert.match(fb[1],/color: #1877F2 !important/);
+  assert.match(tt[1],/color: #101010 !important/);
+  assert.match(fb[1],/background: transparent !important/);
+  assert.match(tt[1],/background: transparent !important/);
+  assert.match(css,/header \.mom-header-social \.social-button:disabled\s*\{[^}]*opacity: 1 !important/);
+  assert.doesNotMatch(css,/border-radius: 50% !important|background: #151515 !important/);
 });
