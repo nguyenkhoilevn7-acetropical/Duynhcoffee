@@ -167,7 +167,8 @@
     box-shadow: 0 -5px 24px rgba(23,47,24,.075);
   }
   body:has(#view-backend.active) .mom-mobile-nav { display: none !important; }
-  .mom-mobile-nav button {
+  .mom-mobile-nav :is(button,a) {
+    text-decoration: none;
     appearance: none;
     -webkit-appearance: none;
     -webkit-tap-highlight-color: transparent;
@@ -187,7 +188,7 @@
     cursor: pointer;
     font-family: inherit;
   }
-  .mom-mobile-nav button svg {
+  .mom-mobile-nav :is(button,a) svg {
     width: 23px; height: 23px;
     stroke: currentColor; stroke-width: 2.15;
     stroke-linecap: round; stroke-linejoin: round;
@@ -199,8 +200,8 @@
     font-weight: 680; line-height: 1.3;
     white-space: nowrap; text-align: center;
   }
-  .mom-mobile-nav button.active { color: #214e2d; }
-  .mom-mobile-nav button:focus-visible { outline: 2px solid #6c9b64; outline-offset: -2px; }
+  .mom-mobile-nav :is(button,a).active { color: #214e2d; }
+  .mom-mobile-nav :is(button,a):focus-visible { outline: 2px solid #6c9b64; outline-offset: -2px; }
   .mom-mobile-nav .mom-nav-cart {
     transform: translateY(-15px);
     z-index: 1;
@@ -223,6 +224,7 @@
     border-radius: 50%;
   }
   .mom-mobile-nav .mom-cart-bubble svg { height: 26px; width: 26px; }
+  .mom-mobile-nav .mom-cart-badge[hidden] { display: none !important; }
   .mom-mobile-nav .mom-cart-badge {
     position: absolute;
     top: -3px; right: -2px;
@@ -285,6 +287,6 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .mom-mobile-nav button,
+  .mom-mobile-nav :is(button,a),
   #view-customer .product-card-actions .btn-card-add { transition:none !important; }
 }
