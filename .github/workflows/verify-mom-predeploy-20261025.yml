@@ -65,8 +65,8 @@ jobs:
             throw error;
           }
           async function main() {
-            const [html, css, js, recipeJs, rawOrders, saleJs, adminJs, saleCss] = await Promise.all([
-              get('/'),get('/admin-ios.css?v=20261025-2'),get('/admin-ios.js?v=20261025-2'),get('/admin-recipes.js?v=20261025-2'),get('/api/orders'),get('/sale-promotions.js?v=20261026-1'),get('/sale-admin.js?v=20261026-1'),get('/sale-promotions.css?v=20261026-1')
+            const [html, css, js, recipeJs, rawOrders, saleJs, adminJs, saleCss, bannerJs, bannerCss] = await Promise.all([
+              get('/'),get('/admin-ios.css?v=20261025-2'),get('/admin-ios.js?v=20261025-2'),get('/admin-recipes.js?v=20261025-2'),get('/api/orders'),get('/sale-promotions.js?v=20261026-1'),get('/sale-admin.js?v=20261028-1'),get('/sale-promotions.css?v=20261026-1'),get('/sale-banner.js?v=20261028-1'),get('/sale-banner.css?v=20261028-1')
             ]);
             const assetTests = {
               'HTML links new iOS CSS': html.includes('admin-ios.css?v=20261025-2'),
@@ -77,7 +77,12 @@ jobs:
               'Order timing layout is active': css.includes('.ios-order-timing'),
               'Product quantity buttons have 10px gap': html.includes('#product-custom-modal .ios-qty-stepper') && html.includes('gap: 10px;'),
               'English handles missing recipes': recipeJs.includes('if(!state.recipe && !state.custom.trim())'),
-              'SALE UI loaded': html.includes('id="mom-sale-products"') && html.includes('sale-admin.js?v=20261026-1'),
+              'SALE UI loaded': html.includes('id="mom-sale-products"') && html.includes('sale-admin.js?v=20261028-1'),
+              'Flash SALE mounted inside hero': html.includes('id="mom-sale-hero" hidden'),
+              'Flash SALE JS asset loaded': html.includes('sale-banner.js?v=20261028-1') && bannerJs.includes('function evaluateCampaigns('),
+              'Flash SALE CSS asset loaded': html.includes('sale-banner.css?v=20261028-1') && bannerCss.includes('#mom-sale-hero[hidden]'),
+              'Flash SALE off state hides instantly': bannerJs.includes('rootNode.hidden=true') && bannerJs.includes('rootNode.replaceChildren()'),
+              'Flash SALE reason editor': html.includes('id="mom-sale-reason"') && adminJs.includes("el('mom-sale-reason').value=p.reason"),
               'SALE price shared': saleJs.includes('function calculate(items,discounts'),
               'SALE admin controls': adminJs.includes('async function create()'),
               'SALE CSS loaded': saleCss.includes('.mom-sale-admin')
