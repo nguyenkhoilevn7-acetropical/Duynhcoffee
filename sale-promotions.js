@@ -14,6 +14,8 @@
     if (!sale(p)) throw new Error('Chương trình SALE không hợp lệ.');
     if (typeof p.title !== 'string' || !p.title.trim() || p.title.length > 100) throw new Error('Cần tên chương trình SALE.');
     if (p.scope !== 'all' && p.scope !== 'selected') throw new Error('Chọn phạm vi giảm giá.');
+    if (p.reason!==undefined && (typeof p.reason!=='string'||p.reason.length>240))
+      throw new Error('Thông điệp SALE tối đa 240 ký tự.');
     if (p.type !== 'percent' && p.type !== 'amount') throw new Error('Chọn kiểu giảm giá.');
     const value = Number(p.value);
     if (!Number.isSafeInteger(value) || value < 1 || (p.type === 'percent' && value > 99) || (p.type === 'amount' && value > 1000000))

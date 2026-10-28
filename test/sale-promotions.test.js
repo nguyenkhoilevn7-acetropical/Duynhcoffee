@@ -67,7 +67,7 @@ test('new promotion UI keeps old coupon fields, sync and API source unchanged',(
  assert.match(html,/id="mom-sale-products"/);
  assert.match(html,/id="new-discount-code"/);
  assert.match(html,/sale-promotions\.js\?v=20261026-1/);
- assert.match(html,/sale-admin\.js\?v=20261026-1/);
+ assert.match(html,/sale-admin\.js\?v=20261028-1/);
  assert.match(html,/getSaleCheckoutResult\(\)/);
  assert.match(js,/\/api\/discounts/);
  assert.match(js,/Authorization/);

@@ -277,6 +277,10 @@
   "Mật khẩu Admin": "Admin password",
   "Đăng nhập quyền SALE": "Sign in to manage SALE",
   "Sản phẩm SALE": "SALE products",
+
+  "Thông báo chương trình SALE": "SALE campaign announcements",
+  "Lý do SALE / Thông điệp gửi khách": "Reason for SALE / Customer message",
+  "Ví dụ: Mừng khai trương — cảm ơn khách hàng đã đồng hành.": "e.g. Grand opening — thank you for your support.",
   "🏷️ Chương trình SALE tự động": "🏷️ Automatic Sale Campaigns",
   "Giảm cho món chọn hoặc toàn bộ menu, tự áp dụng khi thanh toán.": "Offer discounts on selected products or the entire menu, applied automatically at checkout.",
   "0 chương trình": "0 campaigns",

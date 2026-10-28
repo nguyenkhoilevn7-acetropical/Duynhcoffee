@@ -70,6 +70,7 @@
     editingId=p.id;selected.clear();(p.productIds||[]).forEach(id=>selected.add(String(id)));
     el('mom-sale-title-input').value=p.title;el('mom-sale-type').value=p.type;el('mom-sale-value').value=p.value;
     el('mom-sale-scope').value=p.scope;el('mom-sale-start').value=inputDate(p.startsAt);el('mom-sale-end').value=inputDate(p.endsAt);
+    el('mom-sale-reason').value=p.reason || '';
     el('mom-sale-enabled').checked=p.active!==false;el('mom-sale-save').textContent='💾 Lưu thay đổi SALE';message('Đang chỉnh sửa: '+p.title);
     render();el('mom-sale-title-input').scrollIntoView({behavior:'smooth',block:'center'});
   }
@@ -84,6 +85,7 @@
       discounts=next;saveLocalDiscounts(false);
       if(typeof broadcastMeshEvent==='function')broadcastMeshEvent('DISCOUNTS_UPDATE',{discounts});
       if(typeof renderAdminDiscountsTable==='function')renderAdminDiscountsTable();
+      window.MomSaleBanner?.refresh();
       if(typeof renderCustomerProducts==='function')renderCustomerProducts();
       if(typeof updateCheckoutFinancials==='function' && el('checkout-modal')?.style.display==='flex')updateCheckoutFinancials();
       return true;
@@ -95,14 +97,14 @@
     const title=(el('mom-sale-title-input')?.value||'').trim();
     const scope=el('mom-sale-scope').value,type=el('mom-sale-type').value;
     const start=el('mom-sale-start').value,end=el('mom-sale-end').value;
-    const p={id:editingId===null?Date.now():editingId,kind:'sale',mode:'automatic',title,scope,type,
+    const p={id:editingId===null?Date.now():editingId,kind:'sale',mode:'automatic',title,reason:(el('mom-sale-reason')?.value||'').trim(),scope,type,
       value:Number(el('mom-sale-value').value),productIds:scope==='selected'?[...selected]:[],
       startsAt:start?new Date(start).toISOString():'',endsAt:end?new Date(end).toISOString():'',
       active:el('mom-sale-enabled').checked};
     try{window.MomSalePricing.validateCampaign(p,menu)}catch(error){message(error.message,true);return;}
     const next=editingId===null?[...discounts,p]:discounts.map(x=>x.id===editingId?p:x);
     if(await save(next)){
-      editingId=null;selected.clear();['mom-sale-title-input','mom-sale-value','mom-sale-start','mom-sale-end','mom-sale-search'].forEach(id=>{if(el(id))el(id).value='';});
+      editingId=null;selected.clear();['mom-sale-title-input','mom-sale-reason','mom-sale-value','mom-sale-start','mom-sale-end','mom-sale-search'].forEach(id=>{if(el(id))el(id).value='';});
       el('mom-sale-enabled').checked=true;el('mom-sale-save').textContent='＋ Tạo chương trình SALE';
       message('✅ Đã lưu chương trình SALE và đồng bộ với máy chủ.');render();
     }
