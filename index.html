@@ -3338,6 +3338,8 @@ body {
   <script src="sale-promotions.js?v=20261026-1" defer></script>
   <script src="sale-admin.js?v=20261026-1" defer></script>
   <script src="admin-ios.js?v=20261025-2" defer></script>
+  <!-- Presentation-only Mom customer storefront theme; loaded after legacy styles. -->
+  <link rel="stylesheet" href="mom-storefront.css?v=20261028-1">
 </head>
 <body>
 
@@ -3347,6 +3349,13 @@ body {
       <div class="brand-logo-area" onclick="switchView('customer')">
         <span class="mom-logo-frame"><img src="/public/mom-logo-white.jpg" alt="Mom’s Tea &amp; Coffee" class="header-logo-img" width="1536" height="1147" fetchpriority="high"></span>
       </div>
+
+      <nav class="mom-site-nav" aria-label="Điều hướng trang bán hàng">
+        <a href="#view-customer">Trang chủ</a>
+        <a href="#mom-menu-section">Thực đơn</a>
+        <a href="#mom-story">Về Mom’s</a>
+        <a href="#mom-contact">Liên hệ</a>
+      </nav>
 
       <div class="header-controls">
         <!-- NÚT CHUYỂN ĐỔI SONG NGỮ VIỆT - ANH (LIVE AI TRANSLATION) -->
@@ -3393,10 +3402,23 @@ body {
           </h1>
           <p id="hero-desc-text" style="font-size: 0.86rem; color: rgba(255,255,255,0.85); margin-top: 6px; max-width: 520px; line-height: 1.5;"></p>
           <div id="hero-promo-badge-container" style="margin-top: 10px;"></div>
+          <a class="mom-hero-cta" href="#mom-menu-section" aria-label="Đến danh sách món uống">Đặt hàng ngay <span aria-hidden="true">→</span></a>
         </div>
         <div id="hero-banner-image-container" class="hero-banner-image-container" style="display: none;"></div>
       </div>
 
+      <!-- Giá trị dịch vụ — nội dung giới thiệu, không thay đổi luồng đặt hàng -->
+      <div class="mom-benefits" id="mom-benefits" aria-label="Tiện ích đặt hàng">
+        <div class="mom-benefit"><span class="mom-benefit-icon" aria-hidden="true">🍃</span><span><b>Chọn món dễ dàng</b><small>Khám phá thực đơn Mom’s</small></span></div>
+        <div class="mom-benefit"><span class="mom-benefit-icon" aria-hidden="true">🧋</span><span><b>Tùy chỉnh theo gu</b><small>Chọn đá, đường và topping</small></span></div>
+        <div class="mom-benefit"><span class="mom-benefit-icon" aria-hidden="true">💳</span><span><b>Thanh toán tiện lợi</b><small>Gửi biên lai khi thanh toán</small></span></div>
+        <div class="mom-benefit"><span class="mom-benefit-icon" aria-hidden="true">📦</span><span><b>Theo dõi đơn hàng</b><small>Kiểm tra trạng thái đơn</small></span></div>
+      </div>
+
+      <div class="mom-section-intro" id="mom-menu-section">
+        <div><span class="mom-kicker">MOM’S MENU</span><h2>Hôm nay mình uống gì?</h2></div>
+        <p>Trà, cà phê và những món uống yêu thích — chọn món phù hợp với bạn.</p>
+      </div>
       <!-- BỘ LỌC DANH MỤC -->
       <div class="category-scroll-nav" id="category-filter-pills">
         <button type="button" class="cat-btn active" onclick="filterCategory('all', this)">✨ Tất Cả Món</button>
@@ -3405,8 +3427,22 @@ body {
         <button type="button" class="cat-btn" onclick="filterCategory('bakery', this)">🥐 Bánh & Tráng Miệng</button>
       </div>
 
-      <!-- LƯỚI SẢN PHẨM -->
+      <!-- LƯỚI SẢN PHẨM — JS hiện tại vẫn render vào cùng ID -->
+      <div class="mom-section-intro mom-products-heading">
+        <div><span class="mom-kicker">CHỌN MÓN YÊU THÍCH</span><h2>Khám phá thực đơn</h2></div>
+        <p>Chạm vào món để tùy chỉnh hoặc mua ngay.</p>
+      </div>
       <div class="products-grid" id="customer-products-grid"></div>
+
+      <section class="mom-story-card" id="mom-story" aria-label="Giới thiệu Mom’s Tea & Coffee">
+        <div class="mom-story-art"><img src="/public/mom-logo.png" alt="Mom’s Tea & Coffee" loading="lazy" decoding="async"><em>Good drinks · Good mood</em></div>
+        <div class="mom-story-copy">
+          <span class="mom-kicker">CÂU CHUYỆN MOM’S</span>
+          <h2>Trà ngon từ trái tim.</h2>
+          <p>Một chút trà, một chút cà phê và những khoảnh khắc dễ chịu mỗi ngày. Mom’s Tea & Coffee phục vụ đặt món trực tuyến, để thức uống bạn yêu thích luôn gần hơn.</p>
+          <a href="#mom-menu-section">Xem thực đơn <span aria-hidden="true">↗</span></a>
+        </div>
+      </section>
 
       <!-- THANH GIỎ HÀNG NỔI (TỰ ĐỘNG HIỆN 3S KHI ADD MÓN & TỰ ẨN) -->
       <div id="floating-cart-bar" class="floating-cart-bar" onclick="openCartDrawer()" style="display: none;">
@@ -4861,7 +4897,7 @@ body {
   </div>
 
   <!-- ==================== FOOTER ==================== -->
-  <footer>
+  <footer id="mom-contact">
     <div class="footer-inner">
       <div>
         <b>Mom’s Tea & Coffee</b> • Tòa Babylon 2, Chung Cư Thủ Thiêm, An Khánh, TP. Thủ Đức<br>
