@@ -14,7 +14,7 @@
   const fmt=n=>Number(n||0).toFixed(1);
   const lang=()=>document.documentElement.lang==='en'?'en':'vi';
   const msg=(vi,en)=>lang()==='en'?en:vi;
-  const purchase=id=>credentials.find(x=>x.ids.includes(String(id)))||null;
+  const purchase=id=>credentials.slice().reverse().find(x=>x.ids.includes(String(id)))||null;
   const currentRating=id=>summaries[String(id)]||{count:0,average:0};
   function newProof(){
     if(!window.crypto||typeof window.crypto.getRandomValues!=='function')return undefined;
