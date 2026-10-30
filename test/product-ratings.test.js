@@ -95,6 +95,6 @@ test('ratings HTML and secure server integration are connected without exposing 
  assert.match(server,/delete body\.ratingProof/);
  assert.match(server,/ratingEnabled:ratingsStore\.hasGrant/);
  assert.match(server,/ratingsStore\.register\(savedOrder,ratingProof\)/);
- assert.match(server,/path\.basename\(normalized\)[\s\S]*'product-ratings\.json'/);
+ assert.match(server,/'product-ratings\.json'[\s\S]*path\.basename\(normalized\)/);
  assert.match(server,/pathname==='\/api\/ratings'/);
 });
