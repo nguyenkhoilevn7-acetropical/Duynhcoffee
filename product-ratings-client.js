@@ -39,7 +39,9 @@
       for(let score=1;score<=5;score++){
         const btn=document.createElement('button');
         btn.type='button';btn.className='mom-heart-rating-btn';
-        btn.textContent=score<=Math.round(data.average)?'♥':'♡';
+        const selected=score<=Math.round(data.average);
+        btn.innerHTML='<svg class="mom-heart-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78Z"/></svg>';
+        btn.setAttribute('aria-pressed',String(selected));
         btn.classList.toggle('filled',score<=Math.round(data.average));
         btn.setAttribute('aria-label',msg('Đánh giá '+score+' tim','Rate '+score+' hearts'));
         btn.title=owned?msg('Chấm '+score+' tim','Give '+score+' hearts'):
@@ -60,8 +62,8 @@
   async function rate(id,score){
     const grant=purchase(id);
     if(!grant){
-      feedback(msg('Chỉ khách đã đặt và thanh toán món này mới được đánh giá. Hãy đặt món trước nhé.',
-        'Only verified buyers of this drink can rate it. Please order first.'),true);
+      feedback(msg('Tính năng đánh giá chỉ dành cho khách hàng đã đặt và thanh toán sản phẩm này.',
+        'Ratings are only available to customers who have ordered and paid for this product.'),true);
       return;
     }
     if(inFlight)return;
