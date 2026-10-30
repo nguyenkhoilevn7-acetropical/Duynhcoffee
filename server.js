@@ -14,6 +14,7 @@ const os = require('os');
 const crypto = require('crypto');
 const { createBackup } = require('./drive-backup');
 const { createReceiptVerifier } = require('./receipt-verification');
+const { createRatingsStore } = require('./product-ratings');
 const { createReceiptJobs } = require('./receipt-jobs');
 const { createAdminPush } = require('./admin-push');
 const { createDelivery, protectOrderWrite, transition } = require('./delivery');
@@ -90,6 +91,11 @@ function readJsonFile(filePath, defaultVal = []) {
 
 // Hàm ghi JSON an toàn
 let backupService;
+const ratingsStore=createRatingsStore({
+  dir:ROOT_DIR,
+  getOrders:()=>readJsonFile(ORDERS_FILE,[]),
+  onChange:()=>backupService?.changed()
+});
 function writeJsonFile(filePath, data) {
   try {
     const temporary = filePath + '.tmp';
@@ -112,7 +118,7 @@ async function startApplication() {
 backupService = createBackup({
   dir: ROOT_DIR,
   ordersSnapshot: () => readJsonFile(ORDERS_FILE, []),
-  snapshot: () => ({ menu: menuCache, config: configCache, discounts: discountsCache, recipes: readJsonFile(RECIPES_FILE, {}), profitSettings: readJsonFile(PROFIT_FILE, profitReport.emptySettings()), inventory: readJsonFile(INVENTORY_FILE, emptyInventory()) }),
+  snapshot: () => ({ menu: menuCache, config: configCache, discounts: discountsCache, recipes: readJsonFile(RECIPES_FILE, {}), profitSettings: readJsonFile(PROFIT_FILE, profitReport.emptySettings()), inventory: readJsonFile(INVENTORY_FILE, emptyInventory()), ratings:ratingsStore.read() }),
   apply: data => {
     menuCache = data.menu;
     // Secrets remain local and are never restored from Drive.
@@ -120,6 +126,7 @@ backupService = createBackup({
     configCache = data.config;
     if (localAdmin) configCache.adminAccount = localAdmin;
     discountsCache = data.discounts;
+    if(data.ratings)ratingsStore.restore(data.ratings);
     rebrandMenuAndConfig();
 // Retire embedded clips from older saved settings before any public snapshot.
 function bannerImagesOnlyConfig(config) {
@@ -912,6 +919,25 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // Real ratings only: public aggregate display, verified-purchase proof for writes.
+  if(pathname==='/api/ratings'){
+    if(req.method==='GET'){
+      try{sendJson(res,200,{ratings:ratingsStore.summary()});}
+      catch(e){sendJson(res,503,{error:'Chưa đọc được dữ liệu đánh giá.'});}
+      return;
+    }
+    if(req.method==='POST'){
+      try{
+        const payload=await parseRequestBody(req);
+        const answer=ratingsStore.rate(payload||{});
+        if(answer.status!==200){sendJson(res,answer.status,{error:answer.error});return;}
+        sendJson(res,200,{success:true,...answer.result});
+      }catch(error){sendJson(res,503,{error:'Chưa lưu được đánh giá, vui lòng thử lại.'});}
+      return;
+    }
+    sendJson(res,405,{error:'Phương thức không được hỗ trợ.'});return;
+  }
+
   // 1. GET /api/orders
   if (req.method === 'GET' && pathname === '/api/orders') {
     ordersCache = readJsonFile(ORDERS_FILE, ordersCache);
@@ -928,6 +954,9 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      // Strip proof before all order validation/storage/broadcast paths.
+      const ratingProof=body.ratingProof;
+      delete body.ratingProof;
       ordersCache=readJsonFile(ORDERS_FILE,ordersCache);
       if(body.submissionKey!==undefined){
         if(typeof body.submissionKey!=='string' || !/^[a-zA-Z0-9-]{8,100}$/.test(body.submissionKey)){sendJson(res,400,{error:'Khóa gửi đơn không hợp lệ'});return;}
@@ -945,7 +974,8 @@ const server = http.createServer(async (req, res) => {
           customer:order.customerName || '',note:order.note || '',discount:order.discount?.code || ''
         })).digest('hex');
         if(fingerprint(body)!==fingerprint(ordersCache[existingIdx])){sendJson(res,409,{error:'Mã đơn đã tồn tại với nội dung khác. Vui lòng mở lại thanh toán để lấy mã mới.'});return;}
-        sendJson(res,200,{success:true,duplicate:true,orderId:body.id,count:ordersCache.length});return;
+        sendJson(res,200,{success:true,duplicate:true,orderId:body.id,count:ordersCache.length,
+          ratingEnabled:ratingsStore.hasGrant(body.id,ratingProof)});return;
       } else {
         const newOrder = {
           ...body,
@@ -959,8 +989,11 @@ const server = http.createServer(async (req, res) => {
       writeJsonFile(ORDERS_FILE, ordersCache);
       console.log(`[API] Lưu đơn hàng thành công: ${body.id}`);
       const savedOrder = existingIdx >= 0 ? ordersCache[existingIdx] : ordersCache[ordersCache.length - 1];
+      let ratingEnabled=false;
+      try{ratingEnabled=ratingsStore.register(savedOrder,ratingProof);}
+      catch(err){console.error('[Ratings] Không cấp được quyền đánh giá:',err.message);}
       ordersVersion=Math.max(Date.now(),ordersVersion+1);
-      sendJson(res, 200, { success: true, orderId: body.id, count: ordersCache.length });
+      sendJson(res, 200, { success: true, orderId: body.id, count: ordersCache.length, ratingEnabled });
       setImmediate(()=>broadcastRealtime('NEW_ORDER', savedOrder));
     } catch (err) {
       console.error('[API] Lỗi xử lý POST /api/orders:', err);
@@ -1331,7 +1364,7 @@ const server = http.createServer(async (req, res) => {
   // Source code and local data are not static assets.
   let normalized;
   try { normalized = path.posix.normalize(decodeURIComponent(cleanPath)); } catch { sendJson(res, 400, { error: 'Đường dẫn không hợp lệ' }); return; }
-  if (normalized.split('/').some(part => part.startsWith('.')) || ['inventory.js', 'inventory.json', 'profit-report.js', 'profit-excel.js', 'profit-settings.json', 'server.js', 'drink-recipes.js', 'drink-recipes.json', 'menu-ai.js', 'delivery.js', 'admin-push.js', 'drive-backup.js', 'receipt-verification.js', 'receipt-jobs.js', 'receipt-image.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || (normalized.startsWith('/test/') || normalized.startsWith('/scripts/')) || /\.(tmp|md)$/.test(normalized)) {
+  if (normalized.split('/').some(part => part.startsWith('.')) || ['inventory.js', 'inventory.json', 'profit-report.js', 'profit-excel.js', 'profit-settings.json', 'server.js', 'drink-recipes.js', 'drink-recipes.json', 'product-ratings.js', 'product-ratings.json', 'menu-ai.js', 'delivery.js', 'admin-push.js', 'drive-backup.js', 'receipt-verification.js', 'receipt-jobs.js', 'receipt-image.js', 'store_config.json', 'menu.json', 'discounts.json', 'orders.json', 'render.yaml', 'package.json', 'package-lock.json'].includes(path.basename(normalized)) || (normalized.startsWith('/test/') || normalized.startsWith('/scripts/')) || /\.(tmp|md)$/.test(normalized)) {
     sendJson(res, 404, { error: 'Không tìm thấy' }); return;
   }
   if (cleanPath === '/' || cleanPath === '/admin' || cleanPath === '/pos') {

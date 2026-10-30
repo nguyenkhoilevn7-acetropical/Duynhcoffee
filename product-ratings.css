@@ -1,0 +1,17 @@
+/* Hearts at the bottom of each drink card, matching Mom's iOS-like menu. */
+#view-customer .mom-heart-ratings{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 0 3px;min-width:0}
+#view-customer .mom-heart-buttons{display:inline-flex;gap:4px;align-items:center;flex-shrink:0}
+#view-customer .mom-heart-rating-btn{border:0;background:transparent;min-width:29px;min-height:35px;padding:2px;display:inline-flex;align-items:center;justify-content:center;color:#c6cad0;font-size:27px;line-height:1;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer;touch-action:manipulation;border-radius:8px;transition:transform .13s ease,color .13s ease}
+#view-customer .mom-heart-rating-btn.filled{color:#ed4e5c}
+#view-customer .mom-heart-rating-btn:hover{color:#e84052;transform:scale(1.12)}
+#view-customer .mom-heart-rating-btn:active{transform:scale(.94)}
+#view-customer .mom-heart-rating-btn:focus-visible{outline:2px solid #c63749;outline-offset:2px}
+#view-customer .mom-heart-meta{font-size:.82rem;color:#62716d;white-space:nowrap;font-weight:610;font-variant-numeric:tabular-nums}
+#view-customer .product-card .mom-heart-ratings{margin-top:auto}
+@media(max-width:560px){
+ #view-customer .mom-heart-ratings{gap:5px;padding-top:8px}
+ #view-customer .mom-heart-buttons{gap:1px}
+ #view-customer .mom-heart-rating-btn{font-size:22px;min-width:25px;min-height:31px}
+ #view-customer .mom-heart-meta{font-size:.71rem}
+}
+@media(prefers-reduced-motion:reduce){#view-customer .mom-heart-rating-btn{transition:none}}

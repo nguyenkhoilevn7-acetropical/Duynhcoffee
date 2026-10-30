@@ -55,7 +55,7 @@ test('Drive backup validates optional inventory while retaining old backup compa
 test('authenticated inventory API persists, blocks public access and survives restart',async()=>{
  const root=path.resolve(__dirname,'..');
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'mom-inventory-'));
- for(const name of ['server.js','inventory.js','profit-report.js','profit-excel.js','drink-recipes.js','menu-options.js','menu-ai.js','delivery.js','admin-push.js','drive-backup.js','receipt-verification.js','receipt-jobs.js','receipt-image.js']){
+ for(const name of ['server.js','product-ratings.js','inventory.js','profit-report.js','profit-excel.js','drink-recipes.js','menu-options.js','menu-ai.js','delivery.js','admin-push.js','drive-backup.js','receipt-verification.js','receipt-jobs.js','receipt-image.js']){
    fs.copyFileSync(path.join(root,name),path.join(dir,name));
  }
  fs.writeFileSync(path.join(dir,'store_config.json'),JSON.stringify({adminAccount:{username:'test-inventory',password:'inventory-test-password'},banner:{images:[]}}));
