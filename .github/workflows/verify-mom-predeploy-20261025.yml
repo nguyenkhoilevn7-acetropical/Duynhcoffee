@@ -65,8 +65,8 @@ jobs:
             throw error;
           }
           async function main() {
-            const [html, css, js, recipeJs, rawOrders, saleJs, adminJs, saleCss, bannerJs, bannerCss] = await Promise.all([
-              get('/'),get('/admin-ios.css?v=20261025-2'),get('/admin-ios.js?v=20261025-2'),get('/admin-recipes.js?v=20261025-2'),get('/api/orders'),get('/sale-promotions.js?v=20261026-1'),get('/sale-admin.js?v=20261028-1'),get('/sale-promotions.css?v=20261026-1'),get('/sale-banner.js?v=20261028-1'),get('/sale-banner.css?v=20261028-1')
+            const [html, css, js, recipeJs, rawOrders, saleJs, adminJs, saleCss, bannerJs, bannerCss, ratingJs, ratingCss, ratingApi] = await Promise.all([
+              get('/'),get('/admin-ios.css?v=20261025-2'),get('/admin-ios.js?v=20261025-2'),get('/admin-recipes.js?v=20261025-2'),get('/api/orders'),get('/sale-promotions.js?v=20261026-1'),get('/sale-admin.js?v=20261028-1'),get('/sale-promotions.css?v=20261026-1'),get('/sale-banner.js?v=20261028-1'),get('/sale-banner.css?v=20261028-1'),get('/product-ratings-client.js?v=20261030-1'),get('/product-ratings.css?v=20261030-1'),get('/api/ratings')
             ]);
             const assetTests = {
               'HTML links new iOS CSS': html.includes('admin-ios.css?v=20261025-2'),
@@ -83,6 +83,9 @@ jobs:
               'Flash SALE CSS asset loaded': html.includes('sale-banner.css?v=20261028-1') && bannerCss.includes('#mom-sale-hero[hidden]'),
               'Flash SALE off state hides instantly': bannerJs.includes('rootNode.hidden=true') && bannerJs.includes('rootNode.replaceChildren()'),
               'Flash SALE reason editor': html.includes('id="mom-sale-reason"') && adminJs.includes("el('mom-sale-reason').value=p.reason"),
+              'Five-heart customer rating widget': html.includes('class="mom-heart-ratings"') && html.includes('product-ratings-client.js?v=20261030-1') && ratingJs.includes('MomDrinkRatings'),
+              'Five-heart responsive styling': ratingCss.includes('.mom-heart-rating-btn'),
+              'Live ratings endpoint returns real aggregates': (()=>{try{const x=JSON.parse(ratingApi);return x&&typeof x.ratings==='object'&&!Array.isArray(x.ratings)}catch{return false}})(),
               'SALE price shared': saleJs.includes('function calculate(items,discounts'),
               'SALE admin controls': adminJs.includes('async function create()'),
               'SALE CSS loaded': saleCss.includes('.mom-sale-admin')
