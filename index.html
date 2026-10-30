@@ -3337,6 +3337,8 @@ body {
   <link rel="stylesheet" href="admin-ios.css?v=20261025-2">
   <script src="sale-promotions.js?v=20261026-1" defer></script>
   <script src="sale-admin.js?v=20261028-1" defer></script>
+  <link rel="stylesheet" href="product-ratings.css?v=20261030-1">
+  <script src="product-ratings-client.js?v=20261030-1" defer></script>
   <link rel="stylesheet" href="sale-banner.css?v=20261028-1">
   <script src="sale-banner.js?v=20261028-1" defer></script>
   <script src="admin-ios.js?v=20261025-2" defer></script>
@@ -9169,6 +9171,7 @@ async function openPaymentCheckoutModal() {
         status: 'new',
         receiptImage: currentCustomerReceiptBase64,
         verificationToken: receiptVerificationToken,
+        ratingProof:window.__pendingRatingProof || (window.__pendingRatingProof=window.MomDrinkRatings?.newProof?.()),
         mapUrl: mapUrl,
         items: cart.map(c => ({
           id: c.item.id,
@@ -9187,7 +9190,7 @@ async function openPaymentCheckoutModal() {
       const originalLabel=submitButton?.textContent;
       window.__orderSubmitInFlight=true;
       if(submitButton){submitButton.disabled=true;submitButton.textContent='Đang gửi đơn…';submitButton.setAttribute?.('aria-busy','true');}
-      let submitted=false;
+      let submitted=false, ratingEnabled=false;
       try {
         // A lost response is retried once with the SAME order ID and payload.
         for(let attempt=0;attempt<2;attempt++){
@@ -9197,6 +9200,7 @@ async function openPaymentCheckoutModal() {
             const saved=await response.json();
             if(!response.ok || !saved.success){const error=new Error(saved.error || 'Máy chủ chưa nhận đơn');error.noRetry=response.status<500;throw error;}
             if(saved.orderId)newOrder.id=saved.orderId;
+            ratingEnabled=!!saved.ratingEnabled;
             submitted=true;break;
           } catch(error){if(error.noRetry || attempt===1)throw error;}
           finally{clearTimeout(timer);}
@@ -9208,7 +9212,11 @@ async function openPaymentCheckoutModal() {
         window.__orderSubmitInFlight=false;
         if(submitButton){submitButton.disabled=submitted;submitButton.textContent=originalLabel || 'Gửi đơn hàng';submitButton.removeAttribute?.('aria-busy');}
       }
+      const reviewProofForBuyer=newOrder.ratingProof;
       delete newOrder.verificationToken;
+      delete newOrder.ratingProof;
+      window.MomDrinkRatings?.rememberOrder?.({orderId:newOrder.id,items:newOrder.items,proof:reviewProofForBuyer,confirmed:ratingEnabled});
+      window.__pendingRatingProof='';
       // Giảm tồn kho
       cart.forEach(c => {
         const m = menu.find(it => it.id === c.item.id);
@@ -11254,10 +11262,12 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
                   </button>
                 </div>
               </div>
+              <div class="mom-heart-ratings" data-product-id="${item.id}" aria-label="Đánh giá bằng trái tim"></div>
             </div>
           </div>
         `;
       }).join('');
+      window.MomDrinkRatings?.paint();
     }
 
     function filterCategory(cat, btnElem) {
