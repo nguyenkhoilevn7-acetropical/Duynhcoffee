@@ -21,6 +21,14 @@ function safeState(value) {
     !value.records || typeof value.records!=='object' || Array.isArray(value.records))
     throw Error('Invalid ratings store');
   if(Object.keys(value.records).length>MAX_RECORDS || Object.keys(value.grants).length>MAX_RECORDS)throw Error('Rating store too large');
+  if(Object.entries(value.grants).some(([id,hash])=>!/^ORD-[0-9]{5}$/.test(id)||typeof hash!=='string'||!/^[0-9a-f]{64}$/.test(hash)))
+    throw Error('Invalid rating grant');
+  for(const record of Object.values(value.records)){
+    if(!record||!Number.isInteger(record.score)||record.score<1||record.score>5||
+      typeof record.buyer!=='string'||!/^[0-9a-f]{64}$/.test(record.buyer)||
+      !/^ORD-[0-9]{5}$/.test(String(record.orderId))||
+      !/^[0-9a-z_-]{1,60}$/i.test(String(record.productId)))throw Error('Invalid rating record');
+  }
   return value;
 }
 function createRatingsStore({dir,getOrders,onChange=()=>{}}) {
