@@ -23,7 +23,7 @@ function safeState(value) {
   if(Object.keys(value.records).length>MAX_RECORDS || Object.keys(value.grants).length>MAX_RECORDS)throw Error('Rating store too large');
   return value;
 }
-function createRatingsStore({dir,getOrders}) {
+function createRatingsStore({dir,getOrders,onChange=()=>{}}) {
   const filename=path.join(dir,'product-ratings.json');
   let current=null;
   function read() {
@@ -39,6 +39,16 @@ function createRatingsStore({dir,getOrders}) {
     const tmp=filename+'.tmp';
     fs.writeFileSync(tmp,JSON.stringify(state),'utf8');fs.renameSync(tmp,filename);
     current=state;
+    onChange();
+  }
+  function restore(state){
+    safeState(state);
+    // Never overwrite newer local state with an older Drive snapshot.
+    if(!fs.existsSync(filename))save(state);
+  }
+  function hasGrant(orderId,proof){
+    if(!proofOk(proof))return false;
+    return read().grants[String(orderId)]===digest(proof);
   }
   const buyerKey=(state,order)=>digest(state.salt+':'+cleanPhone(order.phone));
   function register(order,proof) {
@@ -81,6 +91,6 @@ function createRatingsStore({dir,getOrders}) {
     }
     return Object.fromEntries(Object.entries(totals).map(([id,v])=>[id,{count:v.count,average:Math.round(10*v.sum/v.count)/10}]));
   }
-  return {register,rate,summary,read};
+  return {register,hasGrant,rate,summary,read,restore};
 }
 module.exports={createRatingsStore,validOrder,proofOk,safeState};
