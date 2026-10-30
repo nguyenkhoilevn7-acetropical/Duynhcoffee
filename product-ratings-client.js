@@ -11,6 +11,19 @@
     }catch{return [];}
   }
   function persist(){try{localStorage.setItem(STORE,JSON.stringify(credentials.slice(-40)));}catch(_){}}
+  const SVG_NS='http://www.w3.org/2000/svg';
+  // Rounded, scalable heart outline from the approved 5-heart preview.
+  const HEART_PATH='M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z';
+  function createHeartIcon(){
+    const svg=document.createElementNS(SVG_NS,'svg');
+    svg.setAttribute('viewBox','0 0 24 24');
+    svg.setAttribute('aria-hidden','true');
+    svg.setAttribute('focusable','false');
+    const path=document.createElementNS(SVG_NS,'path');
+    path.setAttribute('d',HEART_PATH);
+    svg.appendChild(path);
+    return svg;
+  }
   const fmt=n=>Number(n||0).toFixed(1);
   const lang=()=>document.documentElement.lang==='en'?'en':'vi';
   const msg=(vi,en)=>lang()==='en'?en:vi;
@@ -39,11 +52,11 @@
       for(let score=1;score<=5;score++){
         const btn=document.createElement('button');
         btn.type='button';btn.className='mom-heart-rating-btn';
-        btn.textContent=score<=Math.round(data.average)?'♥':'♡';
+        btn.appendChild(createHeartIcon());
         btn.classList.toggle('filled',score<=Math.round(data.average));
         btn.setAttribute('aria-label',msg('Đánh giá '+score+' tim','Rate '+score+' hearts'));
         btn.title=owned?msg('Chấm '+score+' tim','Give '+score+' hearts'):
-          msg('Chỉ khách đã đặt món này mới có quyền đánh giá','Only verified purchasers may rate');
+          msg('Chỉ khách đã đặt và thanh toán món này mới được đánh giá','Only customers who ordered and paid for this drink may rate');
         btn.addEventListener('click',event=>{event.stopPropagation();rate(id,score);});
         buttons.appendChild(btn);
       }
@@ -51,6 +64,21 @@
       meta.textContent=fmt(data.average)+' ('+data.count+' '+msg('đánh giá','ratings')+')';
       target.append(buttons,meta);
     }
+  }
+  function showEligibilityNotice(id,text){
+    const grid=document.getElementById('customer-products-grid');
+    if(!grid)return;
+    const target=Array.from(grid.querySelectorAll('.mom-heart-ratings[data-product-id]'))
+      .find(el=>String(el.dataset.productId)===String(id));
+    if(!target)return;
+    let notice=target.querySelector('.mom-rating-eligibility');
+    if(!notice){
+      notice=document.createElement('p');
+      notice.className='mom-rating-eligibility';
+      notice.setAttribute('role','alert');
+      target.appendChild(notice);
+    }
+    notice.textContent=text;
   }
   function feedback(text,error=false){
     if(typeof window.showSmsToast==='function'){
@@ -60,8 +88,12 @@
   async function rate(id,score){
     const grant=purchase(id);
     if(!grant){
-      feedback(msg('Chỉ khách đã đặt và thanh toán món này mới được đánh giá. Hãy đặt món trước nhé.',
-        'Only verified buyers of this drink can rate it. Please order first.'),true);
+      const warning=msg(
+        'Rating chỉ dành cho khách đã đặt order và thanh toán món này.',
+        'Ratings are only for customers who ordered and paid for this drink.'
+      );
+      showEligibilityNotice(id,warning);
+      feedback(warning,true);
       return;
     }
     if(inFlight)return;

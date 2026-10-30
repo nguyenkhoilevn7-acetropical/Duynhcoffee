@@ -98,3 +98,24 @@ test('ratings HTML and secure server integration are connected without exposing 
  assert.match(server,/'product-ratings\.json'[\s\S]*path\.basename\(normalized\)/);
  assert.match(server,/pathname==='\/api\/ratings'/);
 });
+
+test('heart rating uses SVG icons and explains eligibility without submitting unverified ratings',()=>{
+ const client=fs.readFileSync(path.join(__dirname,'../product-ratings-client.js'),'utf8');
+ const dom=new JSDOM('<!doctype html><html lang="vi"><body><div id="customer-products-grid"><div class="mom-heart-ratings" data-product-id="41"></div></div></body></html>',{url:'https://mom.example',runScripts:'outside-only'});
+ const {window}=dom,requests=[],notifications=[];
+ try{
+  window.fetch=async (url,opts)=>{requests.push({url,method:opts?.method||'GET'});return {ok:true,json:async()=>({ratings:{}})};};
+  window.showSmsToast=(title,message)=>notifications.push({title,message});
+  window.eval(client);
+  window.MomDrinkRatings.paint();
+  const buttons=window.document.querySelectorAll('.mom-heart-rating-btn');
+  assert.equal(buttons.length,5);
+  assert.equal(window.document.querySelectorAll('.mom-heart-rating-btn svg path').length,5);
+  assert.equal(buttons[0].querySelector('svg').getAttribute('aria-hidden'),'true');
+  assert.equal(buttons[4].getAttribute('aria-label'),'Đánh giá 5 tim');
+  buttons[4].click();
+  assert.equal(requests.filter(r=>r.method==='POST').length,0);
+  assert.match(window.document.querySelector('.mom-rating-eligibility[role="alert"]').textContent,/Rating chỉ dành cho khách đã đặt order và thanh toán món này/);
+  assert.match(notifications.at(-1).message,/Rating chỉ dành cho khách đã đặt order/);
+ }finally{dom.window.close();}
+});
