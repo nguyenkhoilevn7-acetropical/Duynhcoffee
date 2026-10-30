@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const {validateRecipeStore} = require('./drink-recipes');
 const {validateSettings:validateProfitSettings} = require('./profit-report');
 const {validateInventory}=require('./inventory');
+const {safeState:validateRatingStore}=require('./product-ratings');
 const SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const TAG = 'duynh-backup-v1';
 const MAX_BYTES = 25 * 1024 * 1024;
@@ -24,6 +25,7 @@ function validate(value) {
   if (value.recipes !== undefined) validateRecipeStore(value.recipes);
   if (value.profitSettings !== undefined) validateProfitSettings(value.profitSettings);
    if (value.inventory !== undefined) validateInventory(value.inventory);
+  if (value.ratings !== undefined) validateRatingStore(value.ratings);
   const clean = sanitize(value);
   if (JSON.stringify(clean) !== JSON.stringify(value)) throw new Error('Backup chứa trường bí mật không được phép');
   return clean;
