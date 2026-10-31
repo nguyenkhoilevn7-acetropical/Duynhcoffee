@@ -188,10 +188,10 @@ test('editorial ratings admin UI requires server token and shows per-item contro
  }finally{dom.window.close();}
 });
 test('public rating API and protected Admin rating API remain separate',()=>{
- assert.match(server,/pathname==='\\/api\\/admin\\/ratings'/);
- assert.match(server,/if\\(!adminPush\\.verify\\(/);
- assert.match(server,/ratingsStore\\.setEditorial\\(body\\|\\|\\{\\}\\)/);
- assert.match(server,/ratings:ratingsStore\\.summary\\(\\),editorial:ratingsStore\\.editorial\\(\\)/);
- assert.match(html,/id="mom-rating-admin"/);
- assert.match(html,/window\\.MomRatingsAdmin\\?\\.render\\(menu\\)/);
+ assert.ok(server.includes("pathname==='/api/admin/ratings'"));
+ assert.ok(server.includes("if(!adminPush.verify("));
+ assert.ok(server.includes("ratingsStore.setEditorial(body||{})"));
+ assert.ok(server.includes("ratings:ratingsStore.summary(),editorial:ratingsStore.editorial()"));
+ assert.ok(html.includes('id="mom-rating-admin"'));
+ assert.ok(html.includes('window.MomRatingsAdmin?.render(menu)'));
 });
