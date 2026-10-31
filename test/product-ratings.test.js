@@ -187,11 +187,56 @@ test('editorial ratings admin UI requires server token and shows per-item contro
   assert.equal(requests.filter(r=>r.opts?.method==='POST').length,1);
  }finally{dom.window.close();}
 });
+test('weighted rating adds verified reviews to Admin without overwriting or double-counting',()=>{
+ const f=fixture();
+ try{
+  let p=f.store.setEditorial({productId:'41',score:4.5,count:100,version:''});
+  assert.equal(p.status,200);
+  assert.deepEqual(f.store.combined()['41'],{count:100,average:4.5,buyerCount:0,adminCount:100});
+  assert.equal(f.store.register(f.orders[0],proof),true);
+  f.store.rate({orderId:order.id,productId:41,score:5,proof});
+  assert.deepEqual(f.store.combined()['41'],{count:101,average:4.5,buyerCount:1,adminCount:100});
+  assert.deepEqual(f.store.summary()['41'],{count:1,average:5});
+  f.orders.push({...order,id:'ORD-15724',phone:'0934000000'});
+  const other='b'.repeat(64);
+  assert.equal(f.store.register(f.orders[1],other),true);
+  f.store.rate({orderId:'ORD-15724',productId:41,score:5,proof:other});
+  assert.deepEqual(f.store.combined()['41'],{count:102,average:4.5,buyerCount:2,adminCount:100});
+  // One customer changing score must not create a new rating.
+  f.store.rate({orderId:'ORD-15724',productId:41,score:1,proof:other});
+  assert.deepEqual(f.store.combined()['41'],{count:102,average:4.5,buyerCount:2,adminCount:100});
+  assert.deepEqual(f.store.summary()['41'],{count:2,average:3});
+  const next=f.store.setEditorial({productId:'41',score:3.5,count:20,version:p.result.entry.version});
+  assert.equal(next.status,200);
+  assert.deepEqual(f.store.combined()['41'],{count:22,average:3.5,buyerCount:2,adminCount:20});
+  f.orders[0].status='cancelled';
+  assert.deepEqual(f.store.combined()['41'],{count:21,average:3.4,buyerCount:1,adminCount:20});
+  assert.equal(f.store.setEditorial({productId:'41',remove:true,version:next.result.entry.version}).status,200);
+  assert.deepEqual(f.store.combined()['41'],{count:1,average:1,buyerCount:1,adminCount:0});
+ }finally{f.close();}
+});
+test('public UI paints combined count and transparent source breakdown',async()=>{
+ const client=fs.readFileSync(path.join(__dirname,'../product-ratings-client.js'),'utf8');
+ const dom=new JSDOM('<html lang="vi"><body><div id="customer-products-grid"><div class="mom-heart-ratings" data-product-id="41"></div></div></body></html>',{url:'https://mom.test',runScripts:'outside-only'});
+ try{
+  const {window}=dom;
+  window.fetch=async()=>({ok:true,json:async()=>({
+    ratings:{41:{count:2,average:4}},combined:{41:{count:102,average:4.5,buyerCount:2,adminCount:100}},
+    editorial:{41:{count:100,score:4.5,version:'a'.repeat(36)}}
+  })});
+  window.eval(client);
+  await window.MomDrinkRatings.refresh();
+  const target=window.document.querySelector('.mom-heart-ratings');
+  assert.match(target.querySelector('.mom-heart-meta').textContent,/4.5 \(102 lượt\)/);
+  assert.match(target.querySelector('.mom-heart-verified').textContent,/2 từ khách đã mua · 100 do quán thiết lập/);
+  assert.equal(target.querySelectorAll('.mom-heart-rating-btn.filled').length,5);
+ }finally{dom.window.close();}
+});
 test('public rating API and protected Admin rating API remain separate',()=>{
  assert.ok(server.includes("pathname==='/api/admin/ratings'"));
  assert.ok(server.includes("if(!adminPush.verify("));
  assert.ok(server.includes("ratingsStore.setEditorial(body||{})"));
- assert.ok(server.includes("ratings:ratingsStore.summary(),editorial:ratingsStore.editorial()"));
+ assert.ok(server.includes("ratings:ratingsStore.summary(),combined:ratingsStore.combined(),editorial:ratingsStore.editorial()"));
  assert.ok(html.includes('id="mom-rating-admin"'));
  assert.ok(html.includes('window.MomRatingsAdmin?.render(menu)'));
 });
