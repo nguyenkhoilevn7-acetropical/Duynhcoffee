@@ -21,6 +21,18 @@ function safeState(value) {
     !value.records || typeof value.records!=='object' || Array.isArray(value.records))
     throw Error('Invalid ratings store');
   if(Object.keys(value.records).length>MAX_RECORDS || Object.keys(value.grants).length>MAX_RECORDS)throw Error('Rating store too large');
+  // Optional in v1 so existing verified ratings and Drive snapshots stay compatible.
+  if(value.editorial!==undefined){
+    if(!value.editorial || typeof value.editorial!=='object' || Array.isArray(value.editorial) || Object.keys(value.editorial).length>1000)
+      throw Error('Invalid editorial ratings');
+    for(const [id,entry] of Object.entries(value.editorial)){
+      if(!/^[0-9a-z_-]{1,60}$/i.test(id) || !entry || typeof entry!=='object' || Array.isArray(entry) ||
+        typeof entry.score!=='number' || !Number.isInteger(entry.score*10) || entry.score<1 || entry.score>5 ||
+        !Number.isSafeInteger(entry.count) || entry.count<0 || entry.count>1000000 ||
+        typeof entry.version!=='string' || !/^[0-9a-f-]{36}$/i.test(entry.version))
+        throw Error('Invalid editorial rating');
+    }
+  }
   if(Object.entries(value.grants).some(([id,hash])=>!/^ORD-[0-9]{5}$/.test(id)||typeof hash!=='string'||!/^[0-9a-f]{64}$/.test(hash)))
     throw Error('Invalid rating grant');
   for(const record of Object.values(value.records)){
@@ -39,7 +51,7 @@ function createRatingsStore({dir,getOrders,onChange=()=>{}}) {
       if(fs.existsSync(filename))current=safeState(JSON.parse(fs.readFileSync(filename,'utf8')));
       if(current)return current;
     }catch(e){throw new Error('Không đọc được dữ liệu đánh giá: '+e.message);}
-    current={schema:'mom-heart-ratings-v1',salt:crypto.randomBytes(32).toString('hex'),grants:{},records:{}};
+    current={schema:'mom-heart-ratings-v1',salt:crypto.randomBytes(32).toString('hex'),grants:{},records:{},editorial:{}};
     return current;
   }
   function save(state) {
@@ -86,6 +98,25 @@ function createRatingsStore({dir,getOrders,onChange=()=>{}}) {
     save(state);
     return {status:200,result:{productId:String(productId),score,summary:summary(getOrders())[String(productId)]}};
   }
+  // Separate shop-curated display scores from verified-customer averages and counts.
+  function editorial(){return Object.fromEntries(Object.entries(read().editorial||{}).map(([id,v])=>[id,{...v}]));}
+  function setEditorial({productId,score,count,version='',remove=false}={}){
+    const id=String(productId||'');
+    if(!/^[0-9a-z_-]{1,60}$/i.test(id))return {status:422,error:'Mã món không hợp lệ.'};
+    if(typeof version!=='string' || version.length>40)return {status:422,error:'Phiên bản rating không hợp lệ.'};
+    if(!remove && (!Number.isFinite(score) || !Number.isInteger(score*10) || score<1 || score>5 ||
+      !Number.isSafeInteger(count) || count<0 || count>1000000))
+      return {status:422,error:'Số tim phải từ 1.0 đến 5.0 và số lượt phải từ 0 đến 1.000.000.'};
+    const state=read(),previous=(state.editorial||{})[id];
+    if((previous?.version||'')!==version)
+      return {status:409,error:'Rating đã thay đổi trên thiết bị khác. Hãy tải lại trước khi lưu.'};
+    if(remove && !previous)return {status:200,result:{productId:id,entry:null}};
+    const next={...state,editorial:{...(state.editorial||{})}};
+    if(remove)delete next.editorial[id];
+    else next.editorial[id]={score,count,version:crypto.randomUUID()};
+    save(next);
+    return {status:200,result:{productId:id,entry:next.editorial[id]||null}};
+  }
   function summary(orders=getOrders()) {
     const state=read();
     const byId=new Map(orders.filter(o=>validOrder(o)).map(o=>[String(o.id),o]));
@@ -99,6 +130,6 @@ function createRatingsStore({dir,getOrders,onChange=()=>{}}) {
     }
     return Object.fromEntries(Object.entries(totals).map(([id,v])=>[id,{count:v.count,average:Math.round(10*v.sum/v.count)/10}]));
   }
-  return {register,hasGrant,rate,summary,read,restore};
+  return {register,hasGrant,rate,summary,editorial,setEditorial,read,restore};
 }
 module.exports={createRatingsStore,validOrder,proofOk,safeState};
