@@ -98,7 +98,7 @@ function createRatingsStore({dir,getOrders,onChange=()=>{}}) {
     save(state);
     return {status:200,result:{productId:String(productId),score,summary:summary(getOrders())[String(productId)]}};
   }
-  // Separate shop-curated display scores from verified-customer averages and counts.
+  // Shop-provided rating contributions remain attributable, distinct from verified purchases.
   function editorial(){return Object.fromEntries(Object.entries(read().editorial||{}).map(([id,v])=>[id,{...v}]));}
   function setEditorial({productId,score,count,version='',remove=false}={}){
     const id=String(productId||'');
@@ -117,7 +117,8 @@ function createRatingsStore({dir,getOrders,onChange=()=>{}}) {
     save(next);
     return {status:200,result:{productId:id,entry:next.editorial[id]||null}};
   }
-  function summary(orders=getOrders()) {
+  // Exact sums (not rounded means) prevent cumulative rounding errors in combined scores.
+  function buyerTotals(orders=getOrders()){
     const state=read();
     const byId=new Map(orders.filter(o=>validOrder(o)).map(o=>[String(o.id),o]));
     const totals={};
@@ -128,8 +129,30 @@ function createRatingsStore({dir,getOrders,onChange=()=>{}}) {
       const value=totals[id]||(totals[id]={count:0,sum:0});
       value.count++;value.sum+=item.score;
     }
-    return Object.fromEntries(Object.entries(totals).map(([id,v])=>[id,{count:v.count,average:Math.round(10*v.sum/v.count)/10}]));
+    return totals;
   }
-  return {register,hasGrant,rate,summary,editorial,setEditorial,read,restore};
+  function summary(orders=getOrders()){
+    const totals=buyerTotals(orders);
+    return Object.fromEntries(Object.entries(totals).map(([id,v])=>[id,{
+      count:v.count,average:Math.round(10*v.sum/v.count)/10
+    }]));
+  }
+  // Combined score is the weighted average of real purchases and a clearly
+  // attributed shop-set contribution. Buyer records and counts stay intact.
+  function combined(orders=getOrders()){
+    const totals=buyerTotals(orders),shop=read().editorial||{};
+    const ids=new Set([...Object.keys(totals),...Object.keys(shop)]);
+    return Object.fromEntries([...ids].map(id=>{
+      const buyers=totals[id]||{count:0,sum:0};
+      const adminCount=shop[id]?.count||0;
+      const adminScore=shop[id]?.score||0;
+      const count=buyers.count+adminCount;
+      return [id,{
+        count,average:count?Math.round(10*(buyers.sum+adminScore*adminCount)/count)/10:0,
+        buyerCount:buyers.count,adminCount
+      }];
+    }));
+  }
+  return {register,hasGrant,rate,summary,combined,editorial,setEditorial,read,restore};
 }
 module.exports={createRatingsStore,validOrder,proofOk,safeState};
