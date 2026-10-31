@@ -3330,15 +3330,17 @@ body {
 <link rel="stylesheet" href="admin-profits.css">
 <script src="admin-profits.js" defer></script>
 <script src="menu-options.js" defer></script>
-<script src="site-i18n.js" defer></script>
+<script src="site-i18n.js?v=20261031-1" defer></script>
 <script src="admin-notifications.js" defer></script>
   <!-- Admin-only iOS-inspired layout; operational handlers remain unchanged -->
   <link rel="stylesheet" href="sale-promotions.css?v=20261026-1">
   <link rel="stylesheet" href="admin-ios.css?v=20261025-2">
   <script src="sale-promotions.js?v=20261026-1" defer></script>
   <script src="sale-admin.js?v=20261028-1" defer></script>
-  <link rel="stylesheet" href="product-ratings.css?v=20261030-2">
-  <script src="product-ratings-client.js?v=20261030-2" defer></script>
+  <link rel="stylesheet" href="product-ratings.css?v=20261031-1">
+  <script src="product-ratings-client.js?v=20261031-1" defer></script>
+  <link rel="stylesheet" href="admin-product-ratings.css?v=20261031-1">
+  <script src="admin-product-ratings.js?v=20261031-1" defer></script>
   <link rel="stylesheet" href="sale-banner.css?v=20261028-1">
   <script src="sale-banner.js?v=20261028-1" defer></script>
   <script src="admin-ios.js?v=20261025-2" defer></script>
@@ -3682,6 +3684,11 @@ body {
             </button>
           </div>
         </div>
+        <details id="mom-rating-admin">
+          <summary>♡ Quản lý Rating từng món</summary>
+          <p class="mom-rating-admin-note">Chỉnh điểm tim (1–5) và số lượt do quán thiết lập cho từng món. Frontend tính tổng có trọng số với đánh giá từ khách đã mua, đồng thời ghi rõ số lượt của từng nguồn. Không thay đổi đánh giá thật.</p>
+          <div id="mom-rating-admin-list"></div>
+        </details>
         <div style="padding:12px; margin-bottom:12px; border:1px solid var(--border); border-radius:12px;">
           <b>Quản lý danh mục trên trang bán hàng</b>
           <div id="admin-category-order" style="display:flex; flex-direction:column; gap:8px; margin-top:10px;"></div>
@@ -6114,6 +6121,11 @@ body {
       const isAdminDevice = isUserAdmin();
 
       switch (type) {
+        case 'RATINGS_UPDATE': {
+          window.MomDrinkRatings?.refresh();
+          window.MomRatingsAdmin?.refresh();
+          break;
+        }
         case 'NEW_ORDER': {
           const newOrder = payload.order || payload.data;
           if (newOrder && newOrder.id) {
@@ -10713,6 +10725,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
           </tr>
         `;
       }).join('');
+      window.MomRatingsAdmin?.render(menu);
     }
 
     // BẬT / TẮT TRẠNG THÁI BEST SELLER CHO MÓN

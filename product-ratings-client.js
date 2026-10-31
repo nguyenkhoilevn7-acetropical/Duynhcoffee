@@ -3,7 +3,7 @@
 (function(){
   'use strict';
   const STORE='mom_verified_rating_orders_v1';
-  let summaries={},credentials=[],inFlight=false;
+  let summaries={},combined={},editorial={},credentials=[],inFlight=false;
   function load(){
     try{
       const value=JSON.parse(localStorage.getItem(STORE)||'[]');
@@ -44,7 +44,7 @@
     const container=document.getElementById('customer-products-grid');
     if(!container)return;
     for(const target of container.querySelectorAll('.mom-heart-ratings[data-product-id]')){
-      const id=String(target.dataset.productId),data=currentRating(id),owned=!!purchase(id);
+      const id=String(target.dataset.productId),data=currentRating(id),curated=editorial[id],mix=combined[id]||data,owned=!!purchase(id);
       target.replaceChildren();
       const buttons=document.createElement('div');buttons.className='mom-heart-buttons';
       buttons.setAttribute('role','group');buttons.setAttribute('aria-label',
@@ -53,7 +53,7 @@
         const btn=document.createElement('button');
         btn.type='button';btn.className='mom-heart-rating-btn';
         btn.appendChild(createHeartIcon());
-        btn.classList.toggle('filled',score<=Math.round(data.average));
+        btn.classList.toggle('filled',score<=Math.round(mix.average));
         btn.setAttribute('aria-label',msg('Đánh giá '+score+' tim','Rate '+score+' hearts'));
         btn.title=owned?msg('Chấm '+score+' tim','Give '+score+' hearts'):
           msg('Chỉ khách đã đặt và thanh toán món này mới được đánh giá','Only customers who ordered and paid for this drink may rate');
@@ -61,8 +61,18 @@
         buttons.appendChild(btn);
       }
       const meta=document.createElement('span');meta.className='mom-heart-meta';
-      meta.textContent=fmt(data.average)+' ('+data.count+' '+msg('đánh giá','ratings')+')';
+      meta.textContent=fmt(mix.average)+' ('+mix.count+' '+msg('lượt','ratings')+')';
       target.append(buttons,meta);
+      if(curated && curated.count>0){
+        const sources=document.createElement('span');
+        sources.className='mom-heart-verified';
+        sources.textContent=msg(
+          (mix.buyerCount??data.count)+' từ khách đã mua · '+(mix.adminCount??curated.count)+' do quán thiết lập',
+          (mix.buyerCount??data.count)+' verified buyers · '+(mix.adminCount??curated.count)+' shop-set'
+        );
+        target.appendChild(sources);
+      }
+
     }
   }
   function showEligibilityNotice(id,text){
@@ -103,7 +113,7 @@
         body:JSON.stringify({orderId:grant.orderId,proof:grant.proof,productId:id,score})});
       const result=await response.json();
       if(!response.ok||!result.summary)throw Error(result.error||'Unable to save rating');
-      summaries[id]=result.summary;paint();
+      summaries[id]=result.summary;await refresh();
       feedback(msg('Đã ghi nhận '+score+' tim. Cảm ơn anh/chị!',
         'Your '+score+'-heart rating has been saved. Thank you!'));
     }catch(error){feedback(error.message,true);}
@@ -115,7 +125,10 @@
       if(!response.ok)return;
       const payload=await response.json();
       if(payload&&typeof payload.ratings==='object'&&payload.ratings){
-        summaries=payload.ratings;paint();
+        summaries=payload.ratings;
+        combined=payload.combined&&typeof payload.combined==='object'?payload.combined:{};
+        editorial=payload.editorial&&typeof payload.editorial==='object'?payload.editorial:{};
+        paint();
       }
     }catch(_){}
   }

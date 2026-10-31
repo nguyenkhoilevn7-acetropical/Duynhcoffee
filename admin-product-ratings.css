@@ -1,0 +1,21 @@
+/* Compact iOS-inspired editor inside Menu & Inventory, not a new main tab. */
+#mom-rating-admin{margin:0 0 16px;border:1px solid #e1e8e0;border-radius:15px;background:#fff;padding:0;overflow:hidden}
+#mom-rating-admin summary{padding:14px 16px;cursor:pointer;font-size:1rem;font-weight:700;color:#254a2a}
+#mom-rating-admin summary:focus-visible{outline:2px solid #356d41;outline-offset:-3px}
+#mom-rating-admin .mom-rating-admin-note{margin:0 16px 14px;font-size:.86rem;line-height:1.55;color:#5c6a60}
+#mom-rating-admin-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,310px),1fr));gap:12px;margin:0 16px 16px}
+.mom-rating-admin-item{border:1px solid #e7eee7;border-radius:13px;padding:12px;background:#fafcf9;min-width:0}
+.mom-rating-admin-heading{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+.mom-rating-admin-heading img{width:48px;height:48px;object-fit:cover;border-radius:9px}
+.mom-rating-admin-heading strong{display:block;font-size:.9rem;color:#233d28}
+.mom-rating-admin-heading small{display:block;font-size:.75rem;color:#68746c;margin-top:4px}
+.mom-rating-admin-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mom-rating-admin-fields label{display:flex;flex-direction:column;gap:6px;font-size:.8rem;font-weight:650;color:#3e5544}
+.mom-rating-admin-fields input{box-sizing:border-box;width:100%;padding:9px 10px;border-radius:9px;border:1px solid #b6c8b7;color:#22392b;background:#fff;font-size:1rem;min-height:40px}
+.mom-rating-admin-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:11px}
+.mom-rating-admin-actions button{border-radius:9px;padding:9px 12px;font-weight:700;font-size:.81rem;cursor:pointer;border:1px solid #a3bd9f;min-height:38px}
+.mom-rating-admin-save{background:#2d5529;color:#fff}
+.mom-rating-admin-reset{background:#fff;color:#546753}
+.mom-rating-admin-actions button:disabled{opacity:.5;cursor:not-allowed}
+.mom-rating-admin-status{font-size:.75rem;color:#64736a;flex:1 1 100%}
+@media(max-width:560px){#mom-rating-admin-list{margin:0 10px 12px}#mom-rating-admin summary{padding:12px}#mom-rating-admin .mom-rating-admin-note{margin:0 12px 12px}}

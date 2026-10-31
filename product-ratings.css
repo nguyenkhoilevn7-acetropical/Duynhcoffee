@@ -19,3 +19,6 @@
  #view-customer .mom-heart-meta{font-size:.71rem}
 }
 @media(prefers-reduced-motion:reduce){#view-customer .mom-heart-rating-btn,#view-customer .mom-heart-rating-btn svg{transition:none}}
+
+#view-customer .mom-heart-verified{font-size:.72rem;color:#52645b;flex-basis:100%;line-height:1.3}
+#view-customer .mom-heart-ratings:has(.mom-heart-verified) .mom-heart-meta{font-size:.78rem;white-space:normal}
