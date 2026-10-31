@@ -944,11 +944,10 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Real buyer averages remain immutable to Admin; public endpoint also exposes
-  // separately labeled shop-curated figures without merging into buyer totals.
+  // Public scores combine contributions, with buyer and shop counts individually attributed.
   if(pathname==='/api/ratings'){
     if(req.method==='GET'){
-      try{res.setHeader('Cache-Control','no-store');sendJson(res,200,{ratings:ratingsStore.summary(),editorial:ratingsStore.editorial()});}
+      try{res.setHeader('Cache-Control','no-store');sendJson(res,200,{ratings:ratingsStore.summary(),combined:ratingsStore.combined(),editorial:ratingsStore.editorial()});}
       catch(e){sendJson(res,503,{error:'Chưa đọc được dữ liệu đánh giá.'});}
       return;
     }
