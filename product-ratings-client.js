@@ -53,7 +53,17 @@
         const btn=document.createElement('button');
         btn.type='button';btn.className='mom-heart-rating-btn';
         btn.appendChild(createHeartIcon());
-        btn.classList.toggle('filled',score<=Math.round(mix.average));
+        // Render the precise fractional portion instead of rounding the heart up.
+        const value=Math.max(0,Math.min(5,Number(mix.average)||0));
+        const portion=Math.min(1,Math.max(0,value-score+1));
+        btn.classList.toggle('filled',portion===1);
+        if(portion>0 && portion<1){
+          btn.classList.add('partial');
+          btn.style.setProperty('--mom-heart-fill',Math.round(portion*100)+'%');
+          const overlay=createHeartIcon();
+          overlay.classList.add('mom-heart-overlay');
+          btn.appendChild(overlay);
+        }
         btn.setAttribute('aria-label',msg('Đánh giá '+score+' tim','Rate '+score+' hearts'));
         btn.title=owned?msg('Chấm '+score+' tim','Give '+score+' hearts'):
           msg('Chỉ khách đã đặt và thanh toán món này mới được đánh giá','Only customers who ordered and paid for this drink may rate');
@@ -61,16 +71,19 @@
         buttons.appendChild(btn);
       }
       const meta=document.createElement('span');meta.className='mom-heart-meta';
-      meta.textContent=fmt(mix.average)+' ('+mix.count+' '+msg('lượt','ratings')+')';
+      // Only verified buyer reviews can be called customer ratings.
+      // Shop-managed counts are not review events and never appear as buyer votes.
+      if(curated){
+        meta.textContent=msg('Điểm hiển thị: ','Display score: ')+fmt(mix.average)+'/5';
+      }else{
+        meta.textContent=fmt(data.average)+' ('+data.count+' '+msg('đánh giá','reviews')+')';
+      }
       target.append(buttons,meta);
-      if(curated && curated.count>0){
-        const sources=document.createElement('span');
-        sources.className='mom-heart-verified';
-        sources.textContent=msg(
-          (mix.buyerCount??data.count)+' từ khách đã mua · '+(mix.adminCount??curated.count)+' do quán thiết lập',
-          (mix.buyerCount??data.count)+' verified buyers · '+(mix.adminCount??curated.count)+' shop-set'
-        );
-        target.appendChild(sources);
+      if(curated && data.count>0){
+        const realCount=document.createElement('span');
+        realCount.className='mom-heart-verified';
+        realCount.textContent=data.count+' '+msg('đánh giá thực tế','verified customer reviews');
+        target.appendChild(realCount);
       }
 
     }
