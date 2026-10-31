@@ -170,7 +170,7 @@ test('editorial ratings admin UI requires server token and shows per-item contro
   };
   window.eval(script);
   window.MomRatingsAdmin.render([{id:41,name:'Trà Mãng Cầu',image:''}]);
-  await window.MomRatingsAdmin.refresh();
+  await new Promise(resolve=>setTimeout(resolve,0)); // wait for automatic initial fetch
   assert.match(window.document.getElementById('mom-rating-admin-list').textContent,/Trà Mãng Cầu/);
   const inputs=window.document.querySelectorAll('#mom-rating-admin-list input');
   assert.equal(inputs.length,2);
