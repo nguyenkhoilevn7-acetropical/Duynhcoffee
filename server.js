@@ -919,10 +919,36 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // Real ratings only: public aggregate display, verified-purchase proof for writes.
+  // Shop-curated ratings are explicitly separate from buyer-verified votes.
+  // Server authorization is mandatory; the client-side admin flag is never trusted.
+  if(pathname==='/api/admin/ratings'){
+    res.setHeader('Cache-Control','no-store');
+    if(req.method!=='POST'){sendJson(res,405,{error:'Phương thức không được hỗ trợ.'});return;}
+    if(req.headers.origin && req.headers.origin!=='https://'+req.headers.host && req.headers.origin!=='http://'+req.headers.host){
+      sendJson(res,403,{error:'Nguồn yêu cầu không hợp lệ.'});return;
+    }
+    if(!adminPush.verify((req.headers.authorization||'').replace(/^Bearer /,''))){
+      sendJson(res,401,{error:'Vui lòng đăng nhập lại quản trị để sửa rating.'});return;
+    }
+    try{
+      const body=await parseRequestBody(req,4*1024);
+      menuCache=readJsonFile(MENU_FILE,menuCache);
+      if(!menuCache.some(m=>String(m.id)===String(body?.productId))){
+        sendJson(res,404,{error:'Món không còn trong thực đơn.'});return;
+      }
+      const result=ratingsStore.setEditorial(body||{});
+      if(result.status!==200){sendJson(res,result.status,{error:result.error});return;}
+      broadcastRealtime('RATINGS_UPDATE',{productId:result.result.productId});
+      sendJson(res,200,{success:true,...result.result});
+    }catch(e){sendJson(res,e.status||500,{error:'Chưa lưu được rating.'});}
+    return;
+  }
+
+  // Real buyer averages remain immutable to Admin; public endpoint also exposes
+  // separately labeled shop-curated figures without merging into buyer totals.
   if(pathname==='/api/ratings'){
     if(req.method==='GET'){
-      try{sendJson(res,200,{ratings:ratingsStore.summary()});}
+      try{res.setHeader('Cache-Control','no-store');sendJson(res,200,{ratings:ratingsStore.summary(),editorial:ratingsStore.editorial()});}
       catch(e){sendJson(res,503,{error:'Chưa đọc được dữ liệu đánh giá.'});}
       return;
     }
