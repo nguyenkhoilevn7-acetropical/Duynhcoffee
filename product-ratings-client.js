@@ -3,7 +3,7 @@
 (function(){
   'use strict';
   const STORE='mom_verified_rating_orders_v1';
-  let summaries={},credentials=[],inFlight=false;
+  let summaries={},editorial={},credentials=[],inFlight=false;
   function load(){
     try{
       const value=JSON.parse(localStorage.getItem(STORE)||'[]');
@@ -44,7 +44,7 @@
     const container=document.getElementById('customer-products-grid');
     if(!container)return;
     for(const target of container.querySelectorAll('.mom-heart-ratings[data-product-id]')){
-      const id=String(target.dataset.productId),data=currentRating(id),owned=!!purchase(id);
+      const id=String(target.dataset.productId),data=currentRating(id),curated=editorial[id],owned=!!purchase(id);
       target.replaceChildren();
       const buttons=document.createElement('div');buttons.className='mom-heart-buttons';
       buttons.setAttribute('role','group');buttons.setAttribute('aria-label',
@@ -53,7 +53,7 @@
         const btn=document.createElement('button');
         btn.type='button';btn.className='mom-heart-rating-btn';
         btn.appendChild(createHeartIcon());
-        btn.classList.toggle('filled',score<=Math.round(data.average));
+        btn.classList.toggle('filled',score<=Math.round(curated?curated.score:data.average));
         btn.setAttribute('aria-label',msg('Đánh giá '+score+' tim','Rate '+score+' hearts'));
         btn.title=owned?msg('Chấm '+score+' tim','Give '+score+' hearts'):
           msg('Chỉ khách đã đặt và thanh toán món này mới được đánh giá','Only customers who ordered and paid for this drink may rate');
@@ -61,8 +61,20 @@
         buttons.appendChild(btn);
       }
       const meta=document.createElement('span');meta.className='mom-heart-meta';
-      meta.textContent=fmt(data.average)+' ('+data.count+' '+msg('đánh giá','ratings')+')';
-      target.append(buttons,meta);
+      if(curated){
+        meta.textContent=fmt(curated.score)+' ('+curated.count+' '+msg('lượt do quán thiết lập','shop-set displays')+')';
+        meta.title=msg('Điểm và số lượt hiển thị do Mom’s thiết lập, không phải đánh giá từ khách mua hàng.',
+          'This display score and count are set by the shop, not customer reviews.');
+        const verified=document.createElement('span');
+        verified.className='mom-heart-verified';
+        verified.textContent=data.count
+          ? msg('Khách đã mua: ','Verified buyers: ')+fmt(data.average)+' ('+data.count+')'
+          : msg('Chưa có đánh giá từ khách đã mua','No verified customer reviews yet');
+        target.append(buttons,meta,verified);
+      }else{
+        meta.textContent=fmt(data.average)+' ('+data.count+' '+msg('đánh giá đã mua','verified ratings')+')';
+        target.append(buttons,meta);
+      }
     }
   }
   function showEligibilityNotice(id,text){
@@ -115,7 +127,9 @@
       if(!response.ok)return;
       const payload=await response.json();
       if(payload&&typeof payload.ratings==='object'&&payload.ratings){
-        summaries=payload.ratings;paint();
+        summaries=payload.ratings;
+        editorial=payload.editorial&&typeof payload.editorial==='object'?payload.editorial:{};
+        paint();
       }
     }catch(_){}
   }
