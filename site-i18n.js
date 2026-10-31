@@ -6,6 +6,7 @@
 })(function () {
   'use strict';
   const catalog = {
+  "Chỉnh điểm tim (1–5) và số lượt do quán thiết lập cho từng món. Frontend tính tổng có trọng số với đánh giá từ khách đã mua, đồng thời ghi rõ số lượt của từng nguồn. Không thay đổi đánh giá thật.": "Set a 1–5 heart score and shop-managed count per item. The storefront shows a weighted combined score while clearly identifying shop-set and verified-customer sources; verified ratings are not altered.",
   "♡ Quản lý Rating từng món": "♡ Manage drink ratings",
   "Chỉnh điểm tim (1–5) và số lượt hiển thị của quán theo từng sản phẩm. Các số do quán thiết lập được ghi nhãn riêng ở trang khách; không thay đổi đánh giá thực tế từ khách đã mua.": "Set a per-drink heart score (1–5) and shop-managed display count. Shop-set figures are labeled separately on the storefront and never change verified customer reviews.",
   "Điểm hiển thị (1–5 ♥)": "Display score (1–5 ♥)",
