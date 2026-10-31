@@ -6,6 +6,21 @@
 })(function () {
   'use strict';
   const catalog = {
+  "♡ Quản lý Rating từng món": "♡ Manage drink ratings",
+  "Chỉnh điểm tim (1–5) và số lượt hiển thị của quán theo từng sản phẩm. Các số do quán thiết lập được ghi nhãn riêng ở trang khách; không thay đổi đánh giá thực tế từ khách đã mua.": "Set a per-drink heart score (1–5) and shop-managed display count. Shop-set figures are labeled separately on the storefront and never change verified customer reviews.",
+  "Điểm hiển thị (1–5 ♥)": "Display score (1–5 ♥)",
+  "Số lượt do quán thiết lập": "Shop-managed display count",
+  "Lưu rating": "Save rating",
+  "Đặt lại": "Reset",
+  "Đã tùy chỉnh": "Custom display",
+  "Đang dùng đánh giá thật": "Using verified customer ratings",
+  "Đang tải rating…": "Loading ratings…",
+  "Đang lưu…": "Saving…",
+  "Khách đã mua:": "Verified buyers:",
+  "Chưa có món trong thực đơn.": "No menu items available.",
+  "Vui lòng đăng nhập quản trị lại.": "Please sign in as Admin again.",
+  "Chưa tải được rating.": "Could not load ratings.",
+  "Không lưu được rating.": "Could not save rating.",
   "✍️ Nội dung “Câu chuyện Mom’s”": "✍️ Mom’s story content",
   "Chỉnh các dòng chữ trong khung giới thiệu ở trang khách. Hai ngôn ngữ được lưu chung trên máy chủ Render và đồng bộ đến các thiết bị. Nút bấm luôn dẫn đến Thực đơn.": "Edit the text in the customer story panel. Both languages are saved on Render and synchronized between devices. The button always opens the menu.",
   "🇻🇳 Tiếng Việt": "🇻🇳 Vietnamese",
