@@ -227,14 +227,14 @@ test('curated fractional score keeps half SVG heart without invented customer ra
   })});
   window.eval(client);await window.MomDrinkRatings.refresh();
   const target=window.document.querySelector('.mom-heart-ratings[data-product-id="41"]');
-  assert.match(target.querySelector('.mom-heart-meta').textContent,/Điểm hiển thị: 4.5\\/5/);
+  assert.equal(target.querySelector('.mom-heart-meta').textContent,'Điểm hiển thị: 4.5/5');
   assert.doesNotMatch(target.textContent,/200|do quán thiết lập|200 lượt|200 đánh giá/);
   assert.equal(target.querySelectorAll('.mom-heart-rating-btn.filled').length,4);
   assert.equal(target.querySelectorAll('.mom-heart-rating-btn.partial').length,1);
   assert.equal(target.querySelectorAll('.mom-heart-rating-btn.partial svg').length,2);
   assert.equal(target.querySelector('.mom-heart-rating-btn.partial').style.getPropertyValue('--mom-heart-fill'),'50%');
   const organic=window.document.querySelector('.mom-heart-ratings[data-product-id="42"]');
-  assert.match(organic.querySelector('.mom-heart-meta').textContent,/4.0 \\(2 đánh giá\\)/);
+  assert.equal(organic.querySelector('.mom-heart-meta').textContent,'4.0 (2 đánh giá)');
   assert.equal(organic.querySelectorAll('.mom-heart-rating-btn.filled').length,4);
   assert.equal(organic.querySelectorAll('.mom-heart-rating-btn.partial').length,0);
  }finally{dom.window.close();}
