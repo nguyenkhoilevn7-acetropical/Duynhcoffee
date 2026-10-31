@@ -3337,8 +3337,10 @@ body {
   <link rel="stylesheet" href="admin-ios.css?v=20261025-2">
   <script src="sale-promotions.js?v=20261026-1" defer></script>
   <script src="sale-admin.js?v=20261028-1" defer></script>
-  <link rel="stylesheet" href="product-ratings.css?v=20261030-2">
-  <script src="product-ratings-client.js?v=20261030-2" defer></script>
+  <link rel="stylesheet" href="product-ratings.css?v=20261031-1">
+  <script src="product-ratings-client.js?v=20261031-1" defer></script>
+  <link rel="stylesheet" href="admin-product-ratings.css?v=20261031-1">
+  <script src="admin-product-ratings.js?v=20261031-1" defer></script>
   <link rel="stylesheet" href="sale-banner.css?v=20261028-1">
   <script src="sale-banner.js?v=20261028-1" defer></script>
   <script src="admin-ios.js?v=20261025-2" defer></script>
@@ -3704,6 +3706,11 @@ body {
             <tbody id="tbody-admin-menu"></tbody>
           </table>
         </div>
+        <details id="mom-rating-admin">
+          <summary>♡ Quản lý Rating từng món</summary>
+          <p class="mom-rating-admin-note">Chỉnh điểm tim (1–5) và số lượt hiển thị của quán theo từng sản phẩm. Các số do quán thiết lập được ghi nhãn riêng ở trang khách; không thay đổi đánh giá thực tế từ khách đã mua.</p>
+          <div id="mom-rating-admin-list"></div>
+        </details>
       </div>
 
       <!-- TAB 7: QUẢN LÝ MÃ GIẢM GIÁ (BACKEND) -->
@@ -6114,6 +6121,11 @@ body {
       const isAdminDevice = isUserAdmin();
 
       switch (type) {
+        case 'RATINGS_UPDATE': {
+          window.MomDrinkRatings?.refresh();
+          window.MomRatingsAdmin?.refresh();
+          break;
+        }
         case 'NEW_ORDER': {
           const newOrder = payload.order || payload.data;
           if (newOrder && newOrder.id) {
@@ -10713,6 +10725,7 @@ Hệ thống đang mở màn hình theo dõi đơn hàng trực tiếp cho bạn
           </tr>
         `;
       }).join('');
+      window.MomRatingsAdmin?.render(menu);
     }
 
     // BẬT / TẮT TRẠNG THÁI BEST SELLER CHO MÓN
