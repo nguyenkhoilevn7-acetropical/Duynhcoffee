@@ -24,7 +24,7 @@
     svg.appendChild(path);
     return svg;
   }
-  const fmt=n=>Number(n||0).toFixed(1);
+  const fmt=n=>Number(n||0).toFixed(1).replace(/\.0$/,'');
   const lang=()=>document.documentElement.lang==='en'?'en':'vi';
   const msg=(vi,en)=>lang()==='en'?en:vi;
   const purchase=id=>credentials.slice().reverse().find(x=>x.ids.includes(String(id)))||null;
