@@ -1,7 +1,7 @@
 /* Mom's admin-managed product rating display. Buyer reviews remain read-only. */
 (function(){
   'use strict';
-  let items=[],buyer={},editorial={},loaded=false,loading=false;
+  let items=[],buyer={},combined={},editorial={},loaded=false,loading=false;
   const root=()=>document.getElementById('mom-rating-admin-list');
   const panel=()=>document.getElementById('mom-rating-admin');
   const txt=(tag,text,className)=>{
@@ -22,7 +22,7 @@
     target.replaceChildren();
     if(!items.length){target.append(txt('p','Chưa có món trong thực đơn.'));return;}
     for(const item of items){
-      const id=String(item.id),custom=editorial[id],verified=buyer[id]||{count:0,average:0};
+      const id=String(item.id),custom=editorial[id],verified=buyer[id]||{count:0,average:0},mix=combined[id]||verified;
       const card=document.createElement('section');card.className='mom-rating-admin-item';
       const heading=document.createElement('div');heading.className='mom-rating-admin-heading';
       if(item.image && /^(data:image\/(png|jpe?g|webp);base64,|https?:\/\/|\/public\/)/i.test(item.image)){
@@ -30,7 +30,11 @@
         image.width=48;image.height=48;image.loading='lazy';heading.appendChild(image);
       }
       const name=document.createElement('div');
-      name.append(txt('strong',String(item.name||'Món #'+id)),txt('small','Khách đã mua: '+fmt(verified.average)+' ♥ · '+verified.count+' đánh giá'));
+      name.append(
+        txt('strong',String(item.name||'Món #'+id)),
+        txt('small','Tổng cộng: '+fmt(mix.average)+' ♥ · '+mix.count+' lượt'),
+        txt('small','Khách đã mua: '+verified.count+' · Do quán thiết lập: '+(custom?.count||0))
+      );
       heading.appendChild(name);card.appendChild(heading);
       const fields=document.createElement('div');fields.className='mom-rating-admin-fields';
       const score=number('1','5','0.1',custom?.score??5);
@@ -63,7 +67,7 @@
           const payload=await response.json();
           if(!response.ok || !payload.success)throw Error(payload.error||'Không lưu được rating.');
           if(payload.entry)editorial[id]=payload.entry;else delete editorial[id];
-          loaded=true;renderRows();
+          loaded=true;await refresh();
           window.MomDrinkRatings?.refresh();
         }catch(error){
           status.textContent=error.message||'Không lưu được rating.';
@@ -86,7 +90,7 @@
       const response=await fetch('/api/ratings',{cache:'no-store'});
       if(!response.ok)throw Error('Chưa tải được rating.');
       const payload=await response.json();
-      buyer=payload.ratings||{};editorial=payload.editorial||{};loaded=true;renderRows();
+      buyer=payload.ratings||{};combined=payload.combined||{};editorial=payload.editorial||{};loaded=true;renderRows();
     }catch(error){if(target && panel()?.open)target.textContent=error.message;}
     finally{loading=false;}
   }
