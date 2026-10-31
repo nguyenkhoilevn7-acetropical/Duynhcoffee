@@ -119,3 +119,79 @@ test('heart rating uses SVG icons and explains eligibility without submitting un
   assert.match(notifications.at(-1).message,/Rating chỉ dành cho khách đã đặt order/);
  }finally{dom.window.close();}
 });
+
+test('admin display scores stay distinct from verified buyer votes and survive restart',()=>{
+ const f=fixture();
+ try{
+  f.store.register(f.orders[0],proof);
+  f.store.rate({orderId:order.id,productId:41,score:3,proof});
+  const custom=f.store.setEditorial({productId:'41',score:4.7,count:128,version:''});
+  assert.equal(custom.status,200);
+  assert.equal(f.store.editorial()['41'].count,128);
+  assert.deepEqual(f.store.summary()['41'],{count:1,average:3});
+  const reloaded=createRatingsStore({dir:f.dir,getOrders:()=>f.orders});
+  assert.equal(reloaded.editorial()['41'].score,4.7);
+  assert.equal(reloaded.editorial()['41'].count,128);
+  assert.equal(reloaded.setEditorial({productId:'41',score:2,count:50,version:''}).status,409);
+  assert.equal(reloaded.setEditorial({productId:'41',score:5.1,count:50,version:custom.result.entry.version}).status,422);
+  assert.equal(reloaded.setEditorial({productId:'41',score:5,count:-1,version:custom.result.entry.version}).status,422);
+  const changed=reloaded.setEditorial({productId:'41',score:4.5,count:0,version:custom.result.entry.version});
+  assert.equal(changed.status,200);
+  assert.equal(reloaded.editorial()['41'].count,0);
+  assert.equal(reloaded.setEditorial({productId:'41',remove:true,version:changed.result.entry.version}).status,200);
+  assert.equal(reloaded.editorial()['41'],undefined);
+  assert.deepEqual(reloaded.summary()['41'],{count:1,average:3});
+ }finally{f.close();}
+});
+test('old ratings backups work and malformed shop scores are rejected',()=>{
+ const f=fixture();
+ try{
+  const original=f.store.read();
+  const legacy={...original};delete legacy.editorial;
+  assert.doesNotThrow(()=>safeState(legacy));
+  assert.throws(()=>safeState({...legacy,editorial:{41:{score:4.5,count:10,version:'bad'}}}),/Invalid editorial/);
+  assert.throws(()=>safeState({...legacy,editorial:{41:{score:4.8,count:2.5,version:'a'.repeat(36)}}}),/Invalid editorial/);
+  assert.throws(()=>safeState({...legacy,editorial:{41:{score:7,count:10,version:'a'.repeat(36)}}}),/Invalid editorial/);
+ }finally{f.close();}
+});
+test('editorial ratings admin UI requires server token and shows per-item controls',async()=>{
+ const script=fs.readFileSync(path.join(__dirname,'../admin-product-ratings.js'),'utf8');
+ const doc='<html lang="vi"><body><details id="mom-rating-admin" open><div id="mom-rating-admin-list"></div></details></body></html>';
+ const dom=new JSDOM(doc,{url:'https://mom.test',runScripts:'outside-only'});
+ const {window}=dom,requests=[];
+ try{
+  window.isUserAdmin=()=>true;
+  window.localStorage.setItem('duynh_admin_api_token','test-token');
+  window.MomDrinkRatings={refresh(){}};
+  window.fetch=async(url,opts)=>{
+    requests.push({url,opts});
+    if(opts?.method==='POST')return {ok:true,json:async()=>({success:true,productId:'41',entry:{score:4.2,count:32,version:'b'.repeat(36)}})};
+    return {ok:true,json:async()=>({ratings:{41:{average:4,count:2}},editorial:{}})};
+  };
+  window.eval(script);
+  window.MomRatingsAdmin.render([{id:41,name:'Trà Mãng Cầu',image:''}]);
+  await window.MomRatingsAdmin.refresh();
+  assert.match(window.document.getElementById('mom-rating-admin-list').textContent,/Trà Mãng Cầu/);
+  const inputs=window.document.querySelectorAll('#mom-rating-admin-list input');
+  assert.equal(inputs.length,2);
+  inputs[0].value='4.2';inputs[1].value='32';
+  window.document.querySelector('.mom-rating-admin-save').click();
+  await new Promise(resolve=>setTimeout(resolve,0));
+  const post=requests.find(r=>r.opts?.method==='POST');
+  assert.equal(post.url,'/api/admin/ratings');
+  assert.equal(post.opts.headers.Authorization,'Bearer test-token');
+  assert.deepEqual(JSON.parse(post.opts.body),{productId:'41',score:4.2,count:32,version:'',remove:false});
+  window.isUserAdmin=()=>false;
+  window.document.querySelector('.mom-rating-admin-save').click();
+  await new Promise(resolve=>setTimeout(resolve,0));
+  assert.equal(requests.filter(r=>r.opts?.method==='POST').length,1);
+ }finally{dom.window.close();}
+});
+test('public rating API and protected Admin rating API remain separate',()=>{
+ assert.match(server,/pathname==='\\/api\\/admin\\/ratings'/);
+ assert.match(server,/if\\(!adminPush\\.verify\\(/);
+ assert.match(server,/ratingsStore\\.setEditorial\\(body\\|\\|\\{\\}\\)/);
+ assert.match(server,/ratings:ratingsStore\\.summary\\(\\),editorial:ratingsStore\\.editorial\\(\\)/);
+ assert.match(html,/id="mom-rating-admin"/);
+ assert.match(html,/window\\.MomRatingsAdmin\\?\\.render\\(menu\\)/);
+});
