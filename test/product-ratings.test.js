@@ -217,13 +217,13 @@ test('weighted rating adds verified reviews to Admin without overwriting or doub
 });
 test('curated fractional score keeps half SVG heart without invented customer rating counts',async()=>{
  const client=fs.readFileSync(path.join(__dirname,'../product-ratings-client.js'),'utf8');
- const dom=new JSDOM('<html lang="vi"><body><div id="customer-products-grid"><div class="mom-heart-ratings" data-product-id="41"></div><div class="mom-heart-ratings" data-product-id="42"></div></div></body></html>',{url:'https://mom.test',runScripts:'outside-only'});
+ const dom=new JSDOM('<html lang="vi"><body><div id="customer-products-grid"><div class="mom-heart-ratings" data-product-id="41"></div><div class="mom-heart-ratings" data-product-id="42"></div><div class="mom-heart-ratings" data-product-id="43"></div></div></body></html>',{url:'https://mom.test',runScripts:'outside-only'});
  try{
   const {window}=dom;
   window.fetch=async()=>({ok:true,json:async()=>({
     ratings:{41:{count:0,average:0},42:{count:2,average:4}},
-    combined:{41:{count:200,average:4.5,buyerCount:0,adminCount:200},42:{count:2,average:4,buyerCount:2,adminCount:0}},
-    editorial:{41:{count:200,score:4.5,version:'a'.repeat(36)}}
+    combined:{41:{count:200,average:4.5,buyerCount:0,adminCount:200},42:{count:2,average:4,buyerCount:2,adminCount:0},43:{count:100,average:5,buyerCount:0,adminCount:100}},
+    editorial:{41:{count:200,score:4.5,version:'a'.repeat(36)},43:{count:100,score:5,version:'b'.repeat(36)}}
   })});
   window.eval(client);await window.MomDrinkRatings.refresh();
   const target=window.document.querySelector('.mom-heart-ratings[data-product-id="41"]');
@@ -234,9 +234,13 @@ test('curated fractional score keeps half SVG heart without invented customer ra
   assert.equal(target.querySelectorAll('.mom-heart-rating-btn.partial svg').length,2);
   assert.equal(target.querySelector('.mom-heart-rating-btn.partial').style.getPropertyValue('--mom-heart-fill'),'50%');
   const organic=window.document.querySelector('.mom-heart-ratings[data-product-id="42"]');
-  assert.equal(organic.querySelector('.mom-heart-meta').textContent,'4.0 (2 đánh giá)');
+  assert.equal(organic.querySelector('.mom-heart-meta').textContent,'4 (2 đánh giá)');
   assert.equal(organic.querySelectorAll('.mom-heart-rating-btn.filled').length,4);
   assert.equal(organic.querySelectorAll('.mom-heart-rating-btn.partial').length,0);
+  const whole=window.document.querySelector('.mom-heart-ratings[data-product-id="43"]');
+  assert.equal(whole.querySelector('.mom-heart-meta').textContent,'Điểm hiển thị: 5/5');
+  assert.equal(whole.querySelectorAll('.mom-heart-rating-btn.filled').length,5);
+  assert.equal(whole.querySelectorAll('.mom-heart-rating-btn.partial').length,0);
  }finally{dom.window.close();}
 });
 test('public rating API and protected Admin rating API remain separate',()=>{
